@@ -15,6 +15,7 @@ A migração é gradual: o sistema antigo e o novo convivem, tela por tela, até
 api/            # FastAPI
 web/            # Vue/Quasar (ainda não criado)
 docs/legado/    # inventário do sistema VB6, mapa de tabelas e schema atual
+docs/roteiro.md   # o que já foi feito e o que vem a seguir
 docs/decisoes.md  # decisões de arquitetura e pendências
 ```
 
@@ -31,6 +32,8 @@ uvicorn app.main:app --reload
 
 A documentação interativa fica em http://localhost:8000/docs, e `GET /saude` confirma se a API está conectada ao banco.
 
+Antes do primeiro login, aplique as migrações em `api/migracoes/` (por enquanto só a `001`, que cria a tabela `web_credencial` sem mexer nas tabelas do VB6). Depois, em `/docs`, use `POST /auth/login` com o apelido ou código do funcionário e a mesma senha do VB6.
+
 Testes:
 
 ```bash
@@ -40,20 +43,7 @@ pytest
 
 ## Onde estamos
 
-O plano completo está em [`docs/legado/README.md`](docs/legado/README.md). As ondas de migração são:
-
-| Onda | Escopo | Status |
-|---|---|---|
-| 0 | Fundação: API, conexão com o banco, login, menu | em andamento |
-| 1 | Cadastros | pendente |
-| 2 | Relatórios | pendente |
-| 3 | Financeiro | pendente |
-| 4 | Estoque e compras | pendente |
-| 5 | Consignação e representantes | pendente |
-| 6 | Fiscal (NF-e/NFC-e via ACBrMonitor, SPED) | pendente |
-| 7 | PDV e caixa | pendente |
-
-O acompanhamento tela a tela fica nas colunas `status_migracao` e `destino_novo` de [`docs/legado/inventario.csv`](docs/legado/inventario.csv).
+O caminho do projeto, com o que já foi feito e o que vem a seguir, está em [`docs/roteiro.md`](docs/roteiro.md). As decisões de arquitetura ficam em [`docs/decisoes.md`](docs/decisoes.md), e o acompanhamento tela a tela nas colunas `status_migracao` e `destino_novo` de [`docs/legado/inventario.csv`](docs/legado/inventario.csv).
 
 ## Segurança
 

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routers import saude
+from app.routers import auth, saude
 
 app = FastAPI(
     title="Piki API",
@@ -9,3 +9,4 @@ app = FastAPI(
 )
 
 app.include_router(saude.router)
+app.include_router(auth.router)

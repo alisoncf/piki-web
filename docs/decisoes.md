@@ -32,10 +32,19 @@ NF-e e NFC-e já são emitidas pelo ACBrMonitor. A API nova envia os mesmos coma
 
 Antes de consolidar: converter as tabelas de MyISAM para InnoDB, criar chave primária nas 48 tabelas que não têm, e usar `DECIMAL` no lugar de `double` para valores.
 
+### D7. Login com migração das senhas para hash (30/10/2026)
+
+O VB6 guarda as senhas em `tab_usuarios.SENHA_USU` com uma codificação reversível (`F_GeraPW`/`F_RetornaPW`), que qualquer pessoa com acesso ao banco consegue desfazer. O sistema novo tem sua própria tabela, `web_credencial`, com a senha guardada como hash argon2 e ligada ao `COD_FUN`.
+
+No primeiro login de cada usuário no sistema novo, a API confere a senha no formato antigo e, se estiver certa, grava o hash. A tabela também guarda uma impressão digital (sha256) do `SENHA_USU` daquele momento: se a senha for trocada no VB6, o hash é refeito no login seguinte. Ninguém precisa recadastrar senha, e o VB6 continua funcionando igual.
+
+Como no VB6, a senha não diferencia maiúsculas de minúsculas, e o usuário entra pelo apelido (`guerra_fun`) ou pelo código do funcionário. O login devolve um token (JWT) válido por 10 horas, que carrega o funcionário e a filial (`cod_emp`).
+
 ## Em aberto
 
 - **P1.** O servidor da API web que o VB6 já usa (`desktop_doc`, `desktop_clientes`, `desktop_baixa`): qual a stack e onde está? Pode ser aproveitado ou absorvido pelo `piki-web`.
 - **P2.** Cada filial já tem um `cod_emp` único no seu `tab_parametros`? Os registros já gravados estão com o `cod_emp` correto?
 - **P3.** Clientes e produtos são do grupo todo ou de cada loja? Um cliente que compra em duas filiais deve ser o mesmo cadastro?
 - **P4.** As lojas ainda usam ECF, ou só NFC-e? Se só NFC-e, o código e as tabelas de ECF são descartados.
-- **P5.** Login: as senhas em `tab_usuarios.SENHA_USU` são guardadas com uma codificação reversível (`F_RetornaPW` no VB6). Proposta: o sistema novo tem sua própria tabela de credenciais com hash (bcrypt/argon2), ligada a `COD_FUN`, preenchida no primeiro login de cada usuário a partir da senha do legado.
+- **P5.** ~~Formato do login~~ Resolvido na D7.
+- **P6.** O login do VB6 monta o SQL concatenando o texto digitado (`frmLogin`), o que permite injeção de SQL. Vale corrigir no legado enquanto ele estiver em uso, já que basta trocar por uma consulta parametrizada.
