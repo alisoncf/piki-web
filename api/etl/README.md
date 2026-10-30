@@ -18,6 +18,15 @@ Regras gerais:
 - **Rastreável.** Cada registro importado guarda de onde veio (empresa e código antigo), numa tabela de mapeamento. É ela que permite reimportar e que liga, por exemplo, uma venda antiga ao cliente novo.
 - **Escopo pela D9.** Cadastros globais são deduplicados entre filiais (clientes por CPF/CNPJ, produtos por código). Dados por empresa entram com a empresa de origem.
 
+## Uso
+
+```bash
+pip install -e ".[legado]"     # driver para ler o MariaDB do VB6
+python -m etl empresas --origem "mysql+pymysql://usuario:senha@servidor:3306/requinte"
+```
+
+O destino é o banco do `.env`. Rode uma vez para cada banco de filial.
+
 ## Situação
 
 | Parte | Status |
@@ -25,5 +34,6 @@ Regras gerais:
 | Conversão de senhas (`senha_legado.py`) | pronta, com testes |
 | Agente das filiais | a fazer |
 | Carga da área de chegada | a fazer |
-| Importação de empresas e usuários | a fazer |
+| Importação de empresas (`empresas.py`) | pronta, com testes |
+| Importação de usuários | a fazer |
 | Demais domínios | acompanham as ondas do roteiro |

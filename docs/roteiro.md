@@ -48,10 +48,14 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 
 - [x] Conversão das senhas do VB6 para hash (`etl/senha_legado.py`) — 30/10/2026
 - [ ] Levantar a infraestrutura das filiais: quantas, computador do banco, internet, tamanho (P8)
-- [ ] Confirmar o `cod_emp` de cada filial (P2)
+- [~] Confirmar o código de cada empresa (P2): conhecidos 01 e 03
+- [x] Cadastro de empresa com dados fiscais e endereço (migração 0002) — 30/10/2026
+- [x] ETL de empresas a partir da `sped_empresa`, sem ler certificado nem CSC (`python -m etl empresas`) — 30/10/2026
+- [ ] Rodar o ETL de empresas nos bancos da matriz (01) e do Jundiaí (03)
+- [ ] Decidir onde guardar certificado digital e CSC de cada empresa (P10)
 - [ ] Agente da filial: dump do banco local e envio por HTTPS
 - [ ] Recebimento no servidor e carga na área de chegada (`legado_fXX`)
-- [ ] ETL de empresas e usuários (com a conversão de senhas e os perfis a partir de `tab_permissoes`)
+- [ ] ETL de usuários (com a conversão de senhas e os perfis a partir de `tab_permissoes`)
 - [ ] ETL dos cadastros globais: clientes (deduplicados por CPF/CNPJ) e produtos
 - [ ] ETL dos demais domínios, acompanhando as ondas
 - [ ] Decidir se produtos cadastrados no sistema novo voltam para os VB6 durante a transição (P9)
