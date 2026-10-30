@@ -63,12 +63,13 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [ ] ETL de usuários (com a conversão de senhas e os perfis a partir de `tab_permissoes`)
 - [x] ETL de clientes, deduplicados por CPF/CNPJ, com setores, órgãos e grupos unificados (D15) — 30/10/2026
 - [ ] ETL de produtos
+- [ ] Depois de importar vendas e contas: excluir os clientes sem CPF/CNPJ válido que não têm movimento (D15)
 - [ ] ETL dos demais domínios, acompanhando as ondas
 - [ ] Decidir se produtos cadastrados no sistema novo voltam para os VB6 durante a transição (P9)
 
 ## Onda 1 · Cadastros
 
-- [~] Clientes, setores, órgãos e grupos (D15): API (migração 0006) e ETL prontos, rodado nas cópias da matriz, Jundiaí e La Viva (80 mil clientes); faltam as telas
+- [~] Clientes, setores, órgãos e grupos (D15): API (migrações 0006 e 0007) e ETL prontos, rodado nas cópias da matriz, Jundiaí e La Viva (80 mil clientes); faltam as telas
 - [ ] Fornecedores
 - [x] Funcionários e cargos: API, telas (lista, ficha, cargos) e ETL do VB6, com cadastro global, loja de lotação e telefones (migrações 0004 e 0005) — 30/10/2026
 - [x] Rodar o ETL de funcionários nos bancos da matriz (01) e da La Viva (03), em cópias locais, juntando os cadastros repetidos entre filiais (pelo CPF ou pelo nome) — 30/10/2026

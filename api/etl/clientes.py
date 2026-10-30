@@ -35,9 +35,9 @@ from sqlalchemy import Connection, inspect, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.dominios.acesso.modelos import Empresa
-from app.dominios.clientes.esquemas import FORMAS_COBRANCA, SITUACOES
 from app.dominios.clientes.modelos import (
-    AnotacaoCliente, Cliente, GrupoCliente, Orgao, ReferenciaCliente, Setor, SetorCobrador, TelefoneCliente,
+    AnotacaoCliente, Cliente, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor, SetorCobrador,
+    TelefoneCliente,
 )
 from app.nucleo.documentos import cpf_cnpj_valido, so_digitos
 from app.nucleo.legado import MapaLegado
@@ -59,12 +59,14 @@ _ANOTACOES = text(
     "  FROM tab_clientesanot ORDER BY id"
 )
 _GRUPOS = text("SELECT cod_gru, nome_gru FROM tab_grupocli")
+_PARENTESCOS = text("SELECT CAST(cod_tip AS CHAR), nome_tip FROM tab_tipopar")
 _CIDADES = text("SELECT cod_cid, nome_cid, uf_cid FROM tab_cidades")
 _SETORES = text("SELECT cod_set, nome_set, cobrador_set, cod_cid, tipo_set FROM tab_setores")
 
 @dataclass
 class Resultado:
     grupos_criados: int = 0
+    parentescos_criados: int = 0
     setores_criados: int = 0
     orgaos_criados: int = 0
     cobradores: int = 0
@@ -100,20 +102,24 @@ def _digitos(valor: object, tamanho: int) -> str | None:
 
 # cadastros de apoio
 
-def _importar_grupos(origem: Connection, db: Session, empresa: Empresa, r: Resultado) -> None:
-    por_nome = {nome_comparavel(g.nome): g for g in db.scalars(select(GrupoCliente))}
-    for linha in origem.execute(_GRUPOS).mappings():
-        codigo, nome = _texto(linha["cod_gru"]), _corta(linha["nome_gru"], 40)
-        if not codigo or not nome or mapa.buscar(db, "tab_grupocli", empresa.id, codigo):
+def _importar_lista(origem: Connection, db: Session, empresa: Empresa, consulta, modelo: type,
+                    tabela: str, tamanho: int) -> int:
+    """Grupos e parentescos: código e nome, juntados pelo nome. Devolve quantos foram criados."""
+    por_nome = {nome_comparavel(item.nome): item for item in db.scalars(select(modelo))}
+    criados = 0
+    for codigo, nome in origem.execute(consulta).all():
+        codigo, nome = _texto(codigo), _corta(nome, tamanho)
+        if codigo is None or not nome or mapa.buscar(db, tabela, empresa.id, codigo):
             continue
-        grupo = por_nome.get(nome_comparavel(nome))
-        if grupo is None:
-            grupo = GrupoCliente(nome=nome)
-            db.add(grupo)
+        item = por_nome.get(nome_comparavel(nome))
+        if item is None:
+            item = modelo(nome=nome)
+            db.add(item)
             db.flush()
-            por_nome[nome_comparavel(nome)] = grupo
-            r.grupos_criados += 1
-        mapa.gravar(db, "tab_grupocli", empresa.id, codigo, grupo.id)
+            por_nome[nome_comparavel(nome)] = item
+            criados += 1
+        mapa.gravar(db, tabela, empresa.id, codigo, item.id)
+    return criados
 
 
 def _importar_setores(origem: Connection, db: Session, empresa: Empresa, r: Resultado) -> None:
@@ -219,14 +225,24 @@ def _documento(linha: dict, r: Resultado) -> str | None:
     return None
 
 
+# cobranca_cli do VB6 → FORMAS_COBRANCA
+_COBRANCA = {"1": "domicilio", "2": "trabalho", "3": "loja"}
+
+
 def converter(linha: dict) -> dict:
     """Uma linha da tab_clientes → campos do cliente (sem documento, setores, órgão e grupo, tratados à parte)."""
     sexo = (_texto(linha.get("sexo_cli")) or "").upper()
     uf = (_texto(linha.get("uf_cli")) or "").upper()
     municipio = so_digitos(linha.get("cod_cid"))
-    situacao = _texto(linha.get("status_cli"))
-    cobranca = _texto(linha.get("cobranca_cli"))
     sim = lambda campo: (_texto(linha.get(campo)) or "").upper() == "S"  # noqa: E731
+    # o endereço certo é o logradouro; endereco_cli é o campo antigo, usado só quando os outros estão vazios
+    if _texto(linha.get("logradouro")):
+        endereco = (linha.get("logradouro"), linha.get("numero"), linha.get("complemento"))
+    elif _texto(linha.get("logradouro_cli")):
+        endereco = (linha.get("logradouro_cli"), linha.get("numero_cli"), linha.get("complemento_cli"))
+    else:
+        endereco = (linha.get("endereco_cli"), linha.get("numero_cli") or linha.get("numero"),
+                    linha.get("complemento_cli") or linha.get("complemento"))
     return {
         "nome": _corta(linha.get("nome_cli"), 60),
         "rg": _corta(linha.get("rg_cli"), 20),
@@ -237,10 +253,9 @@ def converter(linha: dict) -> dict:
         "mae": _corta(linha.get("mae_cli"), 60),
         "email": _corta(linha.get("email_cli"), 100),
         "cep": _digitos(linha.get("cep_cli"), 8),
-        # endereco_cli é o endereço que as telas do VB6 mostram; logradouro_cli é de uso fiscal e mais raro
-        "logradouro": _corta(linha.get("endereco_cli") or linha.get("logradouro_cli") or linha.get("logradouro"), 100),
-        "numero": _corta(linha.get("numero_cli") or linha.get("numero"), 20),
-        "complemento": _corta(linha.get("complemento_cli") or linha.get("complemento"), 60),
+        "logradouro": _corta(endereco[0], 100),
+        "numero": _corta(endereco[1], 20),
+        "complemento": _corta(endereco[2], 60),
         "bairro": _corta(linha.get("bairro_cli"), 40),
         "ponto_referencia": _corta(linha.get("referencia_cli"), 60),
         "cidade": _corta(linha.get("cidade_cli"), 40),
@@ -250,8 +265,8 @@ def converter(linha: dict) -> dict:
         "endereco_trabalho": _corta(linha.get("endtrab_cli") or linha.get("endcom_cli"), 60),
         "telefone_trabalho": _digitos(linha.get("teltrab_cli"), 15),
         "cep_trabalho": _digitos(linha.get("ceptrab_cli"), 8),
-        "situacao": situacao if situacao in SITUACOES else "1",
-        "forma_cobranca": cobranca if cobranca in FORMAS_COBRANCA else "1",
+        "bloqueado": _texto(linha.get("status_cli")) == "2",
+        "forma_cobranca": _COBRANCA.get(_texto(linha.get("cobranca_cli")), "domicilio"),
         "limite_credito": Decimal(str(linha.get("limite_cli") or 0)).quantize(Decimal("0.01")),
         "credito_suspenso": sim("creditosuspenso_cli"),
         "recebe_mensagens": sim("mens_cli"),
@@ -276,6 +291,7 @@ class _Extras:
     telefones: dict[int, list[tuple[str, object]]] = field(default_factory=lambda: defaultdict(list))
     referencias: dict[int, list[dict]] = field(default_factory=lambda: defaultdict(list))
     anotacoes: dict[int, list[dict]] = field(default_factory=lambda: defaultdict(list))
+    parentescos: dict[str, int] = field(default_factory=dict)  # cod_tip → parentesco novo
 
 
 def _ler_extras(origem: Connection) -> _Extras:
@@ -308,7 +324,8 @@ def _somar_extras(db: Session, cliente: Cliente, cod: int, extras: _Extras, anot
     for ref in extras.referencias.get(cod, []):
         nome, telefone = _corta(ref["nome_ref"], 60), _digitos(ref["tel_ref"], 20)
         if (nome_comparavel(nome), telefone) not in existentes:
-            cliente.referencias.append(ReferenciaCliente(nome=nome, telefone=telefone, tipo=_corta(ref["cod_tip"], 2)))
+            cliente.referencias.append(ReferenciaCliente(
+                nome=nome, telefone=telefone, parentesco_id=extras.parentescos.get(_texto(ref["cod_tip"]) or "")))
             existentes.add((nome_comparavel(nome), telefone))
             r.referencias += 1
 
@@ -343,6 +360,7 @@ def _mapa_da_empresa(db: Session, tabela: str, empresa_id: int) -> dict[str, int
 
 def _importar_clientes(origem: Connection, db: Session, empresa: Empresa, r: Resultado) -> None:
     extras = _ler_extras(origem)
+    extras.parentescos = _mapa_da_empresa(db, "tab_tipopar", empresa.id)
     # índices em memória: com dezenas de milhares de clientes, uma consulta por linha seria lenta demais
     por_codigo = _mapa_da_empresa(db, "tab_clientes", empresa.id)
     por_documento = dict(db.execute(select(Cliente.cpf_cnpj, Cliente.id).where(Cliente.cpf_cnpj.is_not(None))).all())
@@ -450,7 +468,8 @@ def importar_clientes(origem: Connection, db: Session, codigo_empresa: str) -> R
     empresa_id = empresa.id
 
     r = Resultado()
-    _importar_grupos(origem, db, empresa, r)
+    r.grupos_criados = _importar_lista(origem, db, empresa, _GRUPOS, GrupoCliente, "tab_grupocli", 40)
+    r.parentescos_criados = _importar_lista(origem, db, empresa, _PARENTESCOS, Parentesco, "tab_tipopar", 30)
     _importar_setores(origem, db, empresa, r)
     _importar_orgaos(origem, db, empresa, r)
     db.flush()

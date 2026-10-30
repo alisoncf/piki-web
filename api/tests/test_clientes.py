@@ -33,10 +33,12 @@ def test_criar_e_consultar_cliente(cliente, cenario, admin):
     grupo = cliente.post("/grupos-clientes", json={"nome": "Servidor municipal"}, headers=admin).json()
     setor = cliente.post("/setores", json={"nome": "Jundiaí", "cidade": "Anápolis", "uf": "go"}, headers=admin).json()
     orgao = cliente.post("/orgaos", json={"nome": "Escola Modelo", "grupo_id": grupo["id"]}, headers=admin).json()
+    irma = cliente.post("/parentescos", json={"nome": "Irmã"}, headers=admin).json()
     r = cliente.post("/clientes", headers=admin, json=_dados(
         setor_id=setor["id"], orgao_id=orgao["id"], grupo_id=grupo["id"], uf="go", cep="75.110-000",
-        limite_credito="550.00", telefones=[{"numero": "(62) 99999-0000", "tipo": "3"}],
-        referencias=[{"nome": "Loja Vizinha", "telefone": "62 3333-4444", "tipo": "1"}],
+        limite_credito="550.00", bloqueado=True, forma_cobranca="trabalho",
+        telefones=[{"numero": "(62) 99999-0000", "tipo": "3"}],
+        referencias=[{"nome": "Joana", "telefone": "62 3333-4444", "parentesco_id": irma["id"]}],
     ))
     assert r.status_code == 201, r.text
     criado = r.json()
@@ -48,10 +50,23 @@ def test_criar_e_consultar_cliente(cliente, cenario, admin):
     assert criado["orgao"]["nome"] == "Escola Modelo"
     assert criado["empresa_cadastro"]["codigo"] == "01"
     assert criado["telefones"] == [{"numero": "62999990000", "tipo": "3"}]
-    assert criado["referencias"] == [{"nome": "Loja Vizinha", "telefone": "6233334444", "tipo": "1"}]
+    assert criado["referencias"] == [{"nome": "Joana", "telefone": "6233334444", "parentesco_id": irma["id"],
+                                      "parentesco": {"id": irma["id"], "nome": "Irmã", "ativo": True}}]
+    assert criado["bloqueado"] is True
+    assert criado["forma_cobranca"] == "trabalho"
     assert criado["data_alteracao"] is not None
 
     assert cliente.get(f"/clientes/{criado['id']}", headers=admin).json() == criado
+
+
+def test_forma_de_cobranca_e_parentesco_validos(cliente, cenario, admin):
+    assert cliente.post("/clientes", headers=admin, json=_dados(forma_cobranca="1")).status_code == 422
+    r = cliente.post("/clientes", headers=admin, json=_dados(referencias=[{"nome": "X", "parentesco_id": 999}]))
+    assert r.status_code == 422
+    assert r.json()["detail"] == "Parentesco não encontrado"
+    assert cliente.post("/parentescos", headers=admin, json={"nome": "Tio"}).status_code == 201
+    assert cliente.post("/parentescos", headers=admin, json={"nome": "TIO"}).status_code == 409
+    assert [p["nome"] for p in cliente.get("/parentescos", headers=admin).json()] == ["Tio"]
 
 
 def test_documento_invalido_ou_repetido(cliente, cenario, admin):

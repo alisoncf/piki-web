@@ -90,6 +90,9 @@ Cliente é um só para todas as lojas (D9), e setores (bairros e regiões de cob
 - **Quem manda nos dados:** o registro com a data de alteração mais recente (`dataalt_cli`, ou `data_cli` se estiver vazia). Os outros só preenchem campos vazios e acrescentam telefones e referências.
 - **Setores e órgãos:** juntados pelo nome (setor: nome + cidade). O cobrador do setor é escolhido por loja (`setor_cobrador`).
 - **Códigos antigos:** cada código de cada loja (`cod_cli`, `cod_set`, `cod_org`, `cod_gru`) fica no `legado_mapa`, apontando para o registro novo. É por ele que as vendas e contas antigas vão ser ligadas.
+- **Listas fixas e tabelas:** vira tabela o que a loja pode aumentar (grupos, setores, órgãos, parentescos). O que o sistema usa para decidir fica fixo no código: a forma de cobrança (`domicilio`, `trabalho`, `loja`, que diz em qual setor cobrar) e o bloqueio do cliente (`bloqueado`), porque um valor novo numa tabela não ensinaria o programa o que fazer com ele.
+- **Endereço:** o certo no VB6 é o `logradouro` (com `numero` e `complemento`); a `endereco_cli` é o campo antigo.
+- **Sem documento válido:** depois que vendas e contas forem importadas, os clientes sem CPF/CNPJ válido e sem nenhum movimento serão excluídos.
 - **Carga final:** as cópias locais servem para montar e testar. A carga de verdade será refeita direto nos bancos das lojas, por um túnel, antes da virada.
 
 ## Substituídas
@@ -113,4 +116,4 @@ Cliente é um só para todas as lojas (D9), e setores (bairros e regiões de cob
 - **P11.** Token no `localStorage` é simples, mas fica exposto se algum dia o front tiver uma falha de XSS. Antes de ir para produção, avaliar trocar por cookie `HttpOnly` emitido pela API, com renovação automática.
 - **P12.** Todas as filiais usam a marca Requinte Enxovais? Se alguma tiver outra marca, o logo e as cores passam para o cadastro da empresa e o visual muda ao trocar de empresa. Em 30/10/2026: a 03 tem nome fantasia La Viva Enxovais na `sped_empresa`; falta confirmar se ela usa outra marca na loja.
 - **P9.** Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.
-- **P13.** O que significam os códigos do cliente no VB6: `status_cli` (1 e 2), `cobranca_cli` (1, 2 e 3) e o tipo da referência (`tab_referencias.cod_tip`, 0 a 9). Os nomes provisórios estão em `api/app/dominios/clientes/esquemas.py`.
+- **P13.** ~~Códigos do cliente no VB6~~. `status_cli`: 1 liberado, 2 bloqueado. `cobranca_cli`: 1 em domicílio, 2 no trabalho, 3 na loja. O tipo da referência é o parentesco (`tab_tipopar`). Resolvido na D15 em 30/10/2026.

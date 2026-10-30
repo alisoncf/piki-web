@@ -7,15 +7,12 @@ from app.dominios.acesso.esquemas import EmpresaResumo
 from app.dominios.funcionarios.esquemas import Telefone
 from app.nucleo.documentos import so_digitos
 
-# códigos do VB6 (status_cli e cobranca_cli); os nomes ainda precisam ser confirmados (P13)
-SITUACOES: dict[str, str] = {
-    "1": "Ativo",
-    "2": "Inativo",
-}
+# lista fixa, não tabela: o sistema decide por ela onde cobrar (setor do endereço, setor do trabalho ou na loja).
+# No VB6, cobranca_cli 1, 2 e 3.
 FORMAS_COBRANCA: dict[str, str] = {
-    "1": "Na loja",
-    "2": "Cobrador",
-    "3": "Outra",
+    "domicilio": "Em domicílio",
+    "trabalho": "No trabalho",
+    "loja": "Pagamento na loja",
 }
 
 
@@ -48,6 +45,22 @@ class GrupoClienteDados(BaseModel):
 
 
 class GrupoCliente(GrupoClienteDados):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+
+
+class ParentescoDados(BaseModel):
+    nome: str = Field(min_length=1, max_length=30)
+    ativo: bool = True
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def _nome(cls, v: object) -> object:
+        return _vazio_para_none(v)
+
+
+class Parentesco(ParentescoDados):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -128,14 +141,12 @@ class Orgao(OrgaoDados):
     setor: SetorResumo | None
 
 
-class Referencia(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class ReferenciaDados(BaseModel):
     nome: str = Field(min_length=1, max_length=60)
     telefone: str | None = Field(default=None, max_length=20)
-    tipo: str | None = Field(default=None, max_length=2)
+    parentesco_id: int | None = None
 
-    @field_validator("nome", "tipo", mode="before")
+    @field_validator("nome", mode="before")
     @classmethod
     def _limpar(cls, v: object) -> object:
         return _vazio_para_none(v)
@@ -144,6 +155,12 @@ class Referencia(BaseModel):
     @classmethod
     def _digitos(cls, v: object) -> str | None:
         return so_digitos(v) or None
+
+
+class Referencia(ReferenciaDados):
+    model_config = ConfigDict(from_attributes=True)
+
+    parentesco: Parentesco | None
 
 
 class AnotacaoDados(BaseModel):
@@ -198,9 +215,9 @@ class ClienteDados(BaseModel):
     cep_trabalho: str | None = Field(default=None, max_length=8)
     setor_trabalho_id: int | None = None
 
-    situacao: str = Field(default="1", description="Código: " + ", ".join(f"{k} {v}" for k, v in SITUACOES.items()))
+    bloqueado: bool = Field(default=False, description="Bloqueado não compra a prazo")
     forma_cobranca: str = Field(
-        default="1", description="Código: " + ", ".join(f"{k} {v}" for k, v in FORMAS_COBRANCA.items())
+        default="domicilio", description="Onde cobrar: " + ", ".join(f"{k} ({v})" for k, v in FORMAS_COBRANCA.items())
     )
     limite_credito: Decimal = Field(default=Decimal("0"), ge=0, max_digits=14, decimal_places=2)
     credito_suspenso: bool = False
@@ -209,7 +226,7 @@ class ClienteDados(BaseModel):
     observacao: str | None = Field(default=None, max_length=4000)
 
     telefones: list[Telefone] = []
-    referencias: list[Referencia] = []
+    referencias: list[ReferenciaDados] = []
 
     @field_validator(
         "nome", "rg", "inscricao_estadual", "pai", "mae", "email", "logradouro", "numero", "complemento", "bairro",
@@ -230,13 +247,6 @@ class ClienteDados(BaseModel):
     def _uf(cls, v: object) -> object:
         return _uf(v)
 
-    @field_validator("situacao")
-    @classmethod
-    def _situacao(cls, v: str) -> str:
-        if v not in SITUACOES:
-            raise ValueError("situação inválida")
-        return v
-
     @field_validator("forma_cobranca")
     @classmethod
     def _forma_cobranca(cls, v: str) -> str:
@@ -255,7 +265,7 @@ class ClienteResumo(BaseModel):
     cpf_cnpj: str | None
     bairro: str | None
     cidade: str | None
-    situacao: str
+    bloqueado: bool
     credito_suspenso: bool
     setor: SetorResumo | None
 
@@ -276,4 +286,5 @@ class Cliente(ClienteDados):
     grupo: GrupoCliente | None
     orgao: Nomeado | None
     empresa_cadastro: EmpresaResumo | None
+    referencias: list[Referencia]
     anotacoes: list[Anotacao]

@@ -5,9 +5,12 @@ from sqlalchemy.orm import Session
 
 from app.dominios.acesso.modelos import Empresa
 from app.dominios.clientes import repositorio as repo
-from app.dominios.clientes.esquemas import AnotacaoDados, ClienteDados, GrupoClienteDados, OrgaoDados, SetorDados
+from app.dominios.clientes.esquemas import (
+    AnotacaoDados, ClienteDados, GrupoClienteDados, OrgaoDados, ParentescoDados, SetorDados,
+)
 from app.dominios.clientes.modelos import (
-    AnotacaoCliente, Cliente, GrupoCliente, Orgao, ReferenciaCliente, Setor, SetorCobrador, TelefoneCliente,
+    AnotacaoCliente, Cliente, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor, SetorCobrador,
+    TelefoneCliente,
 )
 from app.dominios.funcionarios.modelos import Funcionario
 from app.nucleo.documentos import cpf_cnpj_valido
@@ -48,6 +51,8 @@ def _conferir(db: Session, dados: ClienteDados, cliente_id: int | None) -> None:
     _existe(db, Setor, dados.setor_trabalho_id, "Setor do trabalho não encontrado")
     _existe(db, Orgao, dados.orgao_id, "Órgão não encontrado")
     _existe(db, GrupoCliente, dados.grupo_id, "Grupo não encontrado")
+    for ref in dados.referencias:
+        _existe(db, Parentesco, ref.parentesco_id, "Parentesco não encontrado")
     numeros = [t.numero for t in dados.telefones]
     if len(numeros) != len(set(numeros)):
         raise DadoInvalido("Telefone repetido")
@@ -203,3 +208,30 @@ def alterar_grupo(db: Session, grupo_id: int, dados: GrupoClienteDados) -> Grupo
         setattr(grupo, campo, valor)
     db.commit()
     return grupo
+
+
+# parentescos
+
+def _conferir_parentesco(db: Session, dados: ParentescoDados, parentesco_id: int | None) -> None:
+    outro = repo.parentesco_por_nome(db, dados.nome)
+    if outro and outro.id != parentesco_id:
+        raise Duplicado(f"Já existe o parentesco {outro.nome}")
+
+
+def criar_parentesco(db: Session, dados: ParentescoDados) -> Parentesco:
+    _conferir_parentesco(db, dados, None)
+    parentesco = Parentesco(**dados.model_dump())
+    db.add(parentesco)
+    db.commit()
+    return parentesco
+
+
+def alterar_parentesco(db: Session, parentesco_id: int, dados: ParentescoDados) -> Parentesco:
+    parentesco = db.get(Parentesco, parentesco_id)
+    if parentesco is None:
+        raise NaoEncontrado("Parentesco não encontrado")
+    _conferir_parentesco(db, dados, parentesco_id)
+    for campo, valor in dados.model_dump().items():
+        setattr(parentesco, campo, valor)
+    db.commit()
+    return parentesco

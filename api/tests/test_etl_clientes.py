@@ -26,13 +26,15 @@ def _ddl(logradouro: str) -> list[str]:
             limite_cli REAL, endcom_cli TEXT, tipo_cli TEXT, cod_set TEXT, cod_gru TEXT, cobranca_cli TEXT,
             localtrab_cli TEXT, endtrab_cli TEXT, setortrab_cli TEXT, teltrab_cli TEXT, ceptrab_cli TEXT,
             cod_org TEXT, dataalt_cli DATE, sexo_cli TEXT, email_cli TEXT, creditosuspenso_cli TEXT, ie_cli TEXT,
-            cod_cid TEXT, {logradouro} TEXT, numero_cli TEXT, complemento_cli TEXT, especial_cli TEXT)""",
+            cod_cid TEXT, {logradouro} TEXT, numero_cli TEXT, complemento_cli TEXT, especial_cli TEXT,
+            logradouro TEXT, numero TEXT, complemento TEXT)""",
         "CREATE TABLE tab_telefones (cod_cli INTEGER, num_tel TEXT, tipo_tel TEXT, tipo_ter TEXT)",
         """CREATE TABLE tab_referencias (cod_cli INTEGER, seq_ref INTEGER, nome_ref TEXT, cod_tip INTEGER,
             tel_ref TEXT, tipo_ref TEXT)""",
         """CREATE TABLE tab_clientesanot (id INTEGER PRIMARY KEY, cod_cli INTEGER, anotacao TEXT, datahora DATETIME,
             cod_usu TEXT, excluido TEXT)""",
         "CREATE TABLE tab_grupocli (cod_gru TEXT, nome_gru TEXT)",
+        "CREATE TABLE tab_tipopar (cod_tip INTEGER PRIMARY KEY, nome_tip TEXT)",
         "CREATE TABLE tab_cidades (cod_cid TEXT, nome_cid TEXT, uf_cid TEXT, cod_mun TEXT)",
         "CREATE TABLE tab_setores (cod_set TEXT, nome_set TEXT, cobrador_set TEXT, cod_cid TEXT, cod_old TEXT, tipo_set TEXT)",
         """CREATE TABLE tab_orgaos (cod_org TEXT, nome_org TEXT, cod_gru TEXT, endereco_org TEXT, cod_set TEXT,
@@ -42,12 +44,13 @@ def _ddl(logradouro: str) -> list[str]:
 
 _ANA = {
     "cod_cli": 1, "nome_cli": "ANA FICTICIA", "datanasc_cli": "1985-02-30", "cpf_cli": "529.982.247-25",
-    "endereco_cli": "RUA UM QD 1 LT 2", "bairro_cli": "CENTRO", "cep_cli": "75.000-000", "cidade_cli": "ANAPOLIS",
+    "endereco_cli": "R UM", "logradouro": "RUA UM QD 1 LT 2", "numero": "10", "bairro_cli": "CENTRO", "cep_cli": "75.000-000", "cidade_cli": "ANAPOLIS",
     "uf_cli": "go", "data_cli": "2010-01-01", "dataalt_cli": "2020-01-01", "status_cli": "1", "mens_cli": "S",
     "limite_cli": 550, "tipo_cli": "F", "cod_set": "00001", "cod_gru": "001", "cobranca_cli": "2",
     "cod_org": "00007", "sexo_cli": "F", "creditosuspenso_cli": "N", "cod_cid": "5201108", "especial_cli": "N",
 }
 _BETO = {**_ANA, "cod_cli": 2, "nome_cli": "BETO SEM CPF", "cpf_cli": "000.000.000-00", "cod_set": "00000",
+         "status_cli": "2", "cobranca_cli": "3",
          "cod_org": "", "sexo_cli": "M", "mens_cli": ""}
 
 
@@ -61,6 +64,8 @@ def _banco_vb6(caminho, clientes, logradouro="Logradouro_cli", setores=(), orgao
     with eng.begin() as c:
         for ddl in _ddl(logradouro):
             c.execute(text(ddl))
+        for cod, nome in ((0, "Outro"), (1, "Cônjuge"), (3, "Pais")):
+            _inserir(c, "tab_tipopar", {"cod_tip": cod, "nome_tip": nome})
         _inserir(c, "tab_cidades", {"cod_cid": "00001", "nome_cid": "ANAPOLIS", "uf_cid": "GO", "cod_mun": "5201108"})
         for linha in clientes:
             _inserir(c, "tab_clientes", linha)
@@ -123,10 +128,15 @@ def test_converter():
     assert d["cep"] == "75000000"
     assert d["data_nascimento"] is None  # 30 de fevereiro
     assert d["limite_credito"] == Decimal("550.00")
-    assert d["forma_cobranca"] == "2"
+    assert d["forma_cobranca"] == "trabalho"
+    assert d["bloqueado"] is False
+    assert converter(_BETO)["bloqueado"] is True
+    assert converter(_BETO)["forma_cobranca"] == "loja"
     assert d["recebe_mensagens"] is True
     assert d["codigo_municipio"] == "5201108"
-    assert d["logradouro"] == "RUA UM QD 1 LT 2"
+    # o logradouro manda; endereco_cli só quando os outros estão vazios
+    assert (d["logradouro"], d["numero"]) == ("RUA UM QD 1 LT 2", "10")
+    assert converter({**_ANA, "logradouro": ""})["logradouro"] == "R UM"
 
 
 def test_empresa_precisa_existir(banco, matriz):
@@ -136,7 +146,7 @@ def test_empresa_precisa_existir(banco, matriz):
 
 def test_importa_matriz(banco, empresas, matriz):
     r = _importar(matriz, banco, "01")
-    assert (r.grupos_criados, r.setores_criados, r.orgaos_criados, r.cobradores) == (2, 2, 1, 1)
+    assert (r.grupos_criados, r.parentescos_criados, r.setores_criados, r.orgaos_criados, r.cobradores) == (2, 3, 2, 1, 1)
     assert (r.criados, r.sem_documento, r.telefones, r.referencias, r.anotacoes) == (2, 1, 3, 1, 1)
     assert any("cobrador 099" in a for a in r.avisos)
     assert not any("BETO" in a for a in r.avisos)  # CPF só de zeros é "sem CPF", não aviso
@@ -151,10 +161,12 @@ def test_importa_matriz(banco, empresas, matriz):
         assert ana.orgao.nome == "ESCOLA MODELO" and ana.orgao.grupo.nome == "SERVIDOR MUNICIPAL"
         assert ana.grupo.nome == "SERVIDOR MUNICIPAL"
         assert {t.numero for t in ana.telefones} == {"62999990000", "33334444"}
-        assert [(ref.nome, ref.telefone, ref.tipo) for ref in ana.referencias] == [("LOJA VIZINHA", "33110000", "1")]
+        assert [(ref.nome, ref.telefone, ref.parentesco.nome) for ref in ana.referencias] == [
+            ("LOJA VIZINHA", "33110000", "Cônjuge")]
         assert [a.texto for a in ana.anotacoes] == ["PAGA EM DIA"]
         beto = db.scalar(select(Cliente).where(Cliente.nome == "BETO SEM CPF"))
         assert beto.cpf_cnpj is None and beto.setor is None and beto.recebe_mensagens is False
+        assert beto.bloqueado is True and beto.forma_cobranca == "loja"
         cobrador = db.scalar(select(SetorCobrador))
         assert (cobrador.empresa_id, cobrador.funcionario_id) == (empresas["01"], empresas["cobrador"])
 
@@ -162,7 +174,8 @@ def test_importa_matriz(banco, empresas, matriz):
 def test_reimportar_nao_duplica(banco, empresas, matriz):
     _importar(matriz, banco, "01")
     r = _importar(matriz, banco, "01")
-    assert (r.criados, r.atualizados, r.grupos_criados, r.setores_criados, r.orgaos_criados) == (0, 2, 0, 0, 0)
+    assert (r.criados, r.atualizados, r.grupos_criados, r.parentescos_criados, r.setores_criados, r.orgaos_criados) == (
+        0, 2, 0, 0, 0, 0)
     assert (r.telefones, r.referencias, r.anotacoes) == (0, 0, 0)
     with banco() as db:
         assert len(db.scalars(select(Cliente)).all()) == 2
@@ -174,7 +187,7 @@ def test_outra_loja_junta_pelo_cpf_e_o_mais_recente_manda(banco, empresas, matri
     filial = _banco_vb6(
         tmp_path / "f03.db",
         [
-            {**_ANA, "cod_cli": 7, "nome_cli": "ANA FICTICIA SILVA", "endereco_cli": "", "logradouro_cli": "RUA DOIS",
+            {**_ANA, "cod_cli": 7, "nome_cli": "ANA FICTICIA SILVA", "logradouro": "", "logradouro_cli": "RUA DOIS",
              "data_cli": "2008-05-05", "dataalt_cli": "2023-03-03", "cod_set": "00009", "cod_org": "", "pai_cli": "PAI"},
             {**_ANA, "cod_cli": 1, "nome_cli": "CARLA FICTICIA", "cpf_cli": CPF_B, "cod_set": "00001",
              "dataalt_cli": "2015-01-01", "cod_org": ""},

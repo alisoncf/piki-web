@@ -2,12 +2,12 @@
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.dominios.clientes.modelos import Cliente, GrupoCliente, Orgao, Setor, TelefoneCliente
+from app.dominios.clientes.modelos import Cliente, GrupoCliente, Orgao, Parentesco, Setor, TelefoneCliente
 from app.nucleo.documentos import so_digitos
 
 
 def listar_clientes(db: Session, busca: str | None = None, setor_id: int | None = None,
-                    orgao_id: int | None = None, situacao: str | None = None,
+                    orgao_id: int | None = None, bloqueado: bool | None = None,
                     limite: int = 50, deslocamento: int = 0) -> tuple[list[Cliente], int]:
     """Uma página de clientes em ordem de nome, e o total que atende aos filtros."""
     consulta = select(Cliente)
@@ -24,8 +24,8 @@ def listar_clientes(db: Session, busca: str | None = None, setor_id: int | None 
         consulta = consulta.where(Cliente.setor_id == setor_id)
     if orgao_id is not None:
         consulta = consulta.where(Cliente.orgao_id == orgao_id)
-    if situacao is not None:
-        consulta = consulta.where(Cliente.situacao == situacao)
+    if bloqueado is not None:
+        consulta = consulta.where(Cliente.bloqueado.is_(bloqueado))
     total = db.scalar(select(func.count()).select_from(consulta.subquery()))
     itens = db.scalars(consulta.order_by(Cliente.nome, Cliente.id).limit(limite).offset(deslocamento))
     return list(itens), total
@@ -68,3 +68,11 @@ def listar_grupos(db: Session) -> list[GrupoCliente]:
 
 def grupo_por_nome(db: Session, nome: str) -> GrupoCliente | None:
     return db.scalar(select(GrupoCliente).where(func.lower(GrupoCliente.nome) == nome.strip().lower()))
+
+
+def listar_parentescos(db: Session) -> list[Parentesco]:
+    return list(db.scalars(select(Parentesco).order_by(Parentesco.nome)))
+
+
+def parentesco_por_nome(db: Session, nome: str) -> Parentesco | None:
+    return db.scalar(select(Parentesco).where(func.lower(Parentesco.nome) == nome.strip().lower()))

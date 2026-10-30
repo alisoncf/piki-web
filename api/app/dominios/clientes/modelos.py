@@ -1,7 +1,7 @@
 """Clientes e seus cadastros de apoio (cadastro global, D9).
 
 No VB6: tab_clientes, tab_telefones (tipo_ter = 'C'), tab_referencias,
-tab_clientesanot, tab_setores, tab_orgaos e tab_grupocli. Cada loja tinha os
+tab_tipopar, tab_clientesanot, tab_setores, tab_orgaos e tab_grupocli. Cada loja tinha os
 seus setores e órgãos; aqui são uma lista só. O cobrador de cada setor é
 escolhido por loja (setor_cobrador).
 """
@@ -23,6 +23,16 @@ class GrupoCliente(ComDatas, Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     nome: Mapped[str] = mapped_column(String(40), unique=True)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Parentesco(ComDatas, Base):
+    """Relação da referência com o cliente: cônjuge, pais, amigo... (tab_tipopar)."""
+
+    __tablename__ = "parentesco"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nome: Mapped[str] = mapped_column(String(30), unique=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
@@ -112,9 +122,10 @@ class Cliente(ComDatas, Base):
     cep_trabalho: Mapped[str | None] = mapped_column(String(8))
     setor_trabalho_id: Mapped[int | None] = mapped_column(ForeignKey("setor.id"))
 
-    # códigos do VB6, ver SITUACOES e FORMAS_COBRANCA em esquemas.py
-    situacao: Mapped[str] = mapped_column(String(1), default="1")
-    forma_cobranca: Mapped[str] = mapped_column(String(1), default="1")
+    # bloqueado não compra a prazo (status_cli 2 no VB6)
+    bloqueado: Mapped[bool] = mapped_column(Boolean, default=False)
+    # onde o cobrador recebe; ver FORMAS_COBRANCA em esquemas.py
+    forma_cobranca: Mapped[str] = mapped_column(String(10), default="domicilio")
     limite_credito: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0"))
     credito_suspenso: Mapped[bool] = mapped_column(Boolean, default=False)
     recebe_mensagens: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -163,9 +174,10 @@ class ReferenciaCliente(Base):
     cliente_id: Mapped[int] = mapped_column(ForeignKey("cliente.id", ondelete="CASCADE"), index=True)
     nome: Mapped[str] = mapped_column(String(60))
     telefone: Mapped[str | None] = mapped_column(String(20))
-    tipo: Mapped[str | None] = mapped_column(String(2))  # cod_tip no VB6
+    parentesco_id: Mapped[int | None] = mapped_column(ForeignKey("parentesco.id"))
 
     cliente: Mapped[Cliente] = relationship(back_populates="referencias")
+    parentesco: Mapped[Parentesco | None] = relationship(lazy="joined")
 
 
 class AnotacaoCliente(Base):

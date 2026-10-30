@@ -70,7 +70,8 @@ def main(argv: list[str] | None = None) -> None:
                     print(f"aviso: {aviso}")
             elif args.comando == "clientes":
                 r = importar_clientes(conexao, db, args.empresa)
-                print(f"grupos novos: {r.grupos_criados}, setores novos: {r.setores_criados}, "
+                print(f"grupos novos: {r.grupos_criados}, parentescos novos: {r.parentescos_criados}, "
+                      f"setores novos: {r.setores_criados}, "
                       f"órgãos novos: {r.orgaos_criados}, cobradores de setor: {r.cobradores}")
                 print(f"clientes: {r.criados} novos ({r.sem_documento} sem CPF/CNPJ válido), "
                       f"{r.atualizados} atualizados, {r.ligados_por_documento} juntados pelo CPF/CNPJ a um cadastro que já existia")

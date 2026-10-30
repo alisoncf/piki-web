@@ -6,7 +6,7 @@ from app.dominios.clientes import repositorio as repo
 from app.dominios.clientes import servico
 from app.dominios.clientes.esquemas import (
     AnotacaoDados, Cliente, ClienteDados, ClienteResumo, GrupoCliente, GrupoClienteDados, Orgao, OrgaoDados,
-    PaginaClientes, Setor, SetorDados,
+    PaginaClientes, Parentesco, ParentescoDados, Setor, SetorDados,
 )
 from app.nucleo.contexto import Contexto, exige
 
@@ -32,12 +32,12 @@ def listar_clientes(
     busca: Annotated[str | None, Query(description="Parte do nome, início do CPF/CNPJ ou final do telefone")] = None,
     setor_id: int | None = None,
     orgao_id: int | None = None,
-    situacao: str | None = None,
+    bloqueado: bool | None = None,
     limite: Annotated[int, Query(ge=1, le=200)] = 50,
     deslocamento: Annotated[int, Query(ge=0)] = 0,
 ) -> PaginaClientes:
     """Clientes de todas as lojas (cadastro global), uma página por vez."""
-    itens, total = repo.listar_clientes(ctx.db, busca, setor_id, orgao_id, situacao, limite, deslocamento)
+    itens, total = repo.listar_clientes(ctx.db, busca, setor_id, orgao_id, bloqueado, limite, deslocamento)
     return PaginaClientes(itens=[ClienteResumo.model_validate(c) for c in itens], total=total)
 
 
@@ -128,6 +128,27 @@ def listar_grupos(ctx: Ver) -> list[GrupoCliente]:
 def criar_grupo(dados: GrupoClienteDados, ctx: Editar) -> GrupoCliente:
     try:
         return GrupoCliente.model_validate(servico.criar_grupo(ctx.db, dados))
+    except servico.ErroCliente as e:
+        raise _http(e)
+
+
+@router.get("/parentescos", response_model=list[Parentesco])
+def listar_parentescos(ctx: Ver) -> list[Parentesco]:
+    return [Parentesco.model_validate(p) for p in repo.listar_parentescos(ctx.db)]
+
+
+@router.post("/parentescos", response_model=Parentesco, status_code=status.HTTP_201_CREATED)
+def criar_parentesco(dados: ParentescoDados, ctx: Editar) -> Parentesco:
+    try:
+        return Parentesco.model_validate(servico.criar_parentesco(ctx.db, dados))
+    except servico.ErroCliente as e:
+        raise _http(e)
+
+
+@router.put("/parentescos/{parentesco_id}", response_model=Parentesco)
+def alterar_parentesco(parentesco_id: int, dados: ParentescoDados, ctx: Editar) -> Parentesco:
+    try:
+        return Parentesco.model_validate(servico.alterar_parentesco(ctx.db, parentesco_id, dados))
     except servico.ErroCliente as e:
         raise _http(e)
 
