@@ -5,14 +5,27 @@ código aparece em filiais diferentes para pessoas diferentes. Por isso:
 
 - cada código antigo é ligado ao registro novo pelo legado_mapa (tabela +
   empresa de origem + código), o que torna a importação repetível;
-- um funcionário que não está no mapa é procurado pelo CPF, porque a mesma
-  pessoa pode estar cadastrada em mais de uma filial; se não houver, é criado
-  com a loja de origem como lotação;
 - um cargo que não está no mapa é procurado pelo nome.
+
+A maior parte dos funcionários está cadastrada em mais de uma filial (e às
+vezes duas vezes na mesma). Um funcionário que não está no mapa é procurado:
+
+1. pelo CPF, desde que os nomes sejam compatíveis: há cadastros que não são
+   de pessoas ("ESCRITORIO", nome de shopping) com o CPF do dono;
+2. sem CPF que o identifique, pelo nome completo, entre os que vieram de
+   outra filial;
+3. se não achar, é criado, com a loja de origem como lotação.
+
+Quem manda nos dados de uma pessoa cadastrada em várias filiais é a loja de
+lotação (ou, se ela não tem o cadastro, a primeira filial importada). As
+outras só preenchem o que está vazio e acrescentam telefones. A exceção é a
+pessoa inativa na lotação e ativa em outra filial: ela passa para essa filial.
 
 Na reimportação, os dados do VB6 (que segue oficial até a virada, D8)
 atualizam o cadastro, menos a loja de lotação, que é do sistema novo.
 """
+import unicodedata
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
@@ -23,6 +36,7 @@ from sqlalchemy.orm import Session
 from app.dominios.acesso.modelos import Empresa
 from app.dominios.funcionarios.modelos import Cargo, Funcionario, TelefoneFuncionario
 from app.nucleo.documentos import TIPOS_TELEFONE, cpf_valido, so_digitos
+from app.nucleo.legado import MapaLegado
 from etl import mapa
 
 # apelidos explícitos: o VB6 mistura maiúsculas nos nomes das colunas (COD_CAR, cod_Car...)
@@ -53,6 +67,8 @@ class Resultado:
     criados: int = 0
     atualizados: int = 0
     ligados_por_cpf: int = 0
+    ligados_por_nome: int = 0
+    mudaram_de_loja: int = 0
     telefones: int = 0
     avisos: list[str] = field(default_factory=list)
 
@@ -144,6 +160,96 @@ def _cpf(linha: dict, r: Resultado) -> str | None:
     return None
 
 
+def nome_comparavel(nome: str | None) -> str:
+    """Maiúsculas, sem acentos e sem espaços repetidos."""
+    sem_acento = unicodedata.normalize("NFKD", nome or "").encode("ascii", "ignore").decode()
+    return " ".join(sem_acento.upper().split())
+
+
+_LIGACOES = {"DE", "DA", "DO", "DAS", "DOS", "E"}
+
+
+def nomes_compativeis(a: str | None, b: str | None) -> bool:
+    """Se dois nomes com o mesmo CPF podem ser da mesma pessoa.
+
+    Aceita nomes incompletos ou abreviados ("ANA" e "ANA PAULA SOUZA", "ANAS"
+    e "ANA S LIMA") e um nome a mais na frente ("MARIA ANA SOUZA LIMA" e
+    "ANA SOUZA LIMA").
+    """
+    pa, pb = nome_comparavel(a).split(), nome_comparavel(b).split()
+    if not pa or not pb:
+        return False
+    if pa[0].startswith(pb[0]) or pb[0].startswith(pa[0]):
+        return True
+    return len((set(pa) & set(pb)) - _LIGACOES) >= 2
+
+
+class _Indice:
+    """Funcionários já gravados, por CPF e por nome, para achar a mesma pessoa vinda de outra filial."""
+
+    def __init__(self, db: Session, empresa_id: int):
+        self.por_cpf: dict[str, Funcionario] = {}
+        self.por_nome: dict[str, list[Funcionario]] = defaultdict(list)
+        for f in db.scalars(select(Funcionario)):
+            self.incluir(f)
+        # já ligados a um código desta filial: outro código com o mesmo nome é outra pessoa
+        self.desta_filial = set(db.scalars(select(MapaLegado.novo_id).where(
+            MapaLegado.tabela == "tab_funcionarios", MapaLegado.empresa_id == empresa_id)))
+
+    def incluir(self, f: Funcionario) -> None:
+        if f.cpf:
+            self.por_cpf[f.cpf] = f
+        self.por_nome[nome_comparavel(f.nome)].append(f)
+
+    def procurar(self, codigo: str, nome: str, cpf: str | None, r: Resultado) -> tuple[Funcionario | None, str | None]:
+        """Devolve o funcionário (ou None) e o CPF a usar, que vira None se já for de outra pessoa."""
+        if cpf and (dono := self.por_cpf.get(cpf)):
+            if nomes_compativeis(dono.nome, nome):
+                if nome_comparavel(dono.nome) != nome_comparavel(nome):
+                    r.avisos.append(f"funcionário {codigo} ({nome}): ligado pelo CPF a {dono.nome}")
+                r.ligados_por_cpf += 1
+                return dono, cpf
+            r.avisos.append(f"funcionário {codigo} ({nome}): o CPF {cpf} já é de {dono.nome}; cadastrado à parte, sem CPF")
+            cpf = None
+        mesmo_nome = [f for f in self.por_nome[nome_comparavel(nome)] if f.id not in self.desta_filial]
+        candidatos = [f for f in mesmo_nome if not cpf or not f.cpf or f.cpf == cpf]
+        if len(candidatos) == 1:
+            r.ligados_por_nome += 1
+            return candidatos[0], cpf
+        if mesmo_nome:
+            r.avisos.append(f"funcionário {codigo} ({nome}): há outro cadastro com o mesmo nome e outro CPF; "
+                            "cadastrado à parte")
+        return None, cpf
+
+
+def _manda_nos_dados(db: Session, funcionario: Funcionario, empresa_id: int) -> bool:
+    """A lotação manda; se ela não tem o cadastro no VB6, manda a filial de menor id."""
+    if funcionario.empresa_id == empresa_id:
+        return True
+    origens = db.scalars(select(MapaLegado.empresa_id).where(
+        MapaLegado.tabela == "tab_funcionarios", MapaLegado.novo_id == funcionario.id)).all()
+    return funcionario.empresa_id not in origens and empresa_id == min(origens)
+
+
+def _aplicar(funcionario: Funcionario, dados: dict, completo: bool) -> None:
+    """Completo: os dados desta filial substituem os atuais. Senão, só preenchem o que está vazio."""
+    for campo, valor in dados.items():
+        if completo or (getattr(funcionario, campo) in (None, "") and valor not in (None, "")):
+            setattr(funcionario, campo, valor)
+
+
+def _aplicar_cpf(indice: _Indice, funcionario: Funcionario, cpf: str | None, codigo: str,
+                 completo: bool, r: Resultado) -> None:
+    if not cpf or cpf == funcionario.cpf or (funcionario.cpf and not completo):
+        return
+    dono = indice.por_cpf.get(cpf)
+    if dono is None:
+        funcionario.cpf = cpf
+        indice.por_cpf[cpf] = funcionario
+    else:
+        r.avisos.append(f"funcionário {codigo} ({funcionario.nome}): CPF {cpf} já é de {dono.nome}; mantido o anterior")
+
+
 def importar_funcionarios(origem: Connection, db: Session, codigo_empresa: str) -> Resultado:
     """Lê cargos, funcionários e telefones de um banco do VB6 e grava no banco novo."""
     empresa = db.scalar(select(Empresa).where(Empresa.codigo == codigo_empresa))
@@ -159,6 +265,8 @@ def importar_funcionarios(origem: Connection, db: Session, codigo_empresa: str) 
         if len(numero) >= 8 and str(t["cod_cli"]).strip().isdigit():
             telefones.setdefault(int(t["cod_cli"]), []).append((numero[:15], t["tipo_tel"]))
 
+    indice = _Indice(db, empresa.id)
+    vistos: set[int] = set()  # já gravados nesta importação: a mesma pessoa com dois códigos na filial
     for linha in origem.execute(_FUNCIONARIOS).mappings():
         linha = dict(linha)
         codigo = _texto(linha["cod_fun"])
@@ -173,28 +281,31 @@ def importar_funcionarios(origem: Connection, db: Session, codigo_empresa: str) 
         funcionario_id = mapa.buscar(db, "tab_funcionarios", empresa.id, codigo)
         if funcionario_id is not None:
             funcionario = db.get(Funcionario, funcionario_id)
-            for campo, valor in dados.items():
-                setattr(funcionario, campo, valor)
-            if cpf and cpf != funcionario.cpf:
-                dono = db.scalar(select(Funcionario).where(Funcionario.cpf == cpf))
-                if dono is None:
-                    funcionario.cpf = cpf
-                else:
-                    r.avisos.append(f"funcionário {codigo} ({dados['nome']}): CPF {cpf} já é de {dono.nome}; mantido o anterior")
             r.atualizados += 1
         else:
-            funcionario = db.scalar(select(Funcionario).where(Funcionario.cpf == cpf)) if cpf else None
-            if funcionario is not None:
-                # a mesma pessoa já veio de outra filial: só liga o código, sem sobrescrever
-                r.ligados_por_cpf += 1
-            else:
+            funcionario, cpf = indice.procurar(codigo, dados["nome"], cpf, r)
+            if funcionario is None:
                 funcionario = Funcionario(**dados, cpf=cpf, empresa_id=empresa.id)
                 if criado := _data(linha.get("datacad_fun")):
                     funcionario.criado_em = datetime.combine(criado, datetime.min.time())
                 db.add(funcionario)
                 db.flush()
+                indice.incluir(funcionario)
+                vistos.add(funcionario.id)
                 r.criados += 1
             mapa.gravar(db, "tab_funcionarios", empresa.id, codigo, funcionario.id)
+            indice.desta_filial.add(funcionario.id)
+
+        completo = funcionario.id not in vistos and _manda_nos_dados(db, funcionario, empresa.id)
+        if not completo and dados["ativo"] and not funcionario.ativo:
+            # inativo onde estava e ativo aqui: a pessoa trabalha nesta loja
+            if funcionario.empresa_id != empresa.id:
+                funcionario.empresa_id = empresa.id
+                r.mudaram_de_loja += 1
+            completo = True
+        _aplicar(funcionario, dados, completo)
+        _aplicar_cpf(indice, funcionario, cpf, codigo, completo, r)
+        vistos.add(funcionario.id)
 
         existentes = {t.numero for t in funcionario.telefones}
         for numero, tipo in telefones.get(int(codigo), []) if codigo.isdigit() else []:

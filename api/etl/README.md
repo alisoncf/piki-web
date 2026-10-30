@@ -28,13 +28,25 @@ python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
 
 O destino é o banco do `.env`. Rode uma vez para cada banco de filial, começando pelas empresas. O `--empresa` diz de qual empresa é o banco de origem.
 
+### MariaDB local sem senha
+
+Se os bancos foram baixados para um MariaDB local em que o root entra pela autenticação do Windows (sem senha), o pymysql não consegue entrar. Use o conector da MariaDB, que vem no extra `legado` no Windows:
+
+```bash
+python -m etl funcionarios --origem "mariadb+mariadbconnector://root@127.0.0.1:3306/requinte" --empresa 01
+```
+
 ### Funcionários
 
-- Cargos e funcionários são ligados aos códigos antigos pela tabela `legado_mapa` (tabela de origem + empresa + código), porque `cod_fun` e `cod_car` se repetem entre filiais.
-- Funcionário que não está no mapa é procurado pelo CPF: a mesma pessoa em duas filiais vira um cadastro só, e os dados da primeira importação ficam. Sem CPF válido, é criado um cadastro novo.
+- Cargos e funcionários são ligados aos códigos antigos pela tabela `legado_mapa` (tabela de origem + empresa + código), porque `cod_fun` e `cod_car` se repetem entre filiais. Cargo que não está no mapa é procurado pelo nome.
+- A maior parte dos funcionários está cadastrada em mais de uma filial, às vezes até duas vezes na mesma. Funcionário que não está no mapa é procurado:
+  1. pelo CPF, se os nomes forem compatíveis (abreviações e nomes incompletos passam). Há cadastros que não são de pessoas, como "ESCRITORIO" ou nome de shopping, com o CPF do dono: esses viram cadastro à parte, sem CPF, com aviso;
+  2. sem CPF que identifique, pelo nome completo (sem acentos e sem diferenciar maiúsculas), entre os que vieram de outra filial. Mesmo nome na mesma filial são duas pessoas;
+  3. se não achar, é criado, com a loja de origem como lotação.
+- Quem manda nos dados de uma pessoa que está em várias filiais é a loja de lotação. As outras filiais só preenchem campos vazios e acrescentam telefones. Se a pessoa está inativa na lotação e ativa em outra filial, ela passa para essa filial. Quem está ativo em duas filiais fica na primeira importada: rode a matriz primeiro e ajuste na ficha se precisar.
 - Na reimportação, os dados do VB6 atualizam o cadastro, menos a loja de lotação.
 - Telefones vêm da `tab_telefones` com `tipo_ter = 'U'`; só entram os que ainda não existem.
-- CPFs inválidos são ignorados e aparecem como aviso no fim.
+- CPFs inválidos (muitos são `000.000.000-01` ou `5555...`) são ignorados. Tudo o que foi ignorado, separado ou ligado com nome diferente sai como aviso no fim, para conferência.
 
 ## Situação
 

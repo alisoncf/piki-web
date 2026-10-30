@@ -16,7 +16,11 @@ dependencies = [
 
 [project.optional-dependencies]
 # leitura dos bancos MariaDB das filiais, usada pelo ETL
-legado = ["pymysql>=1.1"]
+legado = [
+    "pymysql>=1.1",
+    # lê o MariaDB local com a autenticação do Windows (root sem senha), que o pymysql não tem
+    "mariadb>=1.1; sys_platform == 'win32'",
+]
 dev = [
     "pytest>=8.0",
     "httpx>=0.27",

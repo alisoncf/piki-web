@@ -154,3 +154,87 @@ def test_reimportar_atualiza_mas_mantem_a_loja(matriz, banco, empresas):
 def test_empresa_precisa_existir(matriz, banco):
     with pytest.raises(EmpresaNaoImportada):
         _importar(matriz, banco, "01")
+
+
+def test_nomes_compativeis():
+    from etl.funcionarios import nomes_compativeis
+    assert nomes_compativeis("ANA", "Ana Fictícia Souza")
+    assert nomes_compativeis("ANAC", "ANA C SOUZA")  # abreviado e colado
+    assert nomes_compativeis("MARIA ANA FICTICIA", "ANA FICTICIA SOUZA")  # um nome a mais na frente
+    assert not nomes_compativeis("ANA FICTICIA", "SHOPPING CENTRO")
+    assert not nomes_compativeis("ANA DE SOUZA", "BIA DE SOUZA")  # só a ligação e um sobrenome em comum
+
+
+def _filial(tmp_path, nome, funcionarios, telefones=()):
+    return _banco_vb6(tmp_path / nome, funcionarios, [("001", "VENDEDOR", "S")], telefones)
+
+
+def test_cpf_do_dono_em_cadastro_que_nao_e_pessoa(tmp_path, banco, empresas):
+    loja = {**_ANA, "cod_fun": "009", "nome_fun": "SHOPPING CENTRO", "guerra_fun": "SHOP"}
+    eng = _filial(tmp_path, "f01.db", [_ANA, loja])
+    r = _importar(eng, banco, "01")
+    eng.dispose()
+    assert r.criados == 2
+    assert any("SHOPPING CENTRO" in a and "cadastrado à parte" in a for a in r.avisos)
+    with banco() as db:
+        assert db.scalar(select(Funcionario).where(Funcionario.apelido == "SHOP")).cpf is None
+        assert db.scalar(select(Funcionario).where(Funcionario.apelido == "ANINHA")).cpf == "52998224725"
+
+
+def test_sem_cpf_liga_pelo_nome_so_entre_filiais(tmp_path, banco, empresas):
+    dani = {**_ANA, "cod_fun": "003", "nome_fun": "Dani  Fictícia", "guerra_fun": "DANI", "cpf_fun": "000.000.000-01"}
+    homonima = {**dani, "cod_fun": "004", "guerra_fun": "DANI 2"}
+    m = _filial(tmp_path, "f01.db", [dani, homonima])
+    r = _importar(m, banco, "01")
+    m.dispose()
+    assert (r.criados, r.ligados_por_nome) == (2, 0)  # mesmo nome na mesma filial: duas pessoas
+
+    f = _filial(tmp_path, "f03.db", [{**dani, "cod_fun": "010", "nome_fun": "DANI FICTICIA", "cpf_fun": ""}])
+    r = _importar(f, banco, "03")
+    f.dispose()
+    assert r.criados == 1  # há duas DANI na 01: não dá para saber qual é
+    with banco() as db:
+        assert len(db.scalars(select(Funcionario)).all()) == 3
+
+
+def test_mesmo_nome_sem_cpf_em_outra_filial_vira_um_cadastro(tmp_path, banco, empresas):
+    dani = {**_ANA, "cod_fun": "003", "nome_fun": "DANI FICTICIA", "guerra_fun": "DANI", "cpf_fun": ""}
+    m = _filial(tmp_path, "f01.db", [dani])
+    _importar(m, banco, "01")
+    m.dispose()
+    f = _filial(tmp_path, "f03.db", [{**dani, "cod_fun": "010", "cpf_fun": "111.444.777-35", "rg_fun": None}])
+    r = _importar(f, banco, "03")
+    f.dispose()
+    assert (r.criados, r.ligados_por_nome) == (0, 1)
+    with banco() as db:
+        dani_nova = db.scalar(select(Funcionario))
+        assert dani_nova.cpf == "11144477735"  # o CPF que faltava vem da outra filial
+        assert dani_nova.empresa_id == empresas["01"]
+
+
+def test_ativa_em_outra_filial_muda_de_loja(tmp_path, banco, empresas):
+    saiu = {**_ANA, "status_fun": "2", "guerra_fun": "ANA 01"}
+    m = _filial(tmp_path, "f01.db", [saiu])
+    _importar(m, banco, "01")
+    f = _filial(tmp_path, "f03.db", [{**_ANA, "cod_fun": "020", "guerra_fun": "ANA 03"}])
+    r = _importar(f, banco, "03")
+    assert r.mudaram_de_loja == 1
+    _importar(m, banco, "01")  # reimportar a 01, onde está inativa, não desfaz
+    _importar(f, banco, "03")
+    m.dispose()
+    f.dispose()
+    with banco() as db:
+        ana = db.scalar(select(Funcionario))
+        assert (ana.empresa_id, ana.ativo, ana.apelido) == (empresas["03"], True, "ANA 03")
+
+
+def test_reimportar_a_outra_filial_nao_sobrescreve(matriz, tmp_path, banco, empresas):
+    _importar(matriz, banco, "01")
+    f = _filial(tmp_path, "f03.db", [{**_ANA, "cod_fun": "007", "guerra_fun": "ANA F", "nome_fun": "ANA F SOUZA"}])
+    _importar(f, banco, "03")
+    r = _importar(f, banco, "03")
+    f.dispose()
+    assert r.atualizados == 1
+    with banco() as db:
+        ana = db.scalar(select(Funcionario).where(Funcionario.cpf == "52998224725"))
+        assert (ana.nome, ana.apelido) == ("ANA FICTICIA", "ANINHA")

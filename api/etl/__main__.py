@@ -3,6 +3,9 @@
     python -m etl empresas --origem "mysql+pymysql://usuario:senha@servidor:3306/requinte"
     python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
 
+Para um MariaDB local em que o root entra pela autenticação do Windows (sem
+senha), use o conector da MariaDB: mariadb+mariadbconnector://root@127.0.0.1:3306/requinte
+
 A origem é o banco MariaDB de uma filial (ou a cópia dele na área de
 chegada). O destino é o banco do .env (PIKI_DATABASE_URL). Para ler MariaDB,
 instale o extra: pip install -e ".[legado]".
@@ -39,7 +42,9 @@ def main(argv: list[str] | None = None) -> None:
                 r = importar_funcionarios(conexao, db, args.empresa)
                 print(f"cargos novos: {r.cargos_criados}")
                 print(f"funcionários: {r.criados} novos, {r.atualizados} atualizados, "
-                      f"{r.ligados_por_cpf} já existentes em outra filial (pelo CPF)")
+                      f"{r.ligados_por_cpf + r.ligados_por_nome} já existentes "
+                      f"({r.ligados_por_cpf} pelo CPF, {r.ligados_por_nome} pelo nome), "
+                      f"{r.mudaram_de_loja} mudaram de loja")
                 print(f"telefones novos: {r.telefones}")
                 for aviso in r.avisos:
                     print(f"aviso: {aviso}")
