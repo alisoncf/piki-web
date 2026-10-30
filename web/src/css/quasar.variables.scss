@@ -1,0 +1,18 @@
+// Identidade visual: ameixa da Requinte Enxovais com o dourado do Piki.
+// Este é o único lugar das cores: o Quasar as publica como --q-primary,
+// --q-accent etc., e app.css tira delas os tons de apoio (--piki-*).
+$primary   : #941d70;
+$secondary : #7e155f;
+$accent    : #f2b01e;
+
+$dark      : #2a1f26;
+$dark-page : #1a1217;
+
+$positive  : #2e7d4f;
+$negative  : #c0392b;
+$info      : #3d6f8f;
+$warning   : #e99a0a;
+
+$typography-font-family : 'Inter Variable', 'Segoe UI', Roboto, Arial, sans-serif;
+$button-font-weight     : 600;
+$generic-border-radius  : 8px;

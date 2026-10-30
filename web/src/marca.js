@@ -1,6 +1,6 @@
 /**
  * Marca exibida no sistema: a loja (quem usa) e o Piki (o sistema).
- * Os arquivos ficam em public/. As cores estão em css/quasar.variables.sass e css/app.css.
+ * Os arquivos ficam em public/. As cores estão em css/quasar.variables.scss.
  */
 export const LOJA = {
   nome: 'Requinte',

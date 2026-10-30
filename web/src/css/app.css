@@ -1,17 +1,23 @@
-/* Identidade visual: ameixa da Requinte Enxovais com o dourado do Piki.
-   As cores do Quasar (primary, accent...) ficam em quasar.variables.sass;
-   aqui ficam os tons de apoio e os estilos próprios. */
+/* Estilos globais. As cores vêm de quasar.variables.scss, que o Quasar publica
+   como --q-primary, --q-accent etc.; os tons de apoio são derivados delas,
+   então trocar a cor lá muda o sistema inteiro. */
 :root {
-  --piki-primaria: #941d70;
-  --piki-primaria-clara: #f7e9f2;
-  --piki-primaria-escura: #4f0c3b;
-  --piki-gradiente: linear-gradient(150deg, #a32679 0%, #941d70 45%, #6a1050 100%);
-  --piki-dourado: #f2b01e;
-  --piki-fundo: #faf7f9;
+  --piki-primaria: var(--q-primary);
+  --piki-primaria-clara: color-mix(in srgb, var(--q-primary) 10%, white);
+  --piki-primaria-escura: color-mix(in srgb, var(--q-primary) 55%, black);
+  --piki-gradiente: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--q-primary) 90%, white) 0%,
+    var(--q-primary) 45%,
+    color-mix(in srgb, var(--q-primary) 72%, black) 100%
+  );
+  --piki-dourado: var(--q-accent);
+  --piki-fundo: color-mix(in srgb, var(--q-primary) 3%, white);
   --piki-superficie: #ffffff;
-  --piki-borda: #ece2e8;
-  --piki-texto: #2a1f26;
-  --piki-texto-suave: #6e5f68;
+  --piki-borda: color-mix(in srgb, var(--q-primary) 8%, #f0f0f0);
+  --piki-texto: color-mix(in srgb, var(--q-primary) 12%, #222222);
+  --piki-texto-suave: color-mix(in srgb, var(--q-primary) 12%, #666666);
+  --piki-sombra: color-mix(in srgb, var(--piki-primaria-escura) 8%, transparent);
 }
 
 body {
@@ -32,43 +38,6 @@ body {
   color: var(--piki-texto-suave);
 }
 
-/* ---- marcas ---- */
-.marca-loja {
-  gap: 10px;
-}
-.marca-loja img {
-  border-radius: 22%;
-  flex: none;
-}
-.marca-loja__nome {
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-  color: var(--piki-primaria);
-}
-.marca-loja__complemento {
-  font-weight: 600;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  line-height: 1.2;
-  color: var(--piki-texto-suave);
-}
-.marca-loja--clara img {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
-}
-.marca-loja--clara .marca-loja__nome {
-  color: #fff;
-}
-.marca-loja--clara .marca-loja__complemento {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.assinatura-piki {
-  gap: 8px;
-  font-size: 12px;
-  opacity: 0.75;
-}
-
 /* ---- páginas soltas (login, escolha de empresa, 404) ---- */
 .pagina-centralizada {
   min-height: 100vh;
@@ -87,7 +56,7 @@ body {
   background: var(--piki-superficie);
   border: 1px solid var(--piki-borda);
   border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(60, 15, 45, 0.04);
+  box-shadow: 0 1px 2px var(--piki-sombra);
 }
 
 /* login: painel da loja à esquerda (telas largas) e formulário à direita */
@@ -199,7 +168,7 @@ body {
 .piki-atalho:hover,
 .piki-atalho:focus-visible {
   border-color: var(--piki-primaria);
-  box-shadow: 0 4px 12px rgba(60, 15, 45, 0.08);
+  box-shadow: 0 4px 12px var(--piki-sombra);
   transform: translateY(-1px);
   outline: none;
 }

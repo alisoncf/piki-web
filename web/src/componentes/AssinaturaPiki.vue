@@ -8,3 +8,11 @@
 <script setup>
 import { SISTEMA } from '@/marca'
 </script>
+
+<style scoped>
+.assinatura-piki {
+  gap: 8px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+</style>

@@ -24,7 +24,7 @@ src/
   paginas/              uma tela por arquivo, agrupadas por domínio (paginas/acesso/...)
   componentes/          peças reaproveitadas (marca da loja, assinatura do Piki)
   marca.js              nome e logos da loja e do sistema (arquivos em public/)
-  css/quasar.variables.sass   cores da identidade visual (D14); tons de apoio em css/app.css
+  css/quasar.variables.scss   cores da identidade visual (D14); os tons de apoio saem delas em css/app.css
 tests/
 ```
 

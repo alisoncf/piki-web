@@ -20,3 +20,35 @@ defineProps({
   soLogo: { type: Boolean, default: false },
 })
 </script>
+
+<style scoped>
+.marca-loja {
+  gap: 10px;
+}
+.marca-loja img {
+  border-radius: 22%;
+  flex: none;
+}
+.marca-loja__nome {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--piki-primaria);
+}
+.marca-loja__complemento {
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--piki-texto-suave);
+}
+.marca-loja--clara img {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+.marca-loja--clara .marca-loja__nome {
+  color: #fff;
+}
+.marca-loja--clara .marca-loja__complemento {
+  color: rgba(255, 255, 255, 0.7);
+}
+</style>

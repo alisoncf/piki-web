@@ -77,7 +77,7 @@ O token de login fica no `localStorage`, para durar o turno mesmo fechando a aba
 
 Quem usa o sistema é a equipe da Requinte Enxovais, então a marca da loja aparece no login, no cabeçalho e na escolha de empresa, e as cores vêm do logo dela: ameixa `#941d70` como cor principal e o dourado do ícone do Piki (`#f2b01e`) como destaque. O Piki é o sistema: o ícone dele vai no favicon e como assinatura discreta ("Piki · gestão comercial") no login e no menu. Fonte Inter, instalada no próprio projeto (não depende de internet nas filiais).
 
-Nome e logos ficam em `web/src/marca.js` e `web/public/`; as cores, em `web/src/css/quasar.variables.sass` e `web/src/css/app.css`. Por enquanto a marca é fixa para todas as empresas (ver P12).
+Nome e logos ficam em `web/src/marca.js` e `web/public/`; as cores, só em `web/src/css/quasar.variables.scss` (os tons de apoio de `app.css` são derivados delas). Por enquanto a marca é fixa para todas as empresas (ver P12).
 
 ## Substituídas
 
