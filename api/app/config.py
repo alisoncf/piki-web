@@ -2,7 +2,7 @@ import secrets
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # o .env fica na raiz do repositório, um nível acima de api/
@@ -17,8 +17,8 @@ class Configuracao(BaseSettings):
         extra="ignore",
     )
 
-    database_url: str = "sqlite://"
-    cod_emp_padrao: str = Field(default="01", min_length=2, max_length=2)
+    # sem .env, usa um SQLite local para desenvolver sem servidor de banco
+    database_url: str = "sqlite:///./piki-dev.db"
     ambiente: str = "dev"
     # chave para assinar os tokens de login; obrigatória em produção
     segredo_token: str = ""

@@ -1,50 +1,79 @@
 # Decisões de arquitetura
 
-Registro curto das decisões tomadas e do que ainda está em aberto. Quando uma decisão mudar, atualize o item e anote a data.
+Registro curto das decisões tomadas e do que ainda está em aberto. Quando uma decisão mudar, não apague: marque como substituída, diga por qual e anote a data. O histórico explica por que o código está como está.
 
-## Tomadas
+## Vigentes
 
 ### D1. Repositório separado do legado (30/10/2026)
 
 O VB6 continua em `alisoncf/piki_vb`, intacto. O sistema novo começa aqui, com histórico limpo. O legado tem senhas, logs e dumps no histórico, e o `piki_Simples.vbp` depende de caminhos relativos entre pastas que não podem ser reorganizadas.
 
-### D2. Stack: FastAPI + Vue/Quasar sobre o banco atual (30/10/2026)
-
-A API lê e grava no mesmo MariaDB do VB6. A migração é por tela, não por big bang.
-
-### D3. Filial na chave das tabelas de movimento (30/10/2026)
-
-Tabelas de movimento (vendas, caixa, documentos, cheques, consignações, compras, estoque, NF-e, SPED) ganham `cod_emp CHAR(2)` como primeira coluna da chave primária, por exemplo `(cod_emp, num_ven)`. Cada filial continua numerando como hoje, e as bases podem ser juntadas sem renumerar nada.
-
-Cadastros (clientes, fornecedores, produtos, seções etc.) passam a ser globais, com tabelas de mapeamento `map_*` do código antigo de cada filial para o código unificado. `tab_produtos` é separada em cadastro global e `produto_filial` (estoque, preço e custo por filial).
-
-A classificação de cada tabela está na coluna `escopo_proposto` de `docs/legado/tabelas.csv`.
-
-### D4. Coexistência: VB6 com banco local, sistema novo no central (30/10/2026)
-
-As consultas do VB6 não filtram por `cod_emp`. Enquanto o VB6 estiver em uso numa filial, ele continua com o banco local, e o banco central é alimentado por sincronização, ampliando o mecanismo que já existe (módulo `API`, tabela `fila_transferencia`, `tab_doc.id_doc_web`).
-
 ### D5. Fiscal continua no ACBrMonitor PLUS (30/10/2026)
 
 NF-e e NFC-e já são emitidas pelo ACBrMonitor. A API nova envia os mesmos comandos (por TCP, em vez de `ent.txt`/`sai.txt`) e não reimplementa a comunicação com a SEFAZ.
 
-### D6. Pré-requisitos do banco único (30/10/2026)
+### D8. Esquema novo, alimentado por ETL a partir das filiais (30/10/2026)
 
-Antes de consolidar: converter as tabelas de MyISAM para InnoDB, criar chave primária nas 48 tabelas que não têm, e usar `DECIMAL` no lugar de `double` para valores.
+O sistema novo tem banco e esquema próprios, desenhados para várias empresas desde o começo: InnoDB/transações, chaves estrangeiras, `DECIMAL` para valores, nomes claros. Não herdamos a estrutura do VB6.
 
-### D7. Login com migração das senhas para hash (30/10/2026)
+Cada filial tem hoje seu próprio banco local. Os dados chegam ao banco novo assim:
 
-O VB6 guarda as senhas em `tab_usuarios.SENHA_USU` com uma codificação reversível (`F_GeraPW`/`F_RetornaPW`), que qualquer pessoa com acesso ao banco consegue desfazer. O sistema novo tem sua própria tabela, `web_credencial`, com a senha guardada como hash argon2 e ligada ao `COD_FUN`.
+1. **Agente em cada filial:** programa pequeno que faz o dump do banco local e envia para o servidor central por HTTPS (só conexão de saída, sem abrir porta na loja).
+2. **Área de chegada:** cada dump é carregado como está, num esquema separado por filial (`legado_f01`, `legado_f02`...).
+3. **ETL:** lê cada área de chegada e grava no esquema novo, deduplicando cadastros e mapeando (empresa, código antigo) → id novo. É repetível: rodar de novo atualiza o que existe e insere o que é novo.
 
-No primeiro login de cada usuário no sistema novo, a API confere a senha no formato antigo e, se estiver certa, grava o hash. A tabela também guarda uma impressão digital (sha256) do `SENHA_USU` daquele momento: se a senha for trocada no VB6, o hash é refeito no login seguinte. Ninguém precisa recadastrar senha, e o VB6 continua funcionando igual.
+Enquanto o VB6 estiver em uso, ele é o sistema oficial e o ETL roda todo dia, em mão única. O sistema novo já serve para consultas e relatórios consolidados. A virada é por filial: quando as telas que uma filial usa estiverem prontas, ela passa a gravar no sistema novo e deixa de enviar dumps.
 
-Como no VB6, a senha não diferencia maiúsculas de minúsculas, e o usuário entra pelo apelido (`guerra_fun`) ou pelo código do funcionário. O login devolve um token (JWT) válido por 10 horas, que carrega o funcionário e a filial (`cod_emp`).
+As senhas antigas são reversíveis (`F_GeraPW`/`F_RetornaPW`), então o ETL as converte para hash argon2 na importação. A conferência de senha no formato antigo existe só no ETL (`api/etl/senha_legado.py`), nunca na API.
+
+### D9. Escopo dos dados entre empresas (30/10/2026)
+
+Cada filial é uma **empresa** (CNPJ próprio). Os dados se dividem em três escopos:
+
+| Escopo | Exemplos | Regra |
+|---|---|---|
+| Global | clientes, produtos (cadastro), fornecedores, seções, formas de pagamento | Um cadastro só, visível em todas as empresas |
+| Por empresa | estoque, preço e custo do produto, notas fiscais de entrada e saída, vendas, caixa, inventário | Cada registro pertence a uma empresa; só aparece nela |
+| Por empresa, visível em todas | contas a receber (documentos e parcelas) | O documento pertence à empresa que vendeu, mas pode ser consultado e recebido em qualquer empresa. A baixa registra em qual empresa e em qual caixa o dinheiro entrou |
+
+Na prática: o cliente pode pagar o boleto ou a parcela em qualquer loja, e o caixa de quem recebeu é que registra a entrada.
+
+### D10. Acesso: usuário, empresa e perfil (30/10/2026)
+
+- Um **usuário** pode ter acesso a uma ou várias empresas. A relação usuário–empresa diz também **o que ele pode fazer ali**, por meio de um **perfil** (conjunto de permissões, por exemplo "Caixa", "Gerente", "Financeiro").
+- O mesmo usuário pode ter perfis diferentes em empresas diferentes (gerente na 01, só consulta na 02).
+- No login, o usuário escolhe a empresa. Se só tem acesso a uma, ela é escolhida automaticamente. Ele pode **trocar de empresa** a qualquer momento sem sair do sistema.
+- O token de login carrega o usuário e a empresa ativa. As permissões são conferidas no banco a cada requisição, então uma permissão retirada vale na hora.
+- Usuário marcado como administrador tem acesso total a todas as empresas.
+- As permissões são códigos no formato `area.acao` (por exemplo `clientes.editar`, `caixa.abrir`), definidos no código e cadastrados no banco.
+
+### D11. Back-end organizado por domínio (30/10/2026)
+
+Cada domínio (acesso, cadastros, financeiro...) tem sua pasta em `api/app/dominios/`, com:
+
+- `modelos.py`: tabelas (SQLAlchemy)
+- `esquemas.py`: formatos de entrada e saída da API (Pydantic)
+- `repositorio.py`: consultas ao banco
+- `servico.py`: regras de negócio, sem depender de HTTP
+- `rotas.py`: endpoints, que só recebem, chamam o serviço e devolvem
+
+O que é comum a todos (banco, segurança, dependências de login e empresa) fica em `api/app/nucleo/`. A estrutura do banco é versionada com Alembic (`api/alembic/`).
+
+## Substituídas
+
+- **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
+- **D3.** ~~Filial na chave das tabelas do banco atual~~. Com esquema novo, as tabelas já nascem com a empresa. Substituída pelas D8 e D9 em 30/10/2026.
+- **D4.** ~~VB6 e sistema novo no mesmo banco, com sincronização~~. Substituída pela D8 (ETL de mão única e virada por filial) em 30/10/2026.
+- **D6.** ~~Converter o banco atual para InnoDB e criar chaves~~. Desnecessário com esquema novo. Substituída pela D8 em 30/10/2026.
+- **D7.** ~~Login conferindo a senha do VB6 e migrando para hash no primeiro acesso~~. Com o ETL, as senhas são convertidas na importação. Substituída pela D8 em 30/10/2026.
 
 ## Em aberto
 
-- **P1.** O servidor da API web que o VB6 já usa (`desktop_doc`, `desktop_clientes`, `desktop_baixa`): qual a stack e onde está? Pode ser aproveitado ou absorvido pelo `piki-web`.
-- **P2.** Cada filial já tem um `cod_emp` único no seu `tab_parametros`? Os registros já gravados estão com o `cod_emp` correto?
-- **P3.** Clientes e produtos são do grupo todo ou de cada loja? Um cliente que compra em duas filiais deve ser o mesmo cadastro?
+- **P1.** O servidor da API web que o VB6 já usa (`desktop_doc`, `desktop_clientes`, `desktop_baixa`): qual a stack e onde está? Pode virar o servidor central ou ser absorvido pelo `piki-web`.
+- **P2.** Cada filial já tem um `cod_emp` único no seu `tab_parametros`? É ele que o ETL vai usar para saber de qual empresa vieram os dados.
+- **P3.** ~~Clientes e produtos globais ou por loja?~~ Resolvido na D9.
 - **P4.** As lojas ainda usam ECF, ou só NFC-e? Se só NFC-e, o código e as tabelas de ECF são descartados.
-- **P5.** ~~Formato do login~~ Resolvido na D7.
-- **P6.** O login do VB6 monta o SQL concatenando o texto digitado (`frmLogin`), o que permite injeção de SQL. Vale corrigir no legado enquanto ele estiver em uso, já que basta trocar por uma consulta parametrizada.
+- **P6.** O login do VB6 monta o SQL concatenando o texto digitado (`frmLogin`), o que permite injeção de SQL. Vale corrigir no legado enquanto ele estiver em uso.
+- **P7.** Banco do sistema novo: PostgreSQL ou MariaDB? O código usa SQLAlchemy e funciona com os dois. O PostgreSQL permite isolar empresas no próprio banco (*row-level security*) e tem migrações de estrutura transacionais.
+- **P8.** Infraestrutura das filiais: quantas são, se o computador do banco fica ligado e com internet, e o tamanho de cada banco. Define a frequência do agente.
+- **P9.** Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.

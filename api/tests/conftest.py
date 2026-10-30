@@ -1,24 +1,28 @@
 import pytest
+from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db import sessao
-from app.legado import senha as senha_legado
+from app.dominios.acesso import servico
 from app.main import app
-from app.modelos import Funcionario, LegadoBase, Usuario, WebBase
+from app.nucleo import seguranca
+from app.nucleo.banco import sessao
+from app.registro_modelos import Base
+
+
+@pytest.fixture(autouse=True)
+def hash_rapido(monkeypatch):
+    """Argon2 com custo mínimo nos testes. Em produção valem os parâmetros padrão."""
+    monkeypatch.setattr(seguranca, "_hasher", PasswordHasher(time_cost=1, memory_cost=8, parallelism=1))
 
 
 @pytest.fixture
 def banco():
-    """SQLite em memória com as tabelas do legado usadas pela API e as tabelas novas.
-
-    Nunca toca no banco real do .env.
-    """
+    """SQLite em memória com todas as tabelas. Nunca toca no banco do .env."""
     eng = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    LegadoBase.metadata.create_all(eng)
-    WebBase.metadata.create_all(eng)
+    Base.metadata.create_all(eng)
     fabrica = sessionmaker(bind=eng, autoflush=False, expire_on_commit=False)
 
     def sessao_teste():
@@ -36,13 +40,29 @@ def cliente(banco):
 
 
 @pytest.fixture
-def criar_usuario(banco):
-    """Cria um usuário com a senha gravada no formato do VB6."""
+def cenario(banco):
+    """Três empresas, dois perfis e quatro usuários:
 
-    def _criar(cod_fun="001", apelido="MARIA", senha="SEGREDO", status="1", nome="Maria da Silva"):
-        with banco() as s:
-            s.add(Funcionario(cod_fun=cod_fun, nome=nome, apelido=apelido, cod_cargo="001", status="1"))
-            s.add(Usuario(cod_fun=cod_fun, senha=senha_legado.codificar(senha), status=status, nivel="1"))
-            s.commit()
-
-    return _criar
+    - ana: só a empresa 01, como Gerente
+    - bia: empresas 01 (Gerente) e 02 (Consulta)
+    - caio: administrador, sem vínculos
+    - davi: nenhum acesso
+    A empresa 03 está desativada.
+    """
+    with banco() as db:
+        e1 = servico.criar_empresa(db, "01", "Loja Centro", "11111111000101")
+        e2 = servico.criar_empresa(db, "02", "Loja Bairro", "22222222000102")
+        e3 = servico.criar_empresa(db, "03", "Loja Fechada", "33333333000103")
+        e3.ativa = False
+        db.commit()
+        gerente = servico.criar_perfil(db, "Gerente", ["acesso.usuarios", "acesso.perfis"])
+        consulta = servico.criar_perfil(db, "Consulta", [])
+        ana = servico.criar_usuario(db, "ana", "Ana Lima", "senha-ana")
+        bia = servico.criar_usuario(db, "bia", "Bia Souza", "senha-bia")
+        servico.criar_usuario(db, "caio", "Caio Admin", "senha-caio", administrador=True)
+        servico.criar_usuario(db, "davi", "Davi Sem Acesso", "senha-davi")
+        servico.dar_acesso(db, ana, e1, gerente)
+        servico.dar_acesso(db, bia, e1, gerente)
+        servico.dar_acesso(db, bia, e2, consulta)
+        servico.dar_acesso(db, bia, e3, gerente)  # empresa desativada: não deve aparecer
+        return {"e1": e1.id, "e2": e2.id, "e3": e3.id}

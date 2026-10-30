@@ -16,37 +16,43 @@ Documentos relacionados:
 
 - [x] Analisar o repositório do legado (`piki_vb`) e identificar o projeto em produção (`piki_Simples`) — 30/10/2026
 - [x] Inventário do piki_Simples: 416 itens, ~98 mil linhas, classificados por domínio e onda — 30/10/2026
-- [x] Mapa das 279 tabelas do banco a partir do schema real, com escopo proposto para o banco único — 30/10/2026
+- [x] Mapa das 279 tabelas do banco antigo, a partir do schema real — 30/10/2026
 - [x] Criar o repositório `piki-web`, separado do legado — 30/10/2026
+- [x] Decidir: esquema novo alimentado por ETL, escopo dos dados entre empresas, acesso por usuário–empresa–perfil (D8, D9, D10) — 30/10/2026
 - [ ] Tornar o repositório `piki_vb` privado e trocar as senhas que estão expostas nele
-- [ ] Responder as pendências P1 a P4 de `decisoes.md`
+- [ ] Responder as pendências P1, P2, P4, P7, P8 e P9 de `decisoes.md`
 - [ ] Corrigir a injeção de SQL no login do VB6 (P6)
 
 ## Onda 0 · Fundação
 
-- [x] Esqueleto da API (FastAPI, configuração por `.env`, conexão com o MariaDB) — 30/10/2026
-- [x] Identificação da filial por requisição (`X-Cod-Emp`) — 30/10/2026
+- [x] Esqueleto da API (FastAPI, configuração por `.env`) — 30/10/2026
 - [x] `GET /saude`, com testes — 30/10/2026
 - [x] Roteiro do projeto (este arquivo) — 30/10/2026
-- [x] Login com migração das senhas do legado para hash: `POST /auth/login`, `GET /auth/eu`, tabela `web_credencial` (decisão D7) — 30/10/2026
-- [ ] Aplicar `api/migracoes/001_web_credencial.sql` numa cópia do banco e testar o login com usuários reais
-- [ ] Permissões: ler `tab_permissoes`/`tab_permgru` e proteger as rotas por permissão
+- [x] API organizada por domínio (`nucleo/` + `dominios/`), migrações com Alembic (D11) — 30/10/2026
+- [x] Tabelas de acesso: empresa, usuário, perfil, permissão, usuário–empresa (migração 0001) — 30/10/2026
+- [x] Login com escolha da empresa, troca de empresa sem sair (`POST /auth/login`, `POST /auth/empresa`, `GET /auth/eu`) — 30/10/2026
+- [x] Permissões por empresa, conferidas a cada requisição (`exige("area.acao")`) — 30/10/2026
+- [x] Comandos de administração (`python -m app.cli`): empresas, perfis, usuários, acessos — 30/10/2026
+- [ ] Decidir o banco: PostgreSQL ou MariaDB (P7)
+- [ ] Telas de administração: cadastro de usuários, perfis e acessos (API + web)
+- [ ] Troca de senha pelo próprio usuário (desliga o modo "sem diferenciar maiúsculas" das senhas importadas)
 - [ ] Limitar tentativas de login (o VB6 bloqueia na 4ª tentativa)
-- [ ] Criar o front-end `web/` (Vue 3 + Quasar): tela de login e menu principal
+- [ ] Criar o front-end `web/` (Vue 3 + Quasar): login, escolha e troca de empresa, menu conforme as permissões
 - [ ] Definir onde a API vai rodar (servidor, domínio, HTTPS) e o processo de deploy
 
-## Banco único das filiais (transversal)
+## Dados das filiais: agente e ETL (transversal)
 
-Pode começar em paralelo com as ondas 1 e 2. Detalhes na seção 7 de [`legado/README.md`](legado/README.md).
+Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/etl/README.md`](../api/etl/README.md).
 
-- [ ] Confirmar o `cod_emp` de cada filial e conferir os registros já gravados (P2)
-- [ ] Decidir quais cadastros são globais e quais são por loja (P3)
-- [ ] Converter as tabelas de MyISAM para InnoDB
-- [ ] Criar chave primária nas 48 tabelas sem chave
-- [ ] Adicionar `cod_emp` às tabelas de movimento e colocá-lo na chave primária
-- [ ] Separar `tab_produtos` em cadastro global + `produto_filial`
-- [ ] Script de consolidação: juntar as bases das filiais com as tabelas `map_*`
-- [ ] Sincronização filial → central enquanto o VB6 estiver em uso (ampliar `fila_transferencia`)
+- [x] Conversão das senhas do VB6 para hash (`etl/senha_legado.py`) — 30/10/2026
+- [ ] Levantar a infraestrutura das filiais: quantas, computador do banco, internet, tamanho (P8)
+- [ ] Confirmar o `cod_emp` de cada filial (P2)
+- [ ] Agente da filial: dump do banco local e envio por HTTPS
+- [ ] Recebimento no servidor e carga na área de chegada (`legado_fXX`)
+- [ ] ETL de empresas e usuários (com a conversão de senhas e os perfis a partir de `tab_permissoes`)
+- [ ] ETL dos cadastros globais: clientes (deduplicados por CPF/CNPJ) e produtos
+- [ ] ETL dos demais domínios, acompanhando as ondas
+- [ ] Decidir se produtos cadastrados no sistema novo voltam para os VB6 durante a transição (P9)
 
 ## Onda 1 · Cadastros
 
@@ -58,6 +64,8 @@ Pode começar em paralelo com as ondas 1 e 2. Detalhes na seção 7 de [`legado/
 
 ## Onda 2 · Relatórios
 
+Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, antes de qualquer virada.
+
 - [ ] Levantar quais relatórios são realmente usados e priorizar
 - [ ] Padrão de relatório na web (filtros, PDF, Excel)
 - [ ] Migrar os relatórios por ordem de uso
@@ -65,14 +73,14 @@ Pode começar em paralelo com as ondas 1 e 2. Detalhes na seção 7 de [`legado/
 ## Onda 3 · Financeiro
 
 - [ ] Contas a pagar e a receber (`tab_doc`, `tab_itdoc`)
-- [ ] Baixa de parcelas
+- [ ] Baixa de parcelas em qualquer empresa, registrando o caixa de quem recebeu (D9)
 - [ ] Cheques
 - [ ] Cobrança e carnês
 - [ ] Testes comparando os resultados do sistema novo com os do VB6
 
 ## Onda 4 · Estoque e compras
 
-- [ ] Cadastro de produtos (com `produto_filial`)
+- [ ] Cadastro de produtos (global) com estoque, preço e custo por empresa (D9)
 - [ ] Entrada de notas e compras
 - [ ] Inventário e contagens
 - [ ] Perdas, movimento interno, etiquetas
@@ -98,8 +106,10 @@ Pode começar em paralelo com as ondas 1 e 2. Detalhes na seção 7 de [`legado/
 - [ ] Abertura e fechamento de caixa, trocas, vales, cartão presente
 - [ ] Operação offline com sincronização
 
-## Desligamento do VB6
+## Virada das filiais
 
-- [ ] Todas as telas de uma filial em uso no sistema novo
-- [ ] Filial passa a usar só o banco central
+- [ ] Escolher a filial piloto
+- [ ] Todas as telas que ela usa prontas no sistema novo
+- [ ] Última importação pelo ETL, e a filial passa a gravar só no sistema novo
 - [ ] Repetir para cada filial
+- [ ] Desligar o VB6

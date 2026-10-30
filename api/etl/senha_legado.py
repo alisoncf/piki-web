@@ -13,12 +13,11 @@ maiúsculas. Ou seja, a senha não diferencia maiúsculas de minúsculas.
 Referências no legado: requinte/modulos/Modulo.bas (F_GeraPW, F_RetornaPW,
 P_AjustaTexto) e requinte/forms/frmLogin.frm (cmndbtnEntr_Click).
 
-Este módulo existe só para conferir a senha antiga uma vez e migrá-la para
-hash (decisão D7). O sistema novo nunca grava senha neste formato.
+Na importação (decisão D8), o ETL decodifica a senha e grava só o hash, com
+usuario.senha_sem_caixa = True para continuar aceitando maiúsculas ou
+minúsculas, como no VB6, até o usuário trocar a senha no sistema novo.
 """
-
-# P_AjustaTexto troca estes caracteres antes de comparar
-_TROCAS = str.maketrans({"'": "`", "[": "{", "]": "}", "|": "ö"})
+from app.nucleo.seguranca import gerar_hash, normalizar_legado
 
 
 def _asc(c: str) -> int:
@@ -34,7 +33,7 @@ def _asc(c: str) -> int:
 
 def decodificar(armazenada: str) -> str:
     """Porta de F_RetornaPW."""
-    return "".join(chr(_asc(c) - 1 - i) for i, c in enumerate(armazenada, start=1))
+    return "".join(chr(_asc(c) - 1 - i) for i, c in enumerate(armazenada.rstrip(), start=1))
 
 
 def codificar(senha: str) -> str:
@@ -42,13 +41,15 @@ def codificar(senha: str) -> str:
     return "".join(chr(_asc(c) + 1 + i) for i, c in enumerate(senha, start=1))
 
 
-def ajustar_texto(texto: str) -> str:
-    """Porta de P_AjustaTexto (opção padrão): maiúsculas e trocas de caracteres."""
-    return texto.upper().translate(_TROCAS)
-
-
 def conferir(digitada: str, armazenada: str | None) -> bool:
     """Confere a senha digitada contra o valor de SENHA_USU, como o VB6 faz."""
     if not armazenada:
         return False
-    return decodificar(armazenada.rstrip()).upper() == ajustar_texto(digitada)
+    return decodificar(armazenada).upper() == normalizar_legado(digitada)
+
+
+def hash_para_importar(armazenada: str | None) -> str | None:
+    """Converte o SENHA_USU do legado no hash gravado em usuario.hash_senha."""
+    if not armazenada or not armazenada.strip():
+        return None
+    return gerar_hash(decodificar(armazenada), sem_caixa=True)

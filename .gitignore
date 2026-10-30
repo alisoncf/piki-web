@@ -28,3 +28,6 @@ backup/
 .idea/
 .DS_Store
 Thumbs.db
+
+# bancos SQLite de desenvolvimento
+*.db

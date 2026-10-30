@@ -1,12 +1,13 @@
 from fastapi import FastAPI
 
-from app.routers import auth, saude
+from app.dominios.acesso.rotas import router as acesso
+from app.dominios.sistema.rotas import router as sistema
 
 app = FastAPI(
     title="Piki API",
-    version="0.1.0",
-    description="API da nova versão do Piki. Migração gradual do sistema VB6.",
+    version="0.2.0",
+    description="API da nova versão do Piki.",
 )
 
-app.include_router(saude.router)
-app.include_router(auth.router)
+app.include_router(sistema)
+app.include_router(acesso)

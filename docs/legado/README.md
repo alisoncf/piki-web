@@ -103,6 +103,8 @@ O levantamento foi feito por script, lendo o `.vbp` e cada arquivo referenciado.
 
 ## 7. Integração das filiais num banco único
 
+> **Atualização (30/10/2026):** esta seção descreve a primeira proposta, de adaptar o banco atual. Ela foi substituída pelas decisões D8 a D10 em `docs/decisoes.md`: o sistema novo tem esquema próprio, alimentado por ETL. A análise abaixo continua útil como mapa do que o ETL precisa resolver (códigos repetidos entre filiais, estoque dentro de `tab_produtos`, tabelas sem chave).
+
 Hoje cada filial tem seu próprio banco `requinte`, e os códigos (clientes, vendas, documentos, produtos) são gerados em cada uma com `max()+1` ou sequências próprias. Ao juntar as bases, o mesmo número aparece em várias filiais significando coisas diferentes. A proposta abaixo resolve isso com o mínimo de mudança na lógica que já existe.
 
 ### 7.1 O que já existe
