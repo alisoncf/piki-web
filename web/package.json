@@ -1,0 +1,30 @@
+{
+  "name": "piki-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Front-end da nova versão do Piki",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@quasar/extras": "^2.1.0",
+    "axios": "^1.21.0",
+    "pinia": "^4.1.0",
+    "quasar": "^2.35.2",
+    "vue": "^3.5.44",
+    "vue-router": "^5.4.0"
+  },
+  "devDependencies": {
+    "@quasar/vite-plugin": "^2.0.2",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "@vue/test-utils": "^2.5.1",
+    "jsdom": "^30.1.3",
+    "sass-embedded": "^1.107.0",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

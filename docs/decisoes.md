@@ -67,6 +67,12 @@ Motivos: *row-level security* para isolar as empresas no próprio banco (uma con
 
 Para desenvolver: `docker compose up -d` sobe o PostgreSQL com os bancos `piki` e `piki_teste`. Sem banco configurado, a API e os testes usam SQLite.
 
+### D13. Front-end: Vue 3 + Quasar + Pinia, com Vite (30/10/2026)
+
+O front fica em `web/` e chama a API em `/api`; em desenvolvimento o Vite repassa para a API, em produção o servidor web fará o mesmo (mesma origem, sem CORS). A sessão (usuário, empresa ativa, empresas e permissões) fica numa store Pinia. Rotas e itens de menu declaram a permissão que exigem, com os mesmos códigos da API. Ao trocar de empresa, a tela atual é recarregada com os dados da nova empresa.
+
+O token de login fica no `localStorage`, para durar o turno mesmo fechando a aba. Ver P11.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
@@ -85,4 +91,5 @@ Para desenvolver: `docker compose up -d` sobe o PostgreSQL com os bancos `piki` 
 - **P7.** ~~PostgreSQL ou MariaDB?~~ Resolvido na D12.
 - **P8.** Infraestrutura das filiais: quantas são, se o computador do banco fica ligado e com internet, e o tamanho de cada banco. Define a frequência do agente.
 - **P10.** Segredos fiscais por empresa: certificado digital A1 (`.pfx` e senha) e CSC da NFC-e (id e token). No VB6 ficam em texto puro na `sped_empresa`; o ETL não os lê. Proposta: os arquivos `.pfx` ficam no servidor, fora do repositório e do banco, e senhas e tokens ficam cifrados no banco com uma chave que só existe no `.env` do servidor (ou num cofre de segredos). Decidir antes da onda 6.
+- **P11.** Token no `localStorage` é simples, mas fica exposto se algum dia o front tiver uma falha de XSS. Antes de ir para produção, avaliar trocar por cookie `HttpOnly` emitido pela API, com renovação automática.
 - **P9.** Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.

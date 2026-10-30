@@ -8,7 +8,7 @@ A nova versão tem um banco único para todas as empresas do grupo, com cadastro
 
 - **API:** Python 3.12+, FastAPI, SQLAlchemy 2, Alembic
 - **Banco:** PostgreSQL 16+ (decisão D12); as filiais seguem em MariaDB até a virada
-- **Web:** Vue 3 + Quasar (próxima etapa)
+- **Web:** Vue 3 + Quasar + Pinia, com Vite
 
 ## Estrutura
 
@@ -23,7 +23,7 @@ api/
   alembic/          # migrações da estrutura do banco
   etl/              # importação dos dados do VB6
   tests/
-web/                # Vue/Quasar (ainda não criado)
+web/                # Vue/Quasar (ver web/README.md)
 docker-compose.yml  # PostgreSQL de desenvolvimento
 docs/
   roteiro.md        # o que já foi feito e o que vem a seguir
@@ -53,13 +53,25 @@ python -m app.cli criar-usuario --login admin --nome "Administrador" --admin
 uvicorn app.main:app --reload
 ```
 
-A documentação interativa fica em http://localhost:8000/docs. Para testar: `POST /auth/login`, copie o `access_token`, clique em **Authorize** e use as demais rotas.
+A documentação interativa fica em http://localhost:8000/docs.
+
+## Rodando o front-end
+
+Pré-requisito: Node.js 20+. Com a API rodando, em outro terminal:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Abra http://localhost:9000 e entre com o usuário criado acima.
 
 Testes:
 
 ```bash
-cd api
-pytest        # usa SQLite em memória, ou o PostgreSQL se PIKI_TESTE_DATABASE_URL estiver no .env
+cd api && pytest      # API: SQLite em memória, ou o PostgreSQL se PIKI_TESTE_DATABASE_URL estiver no .env
+cd web && npm test    # front-end
 ```
 
 ## Onde estamos

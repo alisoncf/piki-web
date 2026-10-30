@@ -39,7 +39,9 @@ Documentos relacionados:
 - [ ] Telas de administração: cadastro de usuários, perfis e acessos (API + web)
 - [ ] Troca de senha pelo próprio usuário (desliga o modo "sem diferenciar maiúsculas" das senhas importadas)
 - [ ] Limitar tentativas de login (o VB6 bloqueia na 4ª tentativa)
-- [ ] Criar o front-end `web/` (Vue 3 + Quasar): login, escolha e troca de empresa, menu conforme as permissões
+- [x] Front-end `web/` (Vue 3 + Quasar + Pinia, D13): login, escolha e troca de empresa, menu conforme as permissões, lista de usuários — 30/10/2026
+- [ ] Testar o front no navegador com usuários reais e ajustar a identidade visual
+- [ ] Decidir onde guardar o token no navegador antes de produção (P11)
 - [ ] Definir onde a API vai rodar (servidor, domínio, HTTPS) e o processo de deploy
 
 ## Dados das filiais: agente e ETL (transversal)
