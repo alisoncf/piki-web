@@ -67,7 +67,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 
 ## Onda 1 · Cadastros
 
-- [ ] Clientes
+- [~] Clientes, setores, órgãos e grupos (D15): API pronta (migração 0006); faltam o ETL e as telas
 - [ ] Fornecedores
 - [x] Funcionários e cargos: API, telas (lista, ficha, cargos) e ETL do VB6, com cadastro global, loja de lotação e telefones (migrações 0004 e 0005) — 30/10/2026
 - [x] Rodar o ETL de funcionários nos bancos da matriz (01) e da La Viva (03), em cópias locais, juntando os cadastros repetidos entre filiais (pelo CPF ou pelo nome) — 30/10/2026

@@ -11,4 +11,6 @@ PERMISSOES: dict[str, str] = {
     "acesso.empresas": "Ver e gerenciar o cadastro de empresas",
     "funcionarios.ver": "Consultar funcionários e cargos",
     "funcionarios.editar": "Cadastrar e alterar funcionários e cargos",
+    "clientes.ver": "Consultar clientes, setores, órgãos e grupos de clientes",
+    "clientes.editar": "Cadastrar e alterar clientes, setores, órgãos e grupos de clientes",
 }

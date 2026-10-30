@@ -26,3 +26,21 @@ TIPOS_TELEFONE: dict[str, str] = {
     "4": "Recado",
     "5": "Fax",
 }
+
+
+def cnpj_valido(cnpj: str) -> bool:
+    """Confere os dígitos verificadores. Recebe só os 14 dígitos."""
+    if len(cnpj) != 14 or not cnpj.isdigit() or cnpj == cnpj[0] * 14:
+        return False
+    for tamanho in (12, 13):
+        pesos = list(range(tamanho - 7, 1, -1)) + list(range(9, 1, -1))
+        soma = sum(int(d) * p for d, p in zip(cnpj[:tamanho], pesos))
+        digito = 0 if soma % 11 < 2 else 11 - soma % 11
+        if digito != int(cnpj[tamanho]):
+            return False
+    return True
+
+
+def cpf_cnpj_valido(documento: str) -> bool:
+    """CPF (11 dígitos) ou CNPJ (14 dígitos)."""
+    return cpf_valido(documento) if len(documento) == 11 else cnpj_valido(documento)

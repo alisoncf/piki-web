@@ -81,6 +81,17 @@ Nome e logos ficam em `web/src/marca.js` e `web/public/`; as cores, só em `web/
 
 Cada empresa tem uma **cor de identificação**, para o funcionário saber em que loja está: aparece numa faixa no topo do cabeçalho, no selo da empresa, numa tintura leve do menu lateral, e o nome da loja vai para a aba do navegador. Botões e links continuam na cor da marca. A cor sai de uma paleta fechada de 8 (`api/app/dominios/acesso/cores.py`); sem escolha, vem automática pelo código da empresa. Muda com `python -m app.cli cor-empresa --empresa 01 --cor laranja` (migração 0003).
 
+### D15. Clientes, setores e órgãos unificados a partir dos bancos das lojas (30/10/2026)
+
+Cliente é um só para todas as lojas (D9), e setores (bairros e regiões de cobrança), órgãos (onde o cliente trabalha) e grupos de clientes também passam a ser uma lista só. No VB6 cada loja criava os seus, e os mesmos códigos significam coisas diferentes em cada banco.
+
+- **Fonte:** o ETL lê a `tab_clientes` e as tabelas ligadas de cada loja. O cadastro unificado que já existe no piki.app.br (sincronizado pelo VB6) não é usado: ele vai ser substituído pelo sistema novo.
+- **Mesmo cliente:** mesmo CPF/CNPJ válido. Sem documento válido, o cliente fica como cadastro próprio daquela loja, sem juntar pelo nome, com aviso para conferência.
+- **Quem manda nos dados:** o registro com a data de alteração mais recente (`dataalt_cli`, ou `data_cli` se estiver vazia). Os outros só preenchem campos vazios e acrescentam telefones e referências.
+- **Setores e órgãos:** juntados pelo nome (setor: nome + cidade). O cobrador do setor é escolhido por loja (`setor_cobrador`).
+- **Códigos antigos:** cada código de cada loja (`cod_cli`, `cod_set`, `cod_org`, `cod_gru`) fica no `legado_mapa`, apontando para o registro novo. É por ele que as vendas e contas antigas vão ser ligadas.
+- **Carga final:** as cópias locais servem para montar e testar. A carga de verdade será refeita direto nos bancos das lojas, por um túnel, antes da virada.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
@@ -91,7 +102,7 @@ Cada empresa tem uma **cor de identificação**, para o funcionário saber em qu
 
 ## Em aberto
 
-- **P1.** O servidor da API web que o VB6 já usa (`desktop_doc`, `desktop_clientes`, `desktop_baixa`): qual a stack e onde está? Pode virar o servidor central ou ser absorvido pelo `piki-web`.
+- **P1.** ~~O servidor da API web que o VB6 já usa (piki.app.br)~~. É mantido pelo Alison e vai ser substituído pelo `piki-web`; os clientes não vêm dele (D15).
 - **P2.** Códigos das empresas (`sped_empresa.codigo`, o `cod_emp` do VB6). Conhecidos em 30/10/2026: **01** (matriz, Requinte Enxovais, banco `requinte`), **02** (Jundiaí Casa, nome fantasia Requinte Enxovais, banco `requintejun`) e **03** (La Viva Enxovais, banco `requintebps`). Falta saber se existem outras e conferir se os registros já gravados em cada banco estão com o código certo. O ETL recusa importar quando o mesmo código aparece com CNPJs diferentes.
 - **P3.** ~~Clientes e produtos globais ou por loja?~~ Resolvido na D9.
 - **P4.** As lojas ainda usam ECF, ou só NFC-e? Se só NFC-e, o código e as tabelas de ECF são descartados.
@@ -102,3 +113,4 @@ Cada empresa tem uma **cor de identificação**, para o funcionário saber em qu
 - **P11.** Token no `localStorage` é simples, mas fica exposto se algum dia o front tiver uma falha de XSS. Antes de ir para produção, avaliar trocar por cookie `HttpOnly` emitido pela API, com renovação automática.
 - **P12.** Todas as filiais usam a marca Requinte Enxovais? Se alguma tiver outra marca, o logo e as cores passam para o cadastro da empresa e o visual muda ao trocar de empresa. Em 30/10/2026: a 03 tem nome fantasia La Viva Enxovais na `sped_empresa`; falta confirmar se ela usa outra marca na loja.
 - **P9.** Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.
+- **P13.** O que significam os códigos do cliente no VB6: `status_cli` (1 e 2), `cobranca_cli` (1, 2 e 3) e o tipo da referência (`tab_referencias.cod_tip`, 0 a 9). Os nomes provisórios estão em `api/app/dominios/clientes/esquemas.py`.
