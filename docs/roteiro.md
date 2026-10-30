@@ -55,7 +55,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [~] Confirmar o código de cada empresa (P2): conhecidos 01 e 03
 - [x] Cadastro de empresa com dados fiscais e endereço (migração 0002) — 30/10/2026
 - [x] ETL de empresas a partir da `sped_empresa`, sem ler certificado nem CSC (`python -m etl empresas`) — 30/10/2026
-- [x] Rodar o ETL de empresas nos bancos da matriz (01) e do Jundiaí (03), em cópias locais — 30/10/2026
+- [x] Rodar o ETL de empresas nos bancos da matriz (01) e da La Viva (03), em cópias locais — 30/10/2026
 - [ ] Rodar o ETL nas cópias dos bancos das outras filiais (o Alison vai baixar)
 - [ ] Decidir onde guardar certificado digital e CSC de cada empresa (P10)
 - [ ] Agente da filial: dump do banco local e envio por HTTPS
@@ -70,7 +70,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [ ] Clientes
 - [ ] Fornecedores
 - [x] Funcionários e cargos: API, telas (lista, ficha, cargos) e ETL do VB6, com cadastro global, loja de lotação e telefones (migrações 0004 e 0005) — 30/10/2026
-- [x] Rodar o ETL de funcionários nos bancos da matriz (01) e do Jundiaí (03), em cópias locais, juntando os cadastros repetidos entre filiais (pelo CPF ou pelo nome) — 30/10/2026
+- [x] Rodar o ETL de funcionários nos bancos da matriz (01) e da La Viva (03), em cópias locais, juntando os cadastros repetidos entre filiais (pelo CPF ou pelo nome) — 30/10/2026
 - [ ] Usuários ligados a funcionários (coluna `usuario.funcionario_id` já criada)
 - [ ] Cidades, setores, órgãos, cargos
 - [ ] Bancos, formas de pagamento, plano de contas

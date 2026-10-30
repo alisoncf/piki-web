@@ -92,7 +92,7 @@ Cada empresa tem uma **cor de identificação**, para o funcionário saber em qu
 ## Em aberto
 
 - **P1.** O servidor da API web que o VB6 já usa (`desktop_doc`, `desktop_clientes`, `desktop_baixa`): qual a stack e onde está? Pode virar o servidor central ou ser absorvido pelo `piki-web`.
-- **P2.** Códigos das empresas (`sped_empresa.codigo`, o `cod_emp` do VB6). Conhecidos em 30/10/2026: **01** (matriz, banco `requinte`) e **03** (loja do Jundiaí, banco `requintebps`). Falta saber se existe a 02 e outras, e conferir se os registros já gravados em cada banco estão com o código certo. O ETL recusa importar quando o mesmo código aparece com CNPJs diferentes.
+- **P2.** Códigos das empresas (`sped_empresa.codigo`, o `cod_emp` do VB6). Conhecidos em 30/10/2026: **01** (matriz, Requinte Enxovais, banco `requinte`), **02** (Jundiaí Casa, nome fantasia Requinte Enxovais, banco ainda não baixado) e **03** (La Viva Enxovais, banco `requintebps`). Falta saber se existem outras e conferir se os registros já gravados em cada banco estão com o código certo. O ETL recusa importar quando o mesmo código aparece com CNPJs diferentes.
 - **P3.** ~~Clientes e produtos globais ou por loja?~~ Resolvido na D9.
 - **P4.** As lojas ainda usam ECF, ou só NFC-e? Se só NFC-e, o código e as tabelas de ECF são descartados.
 - **P6.** O login do VB6 monta o SQL concatenando o texto digitado (`frmLogin`), o que permite injeção de SQL. Vale corrigir no legado enquanto ele estiver em uso.
@@ -100,5 +100,5 @@ Cada empresa tem uma **cor de identificação**, para o funcionário saber em qu
 - **P8.** Infraestrutura das filiais: quantas são, se o computador do banco fica ligado e com internet, e o tamanho de cada banco. Define a frequência do agente.
 - **P10.** Segredos fiscais por empresa: certificado digital A1 (`.pfx` e senha) e CSC da NFC-e (id e token). No VB6 ficam em texto puro na `sped_empresa`; o ETL não os lê. Proposta: os arquivos `.pfx` ficam no servidor, fora do repositório e do banco, e senhas e tokens ficam cifrados no banco com uma chave que só existe no `.env` do servidor (ou num cofre de segredos). Decidir antes da onda 6.
 - **P11.** Token no `localStorage` é simples, mas fica exposto se algum dia o front tiver uma falha de XSS. Antes de ir para produção, avaliar trocar por cookie `HttpOnly` emitido pela API, com renovação automática.
-- **P12.** Todas as filiais usam a marca Requinte Enxovais? Se alguma tiver outra marca, o logo e as cores passam para o cadastro da empresa e o visual muda ao trocar de empresa.
+- **P12.** Todas as filiais usam a marca Requinte Enxovais? Se alguma tiver outra marca, o logo e as cores passam para o cadastro da empresa e o visual muda ao trocar de empresa. Em 30/10/2026: a 03 tem nome fantasia La Viva Enxovais na `sped_empresa`; falta confirmar se ela usa outra marca na loja.
 - **P9.** Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.
