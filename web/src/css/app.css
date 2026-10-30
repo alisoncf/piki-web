@@ -11,13 +11,19 @@
     var(--q-primary) 45%,
     color-mix(in srgb, var(--q-primary) 72%, black) 100%
   );
+  /* grafite com um toque da cor da loja; aumente o % para ficar mais ameixa */
+  --piki-menu-fundo: color-mix(in srgb, var(--q-primary) 12%, #1c1b1f);
   --piki-dourado: var(--q-accent);
   --piki-fundo: color-mix(in srgb, var(--q-primary) 3%, white);
   --piki-superficie: #ffffff;
   --piki-borda: color-mix(in srgb, var(--q-primary) 8%, #f0f0f0);
   --piki-texto: color-mix(in srgb, var(--q-primary) 12%, #222222);
   --piki-texto-suave: color-mix(in srgb, var(--q-primary) 12%, #666666);
-  --piki-sombra: color-mix(in srgb, var(--piki-primaria-escura) 8%, transparent);
+  --piki-sombra: color-mix(
+    in srgb,
+    var(--piki-primaria-escura) 8%,
+    transparent
+  );
 }
 
 body {
@@ -79,7 +85,7 @@ body {
 }
 /* desenho de fundo discreto: anéis no canto */
 .login__marca::after {
-  content: '';
+  content: "";
   position: absolute;
   right: -160px;
   bottom: -160px;
@@ -118,23 +124,23 @@ body {
 }
 
 .piki-menu {
-  background: var(--piki-primaria-escura);
-  color: rgba(255, 255, 255, 0.8);
+  background: var(--piki-menu-fundo);
+  color: rgba(255, 255, 255, 0.72);
 }
 .piki-menu .q-item {
-  border-radius: 8px;
+  border-radius: 2px;
   margin: 2px 8px;
   min-height: 40px;
 }
 .piki-menu .q-item__section--avatar {
   min-width: 36px;
-  color: rgba(255, 255, 255, 0.6);
-}
-.piki-menu .q-expansion-item__toggle-icon {
   color: rgba(255, 255, 255, 0.5);
 }
+.piki-menu .q-expansion-item__toggle-icon {
+  color: rgba(255, 255, 255, 0.4);
+}
 .piki-menu__ativo {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.07);
   color: #fff;
   box-shadow: inset 3px 0 0 var(--piki-dourado);
 }
@@ -147,7 +153,7 @@ body {
   right: 0;
   bottom: 0;
   padding: 16px;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .piki-empresa {
