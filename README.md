@@ -64,7 +64,7 @@ pytest        # usa SQLite em memória, ou o PostgreSQL se PIKI_TESTE_DATABASE_U
 
 ## Onde estamos
 
-O caminho do projeto, com o que já foi feito e o que vem a seguir, está em [`docs/roteiro.md`](docs/roteiro.md). As decisões e as perguntas em aberto ficam em [`docs/decisoes.md`](docs/decisoes.md).
+O caminho do projeto, com o que já foi feito e o que vem a seguir, está em [`docs/roteiro.md`](docs/roteiro.md). As decisões e as perguntas em aberto ficam em [`docs/decisoes.md`](docs/decisoes.md), e as convenções de código em [`CLAUDE.md`](CLAUDE.md).
 
 ## Segurança
 

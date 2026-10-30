@@ -28,6 +28,7 @@ Documentos relacionados:
 - [x] Esqueleto da API (FastAPI, configuração por `.env`) — 30/10/2026
 - [x] `GET /saude`, com testes — 30/10/2026
 - [x] Roteiro do projeto (este arquivo) — 30/10/2026
+- [x] `CLAUDE.md` com o guia do projeto e as convenções — 30/10/2026
 - [x] API organizada por domínio (`nucleo/` + `dominios/`), migrações com Alembic (D11) — 30/10/2026
 - [x] Tabelas de acesso: empresa, usuário, perfil, permissão, usuário–empresa (migração 0001) — 30/10/2026
 - [x] Login com escolha da empresa, troca de empresa sem sair (`POST /auth/login`, `POST /auth/empresa`, `GET /auth/eu`) — 30/10/2026
