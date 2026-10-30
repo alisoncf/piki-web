@@ -68,7 +68,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 
 - [ ] Clientes
 - [ ] Fornecedores
-- [~] Funcionários e cargos: API com cadastro global, loja de lotação e telefones (migração 0004); faltam telas e ETL
+- [~] Funcionários e cargos: API e telas (lista, ficha, cargos), cadastro global com loja de lotação e telefones (migração 0004); falta o ETL
 - [ ] Usuários ligados a funcionários (coluna `usuario.funcionario_id` já criada)
 - [ ] Cidades, setores, órgãos, cargos
 - [ ] Bancos, formas de pagamento, plano de contas

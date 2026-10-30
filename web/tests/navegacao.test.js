@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { filtrarMenu, MENU } from '@/menu'
-import { destino } from '@/router'
+import { destino, rotas } from '@/router'
 
 function sessao({ logado = true, empresa = true, permissoes = [] } = {}) {
   return {
@@ -51,5 +52,14 @@ describe('menu por permissão', () => {
     const menu = filtrarMenu(MENU, (p) => !p || p === 'acesso.usuarios')
     const acesso = menu.find((i) => i.titulo === 'Acesso')
     expect(acesso.filhos.map((f) => f.titulo)).toEqual(['Usuários'])
+  })
+})
+
+describe('rotas de cadastro', () => {
+  it('a ficha do funcionário aceita só id numérico', () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: rotas })
+    expect(router.resolve('/cadastros/funcionarios/7').name).toBe('funcionario')
+    expect(router.resolve('/cadastros/funcionarios/novo').name).toBe('funcionario-novo')
+    expect(router.resolve('/cadastros/funcionarios/abc').name).toBe('nao-encontrada')
   })
 })

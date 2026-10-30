@@ -1,0 +1,110 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { Notify, QLayout, QPageContainer, Quasar } from 'quasar'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { h } from 'vue'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
+
+import FuncionarioPagina from '@/paginas/cadastros/FuncionarioPagina.vue'
+import FuncionariosPagina from '@/paginas/cadastros/FuncionariosPagina.vue'
+import { api } from '@/servicos/api'
+import { formatarCpf, formatarTelefone, mascaraTelefone, nomeTipoTelefone } from '@/servicos/formatos'
+import { useSessaoStore } from '@/stores/sessao'
+
+const MATRIZ = { id: 1, codigo: '01', nome: 'MATRIZ', cor: '#2f6fb0' }
+const FILIAL = { id: 3, codigo: '03', nome: 'FILIAL', cor: '#1f8a80' }
+const CARGO = { id: 5, nome: 'Vendedor', vende: true, cobra: false, ativo: true }
+
+const JOANA = {
+  id: 7, nome: 'Joana Teste', apelido: 'JOANA', cpf: '52998224725', ativo: true, empresa: MATRIZ, cargo: CARGO,
+}
+const PEDRO = { id: 8, nome: 'Pedro Teste', apelido: null, cpf: null, ativo: false, empresa: FILIAL, cargo: null }
+
+async function montar(componente, caminho) {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/cadastros/funcionarios', name: 'funcionarios', component: componente === FuncionariosPagina ? componente : { render: () => h('div') } },
+      { path: '/cadastros/funcionarios/novo', name: 'funcionario-novo', component: componente },
+      { path: '/cadastros/funcionarios/:id', name: 'funcionario', component: componente },
+    ],
+  })
+  await router.push(caminho)
+  // q-page só aparece dentro de um q-layout
+  const casca = { render: () => h(QLayout, () => h(QPageContainer, () => h(RouterView))) }
+  const wrapper = mount(casca, { global: { plugins: [[Quasar, { plugins: { Notify } }], router] } })
+  await flushPromises()
+  return { wrapper, router }
+}
+
+function entrar(permissoes) {
+  const sessao = useSessaoStore()
+  sessao.usuario = { nome: 'Bia' }
+  sessao.empresa = MATRIZ
+  sessao.empresas = [MATRIZ, FILIAL]
+  sessao.permissoes = permissoes
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  vi.restoreAllMocks()
+})
+
+describe('formatos', () => {
+  it('formata CPF e telefone', () => {
+    expect(formatarCpf('52998224725')).toBe('529.982.247-25')
+    expect(formatarTelefone('62999990000')).toBe('(62) 99999-0000')
+    expect(formatarTelefone('6233334444')).toBe('(62) 3333-4444')
+    expect(nomeTipoTelefone('3')).toBe('Celular')
+  })
+
+  it('a máscara do telefone cresce para celular', () => {
+    expect(mascaraTelefone('6233334444')).toBe('(##) ####-#####')
+    expect(mascaraTelefone('62999990000')).toBe('(##) #####-####')
+  })
+})
+
+describe('lista de funcionários', () => {
+  it('mostra os ativos de todas as lojas, com CPF formatado', async () => {
+    entrar(['funcionarios.ver'])
+    vi.spyOn(api, 'get').mockResolvedValue({ data: [JOANA, PEDRO] })
+    const { wrapper } = await montar(FuncionariosPagina, '/cadastros/funcionarios')
+    expect(wrapper.text()).toContain('Joana Teste')
+    expect(wrapper.text()).toContain('529.982.247-25')
+    expect(wrapper.text()).not.toContain('Pedro Teste') // inativo
+    // sem permissão de editar, não oferece o botão de novo
+    expect(wrapper.text()).not.toContain('Novo funcionário')
+  })
+})
+
+describe('cadastro de funcionário', () => {
+  it('novo: já vem na loja ativa e envia os dados para a API', async () => {
+    entrar(['funcionarios.ver', 'funcionarios.editar'])
+    vi.spyOn(api, 'get').mockResolvedValue({ data: [CARGO] })
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...JOANA, id: 9 } })
+    const { wrapper, router } = await montar(FuncionarioPagina, '/cadastros/funcionarios/novo')
+
+    expect(wrapper.text()).toContain('Novo funcionário')
+    await wrapper.find('input[maxlength="80"]').setValue('Joana Teste')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(post).toHaveBeenCalledWith('/funcionarios', expect.objectContaining({
+      nome: 'Joana Teste', empresa_id: MATRIZ.id, limite_vale: '0.00', telefones: [],
+    }))
+    expect(router.currentRoute.value.params.id).toBe('9')
+  })
+
+  it('existente: carrega os dados; sem permissão de editar, não mostra o salvar', async () => {
+    entrar(['funcionarios.ver'])
+    vi.spyOn(api, 'get').mockImplementation(async (url) =>
+      url === '/cargos'
+        ? { data: [CARGO] }
+        : { data: { ...JOANA, limite_vale: '10.00', telefones: [{ numero: '62999990000', tipo: '3' }] } },
+    )
+    const { wrapper } = await montar(FuncionarioPagina, '/cadastros/funcionarios/7')
+    expect(wrapper.find('input[maxlength="80"]').element.value).toBe('Joana Teste')
+    expect(wrapper.text()).not.toContain('Salvar')
+    expect(wrapper.find('fieldset').attributes('disabled')).toBeDefined()
+  })
+})
