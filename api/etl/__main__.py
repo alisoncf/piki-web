@@ -30,6 +30,9 @@ def main(argv: list[str] | None = None) -> None:
     f.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     f.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     args = p.parse_args(argv)
+    # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
     origem = create_engine(args.origem)
     try:

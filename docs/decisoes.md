@@ -92,7 +92,7 @@ Cada empresa tem uma **cor de identificação**, para o funcionário saber em qu
 ## Em aberto
 
 - **P1.** O servidor da API web que o VB6 já usa (`desktop_doc`, `desktop_clientes`, `desktop_baixa`): qual a stack e onde está? Pode virar o servidor central ou ser absorvido pelo `piki-web`.
-- **P2.** Códigos das empresas (`sped_empresa.codigo`, o `cod_emp` do VB6). Conhecidos em 30/10/2026: **01** (matriz, Requinte Enxovais, banco `requinte`), **02** (Jundiaí Casa, nome fantasia Requinte Enxovais, banco ainda não baixado) e **03** (La Viva Enxovais, banco `requintebps`). Falta saber se existem outras e conferir se os registros já gravados em cada banco estão com o código certo. O ETL recusa importar quando o mesmo código aparece com CNPJs diferentes.
+- **P2.** Códigos das empresas (`sped_empresa.codigo`, o `cod_emp` do VB6). Conhecidos em 30/10/2026: **01** (matriz, Requinte Enxovais, banco `requinte`), **02** (Jundiaí Casa, nome fantasia Requinte Enxovais, banco `requintejun`) e **03** (La Viva Enxovais, banco `requintebps`). Falta saber se existem outras e conferir se os registros já gravados em cada banco estão com o código certo. O ETL recusa importar quando o mesmo código aparece com CNPJs diferentes.
 - **P3.** ~~Clientes e produtos globais ou por loja?~~ Resolvido na D9.
 - **P4.** As lojas ainda usam ECF, ou só NFC-e? Se só NFC-e, o código e as tabelas de ECF são descartados.
 - **P6.** O login do VB6 monta o SQL concatenando o texto digitado (`frmLogin`), o que permite injeção de SQL. Vale corrigir no legado enquanto ele estiver em uso.

@@ -56,7 +56,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [x] Cadastro de empresa com dados fiscais e endereço (migração 0002) — 30/10/2026
 - [x] ETL de empresas a partir da `sped_empresa`, sem ler certificado nem CSC (`python -m etl empresas`) — 30/10/2026
 - [x] Rodar o ETL de empresas nos bancos da matriz (01) e da La Viva (03), em cópias locais — 30/10/2026
-- [ ] Rodar o ETL nas cópias dos bancos das outras filiais (o Alison vai baixar)
+- [~] Rodar o ETL nas cópias dos bancos das outras filiais: Jundiaí Casa (02, banco `requintejun`) feita em 30/10/2026; faltam as demais
 - [ ] Decidir onde guardar certificado digital e CSC de cada empresa (P10)
 - [ ] Agente da filial: dump do banco local e envio por HTTPS
 - [ ] Recebimento no servidor e carga na área de chegada (`legado_fXX`)
