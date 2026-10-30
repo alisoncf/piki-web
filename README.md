@@ -36,7 +36,7 @@ docs/
 Pré-requisitos: Python 3.12+ e Docker (para o PostgreSQL). Sem Docker, dá para rodar tudo com SQLite: basta não criar o `.env`.
 
 ```bash
-docker compose up -d             # sobe o PostgreSQL (bancos piki e piki_teste)
+docker compose up -d             # sobe o PostgreSQL na porta 5433 (bancos piki e piki_teste)
 cp .env.example .env
 
 cd api

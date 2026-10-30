@@ -9,7 +9,8 @@ services:
       POSTGRES_PASSWORD: piki
       POSTGRES_DB: piki
     ports:
-      - "5432:5432"
+      # porta no seu computador: 5433 por padrão, para não brigar com outro PostgreSQL já instalado
+      - "${PIKI_PORTA_BANCO:-5433}:5432"
     volumes:
       - dados_banco:/var/lib/postgresql/data
       - ./docker/criar-banco-teste.sql:/docker-entrypoint-initdb.d/criar-banco-teste.sql:ro
