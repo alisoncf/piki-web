@@ -19,6 +19,8 @@ class Configuracao(BaseSettings):
 
     # sem .env, usa um SQLite local para desenvolver sem servidor de banco
     database_url: str = "sqlite:///./piki-dev.db"
+    # banco dos testes automatizados (opcional; sem ele, SQLite em memória)
+    teste_database_url: str = ""
     ambiente: str = "dev"
     # chave para assinar os tokens de login; obrigatória em produção
     segredo_token: str = ""

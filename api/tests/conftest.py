@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.config import configuracao
 from app.dominios.acesso import servico
 from app.main import app
 from app.nucleo import seguranca
@@ -20,8 +21,17 @@ def hash_rapido(monkeypatch):
 
 @pytest.fixture
 def banco():
-    """SQLite em memória com todas as tabelas. Nunca toca no banco do .env."""
-    eng = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    """Banco de teste com todas as tabelas, recriado a cada teste. Nunca usa o banco do .env.
+
+    Padrão: SQLite em memória. Para rodar contra um PostgreSQL de teste, defina
+    PIKI_TESTE_DATABASE_URL no .env (ver .env.example).
+    """
+    url = configuracao().teste_database_url
+    if url:
+        eng = create_engine(url)
+        Base.metadata.drop_all(eng)
+    else:
+        eng = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(eng)
     fabrica = sessionmaker(bind=eng, autoflush=False, expire_on_commit=False)
 
@@ -32,6 +42,7 @@ def banco():
     app.dependency_overrides[sessao] = sessao_teste
     yield fabrica
     app.dependency_overrides.clear()
+    eng.dispose()
 
 
 @pytest.fixture

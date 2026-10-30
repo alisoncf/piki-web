@@ -20,7 +20,7 @@ Documentos relacionados:
 - [x] Criar o repositório `piki-web`, separado do legado — 30/10/2026
 - [x] Decidir: esquema novo alimentado por ETL, escopo dos dados entre empresas, acesso por usuário–empresa–perfil (D8, D9, D10) — 30/10/2026
 - [ ] Tornar o repositório `piki_vb` privado e trocar as senhas que estão expostas nele
-- [ ] Responder as pendências P1, P2, P4, P7, P8 e P9 de `decisoes.md`
+- [ ] Responder as pendências P1, P2, P4, P8 e P9 de `decisoes.md`
 - [ ] Corrigir a injeção de SQL no login do VB6 (P6)
 
 ## Onda 0 · Fundação
@@ -33,7 +33,8 @@ Documentos relacionados:
 - [x] Login com escolha da empresa, troca de empresa sem sair (`POST /auth/login`, `POST /auth/empresa`, `GET /auth/eu`) — 30/10/2026
 - [x] Permissões por empresa, conferidas a cada requisição (`exige("area.acao")`) — 30/10/2026
 - [x] Comandos de administração (`python -m app.cli`): empresas, perfis, usuários, acessos — 30/10/2026
-- [ ] Decidir o banco: PostgreSQL ou MariaDB (P7)
+- [x] Banco: PostgreSQL (D12), com `docker-compose.yml` para desenvolvimento; migração 0001 e testes validados no PostgreSQL 16 — 30/10/2026
+- [ ] Ativar o isolamento por empresa no banco (*row-level security*) junto com a primeira tabela por empresa
 - [ ] Telas de administração: cadastro de usuários, perfis e acessos (API + web)
 - [ ] Troca de senha pelo próprio usuário (desliga o modo "sem diferenciar maiúsculas" das senhas importadas)
 - [ ] Limitar tentativas de login (o VB6 bloqueia na 4ª tentativa)

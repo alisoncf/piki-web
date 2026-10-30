@@ -7,7 +7,7 @@ A nova versão tem um banco único para todas as empresas do grupo, com cadastro
 ## Stack
 
 - **API:** Python 3.12+, FastAPI, SQLAlchemy 2, Alembic
-- **Banco:** PostgreSQL ou MariaDB (decisão P7 em aberto); SQLite para desenvolvimento
+- **Banco:** PostgreSQL 16+ (decisão D12); as filiais seguem em MariaDB até a virada
 - **Web:** Vue 3 + Quasar (próxima etapa)
 
 ## Estrutura
@@ -24,6 +24,7 @@ api/
   etl/              # importação dos dados do VB6
   tests/
 web/                # Vue/Quasar (ainda não criado)
+docker-compose.yml  # PostgreSQL de desenvolvimento
 docs/
   roteiro.md        # o que já foi feito e o que vem a seguir
   decisoes.md       # decisões de arquitetura e pendências
@@ -32,12 +33,16 @@ docs/
 
 ## Rodando a API
 
+Pré-requisitos: Python 3.12+ e Docker (para o PostgreSQL). Sem Docker, dá para rodar tudo com SQLite: basta não criar o `.env`.
+
 ```bash
+docker compose up -d             # sobe o PostgreSQL (bancos piki e piki_teste)
+cp .env.example .env
+
 cd api
 python -m venv .venv
 source .venv/bin/activate        # no Windows: .venv\Scripts\activate
-pip install -e ".[dev]"          # acrescente ,mariadb ou ,postgres para o driver do banco
-cp ../.env.example ../.env       # opcional: sem .env, usa SQLite local
+pip install -e ".[dev]"
 
 alembic upgrade head             # cria as tabelas
 
@@ -54,7 +59,7 @@ Testes:
 
 ```bash
 cd api
-pytest
+pytest        # usa SQLite em memória, ou o PostgreSQL se PIKI_TESTE_DATABASE_URL estiver no .env
 ```
 
 ## Onde estamos

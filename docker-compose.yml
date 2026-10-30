@@ -1,0 +1,22 @@
+# Banco de desenvolvimento. Só para uso local: usuário e senha abaixo não valem para produção.
+#   docker compose up -d      sobe o PostgreSQL
+#   docker compose down       desliga (os dados ficam no volume)
+services:
+  banco:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: piki
+      POSTGRES_PASSWORD: piki
+      POSTGRES_DB: piki
+    ports:
+      - "5432:5432"
+    volumes:
+      - dados_banco:/var/lib/postgresql/data
+      - ./docker/criar-banco-teste.sql:/docker-entrypoint-initdb.d/criar-banco-teste.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U piki"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  dados_banco:

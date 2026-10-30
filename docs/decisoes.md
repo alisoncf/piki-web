@@ -59,6 +59,14 @@ Cada domínio (acesso, cadastros, financeiro...) tem sua pasta em `api/app/domin
 
 O que é comum a todos (banco, segurança, dependências de login e empresa) fica em `api/app/nucleo/`. A estrutura do banco é versionada com Alembic (`api/alembic/`).
 
+### D12. PostgreSQL no servidor central (30/10/2026)
+
+O banco do sistema novo é PostgreSQL (16 ou mais recente). As filiais continuam com MariaDB enquanto o VB6 estiver em uso; o ETL lê do MariaDB e grava no PostgreSQL.
+
+Motivos: *row-level security* para isolar as empresas no próprio banco (uma consulta que esqueça o filtro de empresa é barrada pelo banco), migrações de estrutura transacionais (uma migração que falha não deixa o banco pela metade), `INSERT ... ON CONFLICT` e consultas analíticas maduras para o ETL e os relatórios consolidados, e tipos rígidos que obrigam o ETL a tratar as datas `0000-00-00` e textos fora do tamanho do banco antigo.
+
+Para desenvolver: `docker compose up -d` sobe o PostgreSQL com os bancos `piki` e `piki_teste`. Sem banco configurado, a API e os testes usam SQLite.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
@@ -74,6 +82,6 @@ O que é comum a todos (banco, segurança, dependências de login e empresa) fic
 - **P3.** ~~Clientes e produtos globais ou por loja?~~ Resolvido na D9.
 - **P4.** As lojas ainda usam ECF, ou só NFC-e? Se só NFC-e, o código e as tabelas de ECF são descartados.
 - **P6.** O login do VB6 monta o SQL concatenando o texto digitado (`frmLogin`), o que permite injeção de SQL. Vale corrigir no legado enquanto ele estiver em uso.
-- **P7.** Banco do sistema novo: PostgreSQL ou MariaDB? O código usa SQLAlchemy e funciona com os dois. O PostgreSQL permite isolar empresas no próprio banco (*row-level security*) e tem migrações de estrutura transacionais.
+- **P7.** ~~PostgreSQL ou MariaDB?~~ Resolvido na D12.
 - **P8.** Infraestrutura das filiais: quantas são, se o computador do banco fica ligado e com internet, e o tamanho de cada banco. Define a frequência do agente.
 - **P9.** Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.
