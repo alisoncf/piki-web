@@ -68,7 +68,8 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 
 - [ ] Clientes
 - [ ] Fornecedores
-- [~] Funcionários e cargos: API e telas (lista, ficha, cargos), cadastro global com loja de lotação e telefones (migração 0004); falta o ETL
+- [x] Funcionários e cargos: API, telas (lista, ficha, cargos) e ETL do VB6, com cadastro global, loja de lotação e telefones (migrações 0004 e 0005) — 30/10/2026
+- [ ] Rodar o ETL de funcionários nos bancos da matriz (01) e do Jundiaí (03)
 - [ ] Usuários ligados a funcionários (coluna `usuario.funcionario_id` já criada)
 - [ ] Cidades, setores, órgãos, cargos
 - [ ] Bancos, formas de pagamento, plano de contas

@@ -23,9 +23,18 @@ Regras gerais:
 ```bash
 pip install -e ".[legado]"     # driver para ler o MariaDB do VB6
 python -m etl empresas --origem "mysql+pymysql://usuario:senha@servidor:3306/requinte"
+python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
 ```
 
-O destino é o banco do `.env`. Rode uma vez para cada banco de filial.
+O destino é o banco do `.env`. Rode uma vez para cada banco de filial, começando pelas empresas. O `--empresa` diz de qual empresa é o banco de origem.
+
+### Funcionários
+
+- Cargos e funcionários são ligados aos códigos antigos pela tabela `legado_mapa` (tabela de origem + empresa + código), porque `cod_fun` e `cod_car` se repetem entre filiais.
+- Funcionário que não está no mapa é procurado pelo CPF: a mesma pessoa em duas filiais vira um cadastro só, e os dados da primeira importação ficam. Sem CPF válido, é criado um cadastro novo.
+- Na reimportação, os dados do VB6 atualizam o cadastro, menos a loja de lotação.
+- Telefones vêm da `tab_telefones` com `tipo_ter = 'U'`; só entram os que ainda não existem.
+- CPFs inválidos são ignorados e aparecem como aviso no fim.
 
 ## Situação
 
@@ -35,5 +44,6 @@ O destino é o banco do `.env`. Rode uma vez para cada banco de filial.
 | Agente das filiais | a fazer |
 | Carga da área de chegada | a fazer |
 | Importação de empresas (`empresas.py`) | pronta, com testes |
+| Importação de funcionários e cargos (`funcionarios.py`) | pronta, com testes |
 | Importação de usuários | a fazer |
 | Demais domínios | acompanham as ondas do roteiro |
