@@ -19,6 +19,48 @@ export const rotas = [
         meta: { permissao: 'acesso.usuarios' },
       },
       {
+        path: 'cadastros/clientes',
+        name: 'clientes',
+        component: () => import('@/paginas/cadastros/ClientesPagina.vue'),
+        meta: { permissao: 'clientes.ver' },
+      },
+      {
+        path: 'cadastros/clientes/novo',
+        name: 'cliente-novo',
+        component: () => import('@/paginas/cadastros/ClientePagina.vue'),
+        meta: { permissao: 'clientes.editar' },
+      },
+      {
+        path: 'cadastros/clientes/:id(\\d+)',
+        name: 'cliente',
+        component: () => import('@/paginas/cadastros/ClientePagina.vue'),
+        meta: { permissao: 'clientes.ver' },
+      },
+      {
+        path: 'cadastros/setores',
+        name: 'setores',
+        component: () => import('@/paginas/cadastros/SetoresPagina.vue'),
+        meta: { permissao: 'clientes.ver' },
+      },
+      {
+        path: 'cadastros/orgaos',
+        name: 'orgaos',
+        component: () => import('@/paginas/cadastros/OrgaosPagina.vue'),
+        meta: { permissao: 'clientes.ver' },
+      },
+      {
+        path: 'cadastros/grupos-clientes',
+        name: 'grupos-clientes',
+        component: () => import('@/paginas/cadastros/GruposClientesPagina.vue'),
+        meta: { permissao: 'clientes.ver' },
+      },
+      {
+        path: 'cadastros/parentescos',
+        name: 'parentescos',
+        component: () => import('@/paginas/cadastros/ParentescosPagina.vue'),
+        meta: { permissao: 'clientes.ver' },
+      },
+      {
         path: 'cadastros/funcionarios',
         name: 'funcionarios',
         component: () => import('@/paginas/cadastros/FuncionariosPagina.vue'),

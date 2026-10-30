@@ -227,3 +227,8 @@ body {
   margin: 0;
   min-width: 0;
 }
+
+.cartao-medio {
+  width: 100%;
+  max-width: 600px;
+}

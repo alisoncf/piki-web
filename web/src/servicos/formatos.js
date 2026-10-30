@@ -33,3 +33,32 @@ export function nomeTipoTelefone(tipo) {
 export function mascaraTelefone(numero) {
   return soDigitos(numero).length > 10 ? '(##) #####-####' : '(##) ####-#####'
 }
+
+export function formatarCnpj(cnpj) {
+  const d = soDigitos(cnpj)
+  return d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d
+}
+
+export function formatarDocumento(documento) {
+  return soDigitos(documento).length === 14 ? formatarCnpj(documento) : formatarCpf(documento)
+}
+
+// mesmos nomes da API (app/dominios/clientes/esquemas.py)
+export const FORMAS_COBRANCA = [
+  { value: 'domicilio', label: 'Em domicílio' },
+  { value: 'trabalho', label: 'No trabalho' },
+  { value: 'loja', label: 'Pagamento na loja' },
+]
+
+/** Data e hora da API (sem fuso) para exibir: 27/10/2021 15:49. */
+export function formatarDataHora(valor) {
+  if (!valor) return ''
+  const [data, hora = ''] = String(valor).split('T')
+  const [ano, mes, dia] = data.split('-')
+  return `${dia}/${mes}/${ano}${hora ? ' ' + hora.slice(0, 5) : ''}`
+}
+
+/** Para comparar nomes: sem acentos e em minúsculas. */
+export function semAcentos(texto) {
+  return String(texto ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}
