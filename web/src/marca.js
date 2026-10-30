@@ -12,3 +12,13 @@ export const SISTEMA = {
   nome: 'Piki',
   icone: '/piki-icone.svg',
 }
+
+/**
+ * Mostra em que empresa o usuário está: a cor dela vai para a variável
+ * --piki-empresa (faixa do cabeçalho e menu) e o nome vai para a aba do navegador.
+ */
+export function aplicarEmpresa(empresa, doc = document) {
+  if (empresa?.cor) doc.documentElement.style.setProperty('--piki-empresa', empresa.cor)
+  else doc.documentElement.style.removeProperty('--piki-empresa')
+  doc.title = empresa ? `${empresa.nome} · ${SISTEMA.nome}` : SISTEMA.nome
+}

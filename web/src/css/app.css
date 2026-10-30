@@ -11,8 +11,10 @@
     var(--q-primary) 45%,
     color-mix(in srgb, var(--q-primary) 72%, black) 100%
   );
-  /* grafite com um toque da cor da loja; aumente o % para ficar mais ameixa */
-  --piki-menu-fundo: color-mix(in srgb, var(--q-primary) 12%, #1c1b1f);
+  /* cor da empresa ativa (vem da API, ver marca.js); antes da escolha, a da marca */
+  --piki-empresa: var(--q-primary);
+  /* grafite com um toque da cor da empresa ativa; aumente o % para ficar mais colorido */
+  --piki-menu-fundo: color-mix(in srgb, var(--piki-empresa) 15%, #1c1b1f);
   --piki-dourado: var(--q-accent);
   --piki-fundo: color-mix(in srgb, var(--q-primary) 3%, white);
   --piki-superficie: #ffffff;
@@ -120,6 +122,7 @@ body {
 .piki-cabecalho {
   background: var(--piki-superficie);
   color: var(--piki-texto);
+  border-top: 4px solid var(--piki-empresa);
   border-bottom: 1px solid var(--piki-borda);
 }
 

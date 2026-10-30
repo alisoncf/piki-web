@@ -79,6 +79,8 @@ Quem usa o sistema é a equipe da Requinte Enxovais, então a marca da loja apar
 
 Nome e logos ficam em `web/src/marca.js` e `web/public/`; as cores, só em `web/src/css/quasar.variables.scss` (os tons de apoio de `app.css` são derivados delas). Por enquanto a marca é fixa para todas as empresas (ver P12).
 
+Cada empresa tem uma **cor de identificação**, para o funcionário saber em que loja está: aparece numa faixa no topo do cabeçalho, no selo da empresa, numa tintura leve do menu lateral, e o nome da loja vai para a aba do navegador. Botões e links continuam na cor da marca. A cor sai de uma paleta fechada de 8 (`api/app/dominios/acesso/cores.py`); sem escolha, vem automática pelo código da empresa. Muda com `python -m app.cli cor-empresa --empresa 01 --cor laranja` (migração 0003).
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.

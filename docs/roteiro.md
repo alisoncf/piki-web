@@ -41,6 +41,7 @@ Documentos relacionados:
 - [ ] Limitar tentativas de login (o VB6 bloqueia na 4ª tentativa)
 - [x] Front-end `web/` (Vue 3 + Quasar + Pinia, D13): login, escolha e troca de empresa, menu conforme as permissões, lista de usuários — 30/10/2026
 - [x] Identidade visual: marca da Requinte Enxovais, ícone do Piki, cores e fonte (D14) — 30/10/2026
+- [x] Cor de identificação por empresa: faixa, selo, menu e aba do navegador (migração 0003) — 30/10/2026
 - [ ] Testar o front no navegador com usuários reais
 - [ ] Decidir onde guardar o token no navegador antes de produção (P11)
 - [ ] Definir onde a API vai rodar (servidor, domínio, HTTPS) e o processo de deploy

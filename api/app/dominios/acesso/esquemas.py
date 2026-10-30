@@ -7,6 +7,8 @@ class EmpresaResumo(BaseModel):
     id: int
     codigo: str
     nome: str
+    cor: str = Field(validation_alias="cor_hex", serialization_alias="cor",
+                     description="Cor de identificação da empresa na tela (#rrggbb)")
 
 
 class UsuarioResumo(BaseModel):

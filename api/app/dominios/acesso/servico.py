@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.dominios.acesso import repositorio as repo
+from app.dominios.acesso.cores import PALETA
 from app.dominios.acesso.modelos import Empresa, Perfil, Permissao, Usuario, UsuarioEmpresa
 from app.nucleo.permissoes import PERMISSOES
 from app.nucleo.seguranca import conferir_hash, criar_token, gerar_hash
@@ -123,11 +124,24 @@ def sincronizar_permissoes(db: Session) -> int:
 
 
 def criar_empresa(db: Session, codigo: str, nome: str, cnpj: str | None = None,
-                  razao_social: str | None = None) -> Empresa:
-    emp = Empresa(codigo=codigo, nome=nome, cnpj=cnpj, razao_social=razao_social)
+                  razao_social: str | None = None, cor: str | None = None) -> Empresa:
+    _conferir_cor(cor)
+    emp = Empresa(codigo=codigo, nome=nome, cnpj=cnpj, razao_social=razao_social, cor=cor)
     db.add(emp)
     db.commit()
     return emp
+
+
+def _conferir_cor(cor: str | None) -> None:
+    if cor is not None and cor not in PALETA:
+        raise ValueError(f"Cor inexistente: {cor}. Use uma destas: {', '.join(PALETA)}")
+
+
+def definir_cor_empresa(db: Session, empresa: Empresa, cor: str | None) -> None:
+    """Muda a cor de identificação; None volta para a automática."""
+    _conferir_cor(cor)
+    empresa.cor = cor
+    db.commit()
 
 
 def criar_perfil(db: Session, nome: str, permissoes: list[str], descricao: str | None = None) -> Perfil:

@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.dominios.acesso.cores import cor_hex
 from app.nucleo.banco import Base, ComDatas
 
 
@@ -39,6 +40,12 @@ class Empresa(ComDatas, Base):
     email: Mapped[str | None] = mapped_column(String(200))
 
     ativa: Mapped[bool] = mapped_column(Boolean, server_default=true(), default=True)
+    # cor de identificação na tela, um nome da paleta de cores.py; vazia = automática pelo código
+    cor: Mapped[str | None] = mapped_column(String(20))
+
+    @property
+    def cor_hex(self) -> str:
+        return cor_hex(self.cor, self.codigo)
 
 
 perfil_permissao = Table(
