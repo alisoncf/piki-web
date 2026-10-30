@@ -22,7 +22,9 @@ src/
   menu.js               itens do menu e a permissão que cada um exige
   layouts/              layout principal (barra com a troca de empresa e o menu lateral)
   paginas/              uma tela por arquivo, agrupadas por domínio (paginas/acesso/...)
-  css/quasar.variables.sass   cores da identidade visual
+  componentes/          peças reaproveitadas (marca da loja, assinatura do Piki)
+  marca.js              nome e logos da loja e do sistema (arquivos em public/)
+  css/quasar.variables.sass   cores da identidade visual (D14); tons de apoio em css/app.css
 tests/
 ```
 

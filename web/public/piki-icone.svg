@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Piki</title><desc id="desc">Ícone de uma castanha estilizada em tons de verde e dourado.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdf5"/><stop offset="1" stop-color="#f2eedb"/></linearGradient>
+    <linearGradient id="nut" x1=".15" y1="0" x2=".85" y2="1"><stop stop-color="#ffe85a"/><stop offset=".55" stop-color="#ffc928"/><stop offset="1" stop-color="#e99a0a"/></linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9bc653"/><stop offset=".55" stop-color="#5c9638"/><stop offset="1" stop-color="#285b36"/></linearGradient>
+    <linearGradient id="leaf2" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b0d65d"/><stop offset="1" stop-color="#477d38"/></linearGradient>
+    <linearGradient id="stem" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#bd7835"/><stop offset="1" stop-color="#754019"/></linearGradient>
+  </defs>
+  <rect x="22" y="22" width="468" height="468" rx="92" fill="url(#bg)"/>
+  <path d="M207 159 C207 132 226 104 248 88 C264 76 279 86 274 103 C270 119 250 131 245 151Z" fill="url(#stem)"/>
+  <path d="M240 158 C187 130 119 157 92 217 C69 267 89 322 130 334 C145 280 181 215 240 158Z" fill="#477b36"/>
+  <path d="M239 159 C294 127 366 155 410 210 C442 250 445 291 420 321 C372 286 318 257 239 159Z" fill="url(#leaf)"/>
+  <path d="M239 159 C177 175 136 239 139 308 C141 370 177 414 220 416 C246 356 278 269 239 159Z" fill="url(#leaf2)"/>
+  <path d="M240 160 C292 169 337 219 349 275 C360 327 338 372 300 389 C268 342 244 260 240 160Z" fill="#63983b"/>
+  <path d="M240 160 C204 205 177 265 166 326" fill="none" stroke="#b3d65a" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+  <path d="M241 160 C287 197 333 243 374 286" fill="none" stroke="#2e6338" stroke-width="7" stroke-linecap="round" opacity=".65"/>
+  <path d="M205 290 C226 256 264 240 302 249 C349 260 390 300 397 349 C404 404 368 445 312 451 C255 457 197 427 184 380 C176 349 185 319 205 290Z" fill="url(#nut)"/>
+  <path d="M209 316 C228 280 262 267 292 274 C269 301 254 343 263 385 C270 415 294 438 313 450 C264 451 215 422 199 386 C188 360 194 339 209 316Z" fill="#f4ad18" opacity=".72"/>
+  <path d="M291 273 C326 275 361 303 376 340 C389 373 379 407 355 427 C362 388 345 338 316 309 C306 298 297 285 291 273Z" fill="#ffe96c" opacity=".65"/>
+  <ellipse cx="270" cy="331" rx="22" ry="11" transform="rotate(48 270 331)" fill="#fff4a9" opacity=".8"/>
+  <path d="M342 300 C357 310 370 329 376 348" fill="none" stroke="#fff3a0" stroke-width="8" stroke-linecap="round" opacity=".8"/>
+</svg>

@@ -73,6 +73,12 @@ O front fica em `web/` e chama a API em `/api`; em desenvolvimento o Vite repass
 
 O token de login fica no `localStorage`, para durar o turno mesmo fechando a aba. Ver P11.
 
+### D14. Identidade visual: a marca da loja, com o Piki como assinatura (30/10/2026)
+
+Quem usa o sistema é a equipe da Requinte Enxovais, então a marca da loja aparece no login, no cabeçalho e na escolha de empresa, e as cores vêm do logo dela: ameixa `#941d70` como cor principal e o dourado do ícone do Piki (`#f2b01e`) como destaque. O Piki é o sistema: o ícone dele vai no favicon e como assinatura discreta ("Piki · gestão comercial") no login e no menu. Fonte Inter, instalada no próprio projeto (não depende de internet nas filiais).
+
+Nome e logos ficam em `web/src/marca.js` e `web/public/`; as cores, em `web/src/css/quasar.variables.sass` e `web/src/css/app.css`. Por enquanto a marca é fixa para todas as empresas (ver P12).
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
@@ -92,4 +98,5 @@ O token de login fica no `localStorage`, para durar o turno mesmo fechando a aba
 - **P8.** Infraestrutura das filiais: quantas são, se o computador do banco fica ligado e com internet, e o tamanho de cada banco. Define a frequência do agente.
 - **P10.** Segredos fiscais por empresa: certificado digital A1 (`.pfx` e senha) e CSC da NFC-e (id e token). No VB6 ficam em texto puro na `sped_empresa`; o ETL não os lê. Proposta: os arquivos `.pfx` ficam no servidor, fora do repositório e do banco, e senhas e tokens ficam cifrados no banco com uma chave que só existe no `.env` do servidor (ou num cofre de segredos). Decidir antes da onda 6.
 - **P11.** Token no `localStorage` é simples, mas fica exposto se algum dia o front tiver uma falha de XSS. Antes de ir para produção, avaliar trocar por cookie `HttpOnly` emitido pela API, com renovação automática.
+- **P12.** Todas as filiais usam a marca Requinte Enxovais? Se alguma tiver outra marca, o logo e as cores passam para o cadastro da empresa e o visual muda ao trocar de empresa.
 - **P9.** Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.

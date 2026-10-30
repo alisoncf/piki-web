@@ -1,23 +1,24 @@
 <template>
   <q-page padding>
-    <div class="text-h5 q-mb-xs">Bom trabalho, {{ primeiroNome }}!</div>
-    <div class="text-grey-7 q-mb-lg">Você está em <strong>{{ sessao.empresa?.nome }}</strong>.</div>
+    <div class="q-mb-lg">
+      <div class="piki-titulo">Bom trabalho, {{ primeiroNome }}!</div>
+      <div class="text-suave">Você está em <strong>{{ sessao.empresa?.nome }}</strong>.</div>
+    </div>
 
     <div class="row q-col-gutter-md">
-      <div v-for="atalho in atalhos" :key="atalho.rota" class="col-12 col-sm-6 col-md-4">
-        <q-card flat bordered class="cursor-pointer" @click="$router.push(atalho.rota)">
-          <q-card-section class="row items-center no-wrap">
-            <q-icon :name="atalho.icone" size="md" color="primary" class="q-mr-md" />
-            <div>
-              <div class="text-subtitle1">{{ atalho.titulo }}</div>
-              <div class="text-caption text-grey-7">{{ atalho.grupo }}</div>
-            </div>
-          </q-card-section>
-        </q-card>
+      <div v-for="atalho in atalhos" :key="atalho.rota" class="col-12 col-sm-6 col-md-4 col-lg-3">
+        <router-link :to="atalho.rota" class="cartao piki-atalho row items-center no-wrap q-pa-md" style="text-decoration: none; color: inherit">
+          <div class="piki-atalho__icone q-mr-md"><q-icon :name="atalho.icone" size="24px" /></div>
+          <div>
+            <div class="text-subtitle1 text-weight-medium">{{ atalho.titulo }}</div>
+            <div class="text-caption text-suave">{{ atalho.grupo }}</div>
+          </div>
+        </router-link>
       </div>
     </div>
 
-    <q-banner v-if="!atalhos.length" class="bg-grey-2 text-grey-8" rounded>
+    <q-banner v-if="!atalhos.length" class="cartao text-suave">
+      <template #avatar><q-icon name="lock_clock" color="primary" /></template>
       Ainda não há telas liberadas para você nesta empresa.
     </q-banner>
   </q-page>

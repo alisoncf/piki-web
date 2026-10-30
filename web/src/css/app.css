@@ -1,7 +1,75 @@
-body {
-  background: #f4f6f8;
+/* Identidade visual: ameixa da Requinte Enxovais com o dourado do Piki.
+   As cores do Quasar (primary, accent...) ficam em quasar.variables.sass;
+   aqui ficam os tons de apoio e os estilos próprios. */
+:root {
+  --piki-primaria: #941d70;
+  --piki-primaria-clara: #f7e9f2;
+  --piki-primaria-escura: #4f0c3b;
+  --piki-gradiente: linear-gradient(150deg, #a32679 0%, #941d70 45%, #6a1050 100%);
+  --piki-dourado: #f2b01e;
+  --piki-fundo: #faf7f9;
+  --piki-superficie: #ffffff;
+  --piki-borda: #ece2e8;
+  --piki-texto: #2a1f26;
+  --piki-texto-suave: #6e5f68;
 }
 
+body {
+  background: var(--piki-fundo);
+  color: var(--piki-texto);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* cor clara para chips, avatares e itens ativos: color="primario-claro" */
+.bg-primario-claro {
+  background: var(--piki-primaria-clara) !important;
+}
+.text-primario-claro {
+  color: var(--piki-primaria-clara) !important;
+}
+
+.text-suave {
+  color: var(--piki-texto-suave);
+}
+
+/* ---- marcas ---- */
+.marca-loja {
+  gap: 10px;
+}
+.marca-loja img {
+  border-radius: 22%;
+  flex: none;
+}
+.marca-loja__nome {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--piki-primaria);
+}
+.marca-loja__complemento {
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--piki-texto-suave);
+}
+.marca-loja--clara img {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+.marca-loja--clara .marca-loja__nome {
+  color: #fff;
+}
+.marca-loja--clara .marca-loja__complemento {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.assinatura-piki {
+  gap: 8px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+/* ---- páginas soltas (login, escolha de empresa, 404) ---- */
 .pagina-centralizada {
   min-height: 100vh;
   display: flex;
@@ -13,4 +81,143 @@ body {
 .cartao-estreito {
   width: 100%;
   max-width: 400px;
+}
+
+.cartao {
+  background: var(--piki-superficie);
+  border: 1px solid var(--piki-borda);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(60, 15, 45, 0.04);
+}
+
+/* login: painel da loja à esquerda (telas largas) e formulário à direita */
+.login {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1024px) {
+  .login {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  }
+}
+.login__marca {
+  position: relative;
+  overflow: hidden;
+  padding: 48px;
+  color: #fff;
+  background: var(--piki-gradiente);
+}
+/* desenho de fundo discreto: anéis no canto */
+.login__marca::after {
+  content: '';
+  position: absolute;
+  right: -160px;
+  bottom: -160px;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  border: 56px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 56px rgba(255, 255, 255, 0.03);
+  pointer-events: none;
+}
+.login__titulo {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  max-width: 420px;
+}
+.login__recurso {
+  color: rgba(255, 255, 255, 0.88);
+}
+.login__recurso .q-icon {
+  color: var(--piki-dourado);
+}
+.login__formulario {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+/* ---- layout principal ---- */
+.piki-cabecalho {
+  background: var(--piki-superficie);
+  color: var(--piki-texto);
+  border-bottom: 1px solid var(--piki-borda);
+}
+
+.piki-menu {
+  background: var(--piki-primaria-escura);
+  color: rgba(255, 255, 255, 0.8);
+}
+.piki-menu .q-item {
+  border-radius: 8px;
+  margin: 2px 8px;
+  min-height: 40px;
+}
+.piki-menu .q-item__section--avatar {
+  min-width: 36px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.piki-menu .q-expansion-item__toggle-icon {
+  color: rgba(255, 255, 255, 0.5);
+}
+.piki-menu__ativo {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  box-shadow: inset 3px 0 0 var(--piki-dourado);
+}
+.piki-menu__ativo .q-item__section--avatar {
+  color: var(--piki-dourado);
+}
+.piki-menu__rodape {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.piki-empresa {
+  border: 1px solid var(--piki-borda);
+  border-radius: 8px;
+}
+
+/* ---- conteúdo ---- */
+.piki-titulo {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.piki-atalho {
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.piki-atalho:hover,
+.piki-atalho:focus-visible {
+  border-color: var(--piki-primaria);
+  box-shadow: 0 4px 12px rgba(60, 15, 45, 0.08);
+  transform: translateY(-1px);
+  outline: none;
+}
+.piki-atalho__icone {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--piki-primaria-clara);
+  color: var(--piki-primaria);
+}
+
+.q-table__card {
+  border-radius: 12px;
+}
+.q-table thead th {
+  font-weight: 600;
+  color: var(--piki-texto-suave);
 }

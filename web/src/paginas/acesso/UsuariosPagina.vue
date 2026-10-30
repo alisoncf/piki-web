@@ -1,6 +1,6 @@
 <template>
   <q-page padding>
-    <div class="text-h5 q-mb-md">Usuários</div>
+    <div class="piki-titulo q-mb-md">Usuários</div>
     <q-table
       flat
       bordered
@@ -22,7 +22,7 @@
       <template #body-cell-situacao="props">
         <q-td :props="props">
           <q-badge :color="props.row.ativo ? 'positive' : 'grey'">{{ props.row.ativo ? 'Ativo' : 'Inativo' }}</q-badge>
-          <q-badge v-if="props.row.administrador" color="accent" class="q-ml-xs">Administrador</q-badge>
+          <q-badge v-if="props.row.administrador" color="accent" text-color="dark" class="q-ml-xs">Administrador</q-badge>
         </q-td>
       </template>
       <template #body-cell-acessos="props">
@@ -33,7 +33,7 @@
               v-for="a in props.row.acessos"
               :key="a.empresa.id"
               dense
-              :color="a.ativo ? 'blue-1' : 'grey-3'"
+              :color="a.ativo ? 'primario-claro' : 'grey-3'"
               :text-color="a.ativo ? 'primary' : 'grey-7'"
             >
               {{ a.empresa.nome }} · {{ a.perfil }}

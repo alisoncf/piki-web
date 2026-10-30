@@ -38,6 +38,12 @@ export const useSessaoStore = defineStore('sessao', () => {
   const logado = computed(() => !!token.value && !!usuario.value)
   const precisaEscolherEmpresa = computed(() => logado.value && !empresa.value)
   const podeTrocarEmpresa = computed(() => empresas.value.length > 1)
+  /** primeira letra do primeiro e do último nome, para o avatar */
+  const iniciais = computed(() => {
+    const partes = (usuario.value?.nome || '').trim().split(/\s+/).filter(Boolean)
+    if (!partes.length) return '?'
+    return (partes[0][0] + (partes.length > 1 ? partes.at(-1)[0] : '')).toUpperCase()
+  })
 
   function pode(permissao) {
     return !permissao || permissoes.value.includes(permissao)
@@ -101,7 +107,7 @@ export const useSessaoStore = defineStore('sessao', () => {
 
   return {
     token, usuario, empresa, empresas, permissoes, ultimaEmpresaId,
-    logado, precisaEscolherEmpresa, podeTrocarEmpresa,
+    logado, precisaEscolherEmpresa, podeTrocarEmpresa, iniciais,
     pode, entrar, escolherEmpresa, carregarEu, sair, restaurar,
   }
 })

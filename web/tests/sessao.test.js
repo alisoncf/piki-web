@@ -54,6 +54,15 @@ describe('sessão', () => {
     expect(sessao.pode('outra.coisa')).toBe(false)
   })
 
+  it('iniciais do usuário para o avatar', () => {
+    const sessao = useSessaoStore()
+    expect(sessao.iniciais).toBe('?')
+    sessao.usuario = { nome: 'bia' }
+    expect(sessao.iniciais).toBe('B')
+    sessao.usuario = { nome: '  Ana Beatriz  de Souza ' }
+    expect(sessao.iniciais).toBe('AS')
+  })
+
   it('sair limpa tudo, inclusive o token guardado', async () => {
     vi.spyOn(api, 'post').mockResolvedValue({ data: respostaLogin(null) })
     const sessao = useSessaoStore()

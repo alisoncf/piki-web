@@ -1,28 +1,32 @@
 <template>
   <q-layout>
     <q-page-container>
-      <q-page class="pagina-centralizada">
-        <q-card class="cartao-estreito" flat bordered>
-          <q-card-section>
-            <div class="text-h6">Olá, {{ primeiroNome }}</div>
-            <div class="text-grey-7">Em qual empresa você vai trabalhar?</div>
-          </q-card-section>
+      <q-page class="pagina-centralizada column">
+        <marca-loja :tamanho="44" class="q-mb-lg" />
+        <div class="cartao cartao-estreito">
+          <div class="q-pa-lg q-pb-md">
+            <div class="piki-titulo">Olá, {{ primeiroNome }}</div>
+            <div class="text-suave">Em qual empresa você vai trabalhar?</div>
+          </div>
 
-          <q-list separator>
+          <q-list separator class="q-px-sm">
             <q-item
               v-for="emp in sessao.empresas"
               :key="emp.id"
               clickable
+              class="rounded-borders"
               :active="emp.id === sessao.empresa?.id"
-              active-class="bg-blue-1"
+              active-class="bg-primario-claro text-primary"
               :disable="!!enviando"
               @click="escolher(emp)"
             >
               <q-item-section avatar>
-                <q-avatar color="primary" text-color="white" size="md">{{ emp.codigo }}</q-avatar>
+                <q-avatar color="primary" text-color="white" size="40px" font-size="15px" class="text-weight-bold">
+                  {{ emp.codigo }}
+                </q-avatar>
               </q-item-section>
               <q-item-section>
-                <q-item-label>{{ emp.nome }}</q-item-label>
+                <q-item-label class="text-weight-medium">{{ emp.nome }}</q-item-label>
                 <q-item-label v-if="emp.id === sessao.ultimaEmpresaId" caption>Última usada</q-item-label>
               </q-item-section>
               <q-item-section side>
@@ -32,10 +36,11 @@
             </q-item>
           </q-list>
 
-          <q-card-actions align="right">
-            <q-btn flat color="grey-8" label="Sair" icon="logout" @click="sair" />
-          </q-card-actions>
-        </q-card>
+          <div class="row justify-end q-pa-sm">
+            <q-btn flat no-caps color="grey-8" label="Sair" icon="logout" @click="sair" />
+          </div>
+        </div>
+        <assinatura-piki class="q-mt-lg text-suave" />
       </q-page>
     </q-page-container>
   </q-layout>
@@ -46,6 +51,8 @@ import { useQuasar } from 'quasar'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import AssinaturaPiki from '@/componentes/AssinaturaPiki.vue'
+import MarcaLoja from '@/componentes/MarcaLoja.vue'
 import { mensagemDeErro } from '@/servicos/api'
 import { useSessaoStore } from '@/stores/sessao'
 

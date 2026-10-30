@@ -1,20 +1,26 @@
 <template>
   <q-layout view="hHh lpR fFf">
-    <q-header elevated class="bg-primary text-white">
-      <q-toolbar>
-        <q-btn flat round dense icon="menu" aria-label="Abrir menu" @click="menuAberto = !menuAberto" />
-        <q-toolbar-title class="text-weight-bold">Piki</q-toolbar-title>
+    <q-header class="piki-cabecalho">
+      <q-toolbar class="q-gutter-x-sm">
+        <q-btn flat round dense icon="menu" color="grey-8" aria-label="Abrir menu" @click="menuAberto = !menuAberto" />
+        <router-link to="/" class="q-mr-auto" aria-label="Início" style="text-decoration: none">
+          <marca-loja :tamanho="34" />
+        </router-link>
 
         <!-- empresa ativa e troca rápida -->
         <q-btn
           v-if="sessao.podeTrocarEmpresa"
           flat
           no-caps
-          icon="store"
-          :label="sessao.empresa?.nome"
+          class="piki-empresa"
           :loading="trocando"
           aria-label="Trocar de empresa"
         >
+          <q-avatar color="primary" text-color="white" size="22px" font-size="11px" class="q-mr-sm">
+            {{ sessao.empresa?.codigo }}
+          </q-avatar>
+          <span class="text-weight-medium">{{ sessao.empresa?.nome }}</span>
+          <q-icon name="expand_more" size="18px" class="q-ml-xs text-suave" />
           <q-menu anchor="bottom right" self="top right">
             <q-list style="min-width: 220px">
               <q-item-label header>Trocar de empresa</q-item-label>
@@ -37,12 +43,18 @@
             </q-list>
           </q-menu>
         </q-btn>
-        <div v-else class="q-px-sm row items-center no-wrap">
-          <q-icon name="store" class="q-mr-xs" />{{ sessao.empresa?.nome }}
+        <div v-else class="piki-empresa q-px-sm q-py-xs row items-center no-wrap">
+          <q-avatar color="primary" text-color="white" size="22px" font-size="11px" class="q-mr-sm">
+            {{ sessao.empresa?.codigo }}
+          </q-avatar>
+          <span class="text-weight-medium">{{ sessao.empresa?.nome }}</span>
         </div>
 
         <!-- usuário -->
-        <q-btn flat round dense icon="account_circle" class="q-ml-sm" aria-label="Usuário">
+        <q-btn flat round dense aria-label="Usuário">
+          <q-avatar color="accent" text-color="dark" size="34px" font-size="13px" class="text-weight-bold">
+            {{ sessao.iniciais }}
+          </q-avatar>
           <q-menu anchor="bottom right" self="top right">
             <q-list style="min-width: 200px">
               <q-item>
@@ -62,10 +74,10 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="menuAberto" show-if-above bordered :width="240">
-      <q-list padding>
+    <q-drawer v-model="menuAberto" show-if-above :width="248" class="piki-menu">
+      <q-list padding dark>
         <template v-for="item in menu" :key="item.titulo">
-          <q-expansion-item v-if="item.filhos" :icon="item.icone" :label="item.titulo" default-opened>
+          <q-expansion-item v-if="item.filhos" :icon="item.icone" :label="item.titulo" dark default-opened>
             <q-item
               v-for="filho in item.filhos"
               :key="filho.rota"
@@ -73,18 +85,19 @@
               exact
               clickable
               class="q-pl-lg"
-              active-class="text-primary bg-blue-1"
+              active-class="piki-menu__ativo"
             >
               <q-item-section avatar><q-icon :name="filho.icone" /></q-item-section>
               <q-item-section>{{ filho.titulo }}</q-item-section>
             </q-item>
           </q-expansion-item>
-          <q-item v-else :to="item.rota" exact clickable active-class="text-primary bg-blue-1">
+          <q-item v-else :to="item.rota" exact clickable active-class="piki-menu__ativo">
             <q-item-section avatar><q-icon :name="item.icone" /></q-item-section>
             <q-item-section>{{ item.titulo }}</q-item-section>
           </q-item>
         </template>
       </q-list>
+      <assinatura-piki class="piki-menu__rodape" />
     </q-drawer>
 
     <q-page-container>
@@ -99,6 +112,8 @@ import { useQuasar } from 'quasar'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import AssinaturaPiki from '@/componentes/AssinaturaPiki.vue'
+import MarcaLoja from '@/componentes/MarcaLoja.vue'
 import { filtrarMenu, MENU } from '@/menu'
 import { mensagemDeErro } from '@/servicos/api'
 import { useSessaoStore } from '@/stores/sessao'
