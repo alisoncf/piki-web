@@ -1,0 +1,326 @@
+tabela,no_banco,engine,chave_primaria,tipo_pk,auto_increment,ja_tem_cod_emp,n_itens_que_usam,n_itens_que_escrevem,dominio_principal,escopo_proposto,situacao,observacao,itens_que_escrevem
+abrecaixa,sim,MyISAM,id,int(11),sim,,1,1,PDV / Caixa,por filial,,,CAIXA
+atualizacao_produtos,sim,InnoDB,cod_pro,char(8),,,1,1,Estoque / Compras,verificar,,,Produtos
+bases,sim,MyISAM,codigo,char(2),,,0,0,,global,não usada pelo piki_Simples,,
+carta_presente,não,,,,,,1,1,PDV / Caixa,por filial,"citada no código, ausente no banco",,Cartao_Presente
+cartao_movimento,sim,MyISAM,id,int(11),sim,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Cartoes
+cartao_presente,sim,MyISAM,id,int(11),sim,,3,1,PDV / Caixa,por filial,,,Cartao_Presente
+chequepresente,sim,MyISAM,codigo,int(11),,,0,0,,por filial,não usada pelo piki_Simples,,
+cidades,sim,MyISAM,cod_cid,char(7),,,2,0,Cadastros,global,,,
+conferencia_entrada,não,,,,,,1,1,Fiscal: SPED / entrada de notas,por filial,"citada no código, ausente no banco",,SpedNF
+contagem,sim,MyISAM,id,int(11),sim,sim,3,1,Estoque / Compras,por filial,,,contagem
+contato,sim,MyISAM,id,int(11),sim,,2,2,Cadastros,global,,,Contato frmAgenda
+cupons,não,,,,,,1,0,Utilitários / helpers VB6,descartar se ECF não for mais usado,"citada no código, ausente no banco",,
+devolucoes,não,,,,,,1,0,Estoque / Compras,por filial,"citada no código, ausente no banco",,
+doc_quitacao,sim,InnoDB,id,int(11),sim,sim,0,0,,por filial,não usada pelo piki_Simples,,
+documentos_contrato,sim,MyISAM,id,int(11),sim,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Contrato
+fecha_caixa,sim,MyISAM,id,int(11),sim,,2,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Financeiro
+fechacaixa,sim,MyISAM,id,int(11),,,0,0,,por filial,não usada pelo piki_Simples,,
+fila_transferencia,sim,InnoDB,id,int(11),sim,,2,1,Utilitários / helpers VB6,por filial,,fila de sincronização com a API web já existente,API
+inventario,sim,MyISAM,id,int(11),,sim,5,2,Estoque / Compras,por filial,,,frmBuscaInv inventario
+inventario_it,sim,MyISAM,id,int(11),sim,sim,5,4,Estoque / Compras,por filial,,,frmAlteraEstInv frmBuscaInv frmInventario inventario
+itdev,não,,,,,,1,0,Estoque / Compras,por filial,"citada no código, ausente no banco",,
+mensagem,sim,MyISAM,id,int(11),sim,,0,0,,verificar,não usada pelo piki_Simples,,
+mensagens,sim,MyISAM,id,int(11),sim,,2,1,Cadastros,por filial,,,Mensagem
+nfe,sim,MyISAM,id,int(11),sim,sim,9,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_cobr_dup,sim,MyISAM,id_nfe,int(11),,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_cobr_fat,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_crt,sim,MyISAM,id,int(11),,,0,0,,global,não usada pelo piki_Simples,,
+nfe_cst,sim,MyISAM,codigo,char(2),,,0,0,,global,não usada pelo piki_Simples,,
+nfe_dest,sim,MyISAM,id_nfe,int(11),,,5,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_emit,sim,MyISAM,id_nfe,int(11),,,4,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_enderdest,sim,MyISAM,id_nfe,int(11),,,5,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_enderemit,sim,MyISAM,,,,,4,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_icmstot,sim,MyISAM,,,,,4,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_infaddpadrao,sim,MyISAM,id,int(11),sim,sim,0,0,,configuração da filial,não usada pelo piki_Simples,,
+nfe_infadic,sim,MyISAM,,,,,4,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_infadicnfe,não,,,,,,1,0,Fiscal: NF-e / NFC-e,por filial,"citada no código, ausente no banco",,
+nfe_item,sim,MyISAM,id,int(11),sim,sim,9,3,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe frmNFE_Detalhe
+nfe_item_comb,sim,MyISAM,id_item,int(11),,,4,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_icms,sim,MyISAM,id,int(11),,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto,sim,MyISAM,id,int(11),,,6,3,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe frmNFe_Item
+nfe_item_imposto_,não,,,,,,4,1,Fiscal: NF-e / NFC-e,descartar (backup/cópia/temporária),"citada no código, ausente no banco",,frmNFe_Item
+nfe_item_imposto_cofinsaliq,sim,MyISAM,,,,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_cofinsnt,sim,MyISAM,,,,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_cofinsoutr,sim,MyISAM,,,,,2,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_cofinsqtde,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_cofinsst,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_icms00,sim,MyISAM,,,,,2,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_imposto_icms10,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_icms20,sim,MyISAM,,,,,2,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_imposto_icms30,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_icms40,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_icms51,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_icms60,sim,MyISAM,,,,,2,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_imposto_icms70,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_icms90,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_icmspart,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_icmssn101,sim,MyISAM,,,,,2,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_imposto_icmssn102,sim,MyISAM,,,,,4,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_imposto_icmssn201,sim,MyISAM,,,,,2,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_imposto_icmssn202,sim,MyISAM,,,,,2,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_imposto_icmssn500,sim,MyISAM,,,,,4,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_imposto_icmssn900,sim,MyISAM,,,,,2,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_item_imposto_icmsst,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_ipi,sim,MyISAM,,,,,2,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_ipiint,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_item_imposto_ipint,sim,MyISAM,,,,,2,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_ipitrib,sim,MyISAM,,,,,2,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_pisaliq,sim,MyISAM,,,,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_pisnt,sim,MyISAM,,,,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_pisoutr,sim,MyISAM,,,,,2,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_pisqtde,sim,MyISAM,,,,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_imposto_pisst,sim,MyISAM,,,,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_item_ipi,sim,InnoDB,id,int(11),sim,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_itens_preco,não,,,,,,1,1,Fiscal: SPED / entrada de notas,por filial,"citada no código, ausente no banco",,SpedNF
+nfe_lote,sim,MyISAM,id,int(11),sim,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_pag,sim,MyISAM,id,int(11),sim,,5,3,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe frmNFE_Detalhe
+nfe_pedidoinut,sim,MyISAM,id,int(11),sim,,1,1,Fiscal: NF-e / NFC-e,por filial,,,NFe_DAO
+nfe_procrec,não,,,,,,1,1,Fiscal: NF-e / NFC-e,por filial,"citada no código, ausente no banco",,NFe
+nfe_procref,sim,MyISAM,,,,,0,0,,por filial,não usada pelo piki_Simples,,
+nfe_ref,sim,MyISAM,id+refNfe,int(11),,,2,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_tipo_icms,sim,MyISAM,codigo,char(3),,,2,0,Estoque / Compras,global,,,
+nfe_tpag,sim,MyISAM,tpag,char(2),,,1,0,"Financeiro (pagar/receber, cheques, cobrança)",global,,,
+nfe_transp,sim,MyISAM,,,,,5,2,Fiscal: NF-e / NFC-e,por filial,,,NFe frmEdiNFe
+nfe_transp_reboque,sim,MyISAM,,,,,3,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_transp_rettransp,sim,MyISAM,,,,,2,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_transp_transportadora,sim,MyISAM,,,,,3,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_transp_veictransp,sim,MyISAM,,,,,3,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+nfe_transp_vol,sim,MyISAM,,,,,3,1,Fiscal: NF-e / NFC-e,por filial,,,NFe
+parametro_estrutura,sim,MyISAM,id,int(11),sim,,2,0,Cadastros,configuração da filial,,,
+parcelas_baixadas_desktop,sim,InnoDB,id,int(11),,sim,0,0,,por filial,não usada pelo piki_Simples,,
+parcelas_online_baixadas,sim,InnoDB,id,int(11),,sim,0,0,,por filial,não usada pelo piki_Simples,,
+produtos_comb,sim,MyISAM,cod_pro,char(8),,,1,0,Fiscal: NF-e / NFC-e,verificar,,,
+quitacao_debitos,sim,MyISAM,id,int(11),,,0,0,,por filial,não usada pelo piki_Simples,,
+sendmail,sim,MyISAM,id,int(11),sim,,1,1,Núcleo / infraestrutura,verificar,,,sendMail
+servico,não,,,,,,1,1,Estoque / Compras,global,"citada no código, ausente no banco",,Servicos
+sped_cfop,sim,MyISAM,codigo,char(4),,,0,0,,global,não usada pelo piki_Simples,,
+sped_cst_cofins,sim,MyISAM,codigo,char(2),,,2,0,Estoque / Compras,global,,,
+sped_cst_ipi,sim,MyISAM,codigo,char(2),,,2,0,Estoque / Compras,global,,,
+sped_cst_pis,sim,MyISAM,codigo,char(2),,,2,0,Estoque / Compras,global,,,
+sped_cupom,sim,MyISAM,id,int(11),sim,,0,0,,descartar se ECF não for mais usado,,,
+sped_cupom_itens,sim,MyISAM,id,int(11),sim,,0,0,,descartar se ECF não for mais usado,,,
+sped_cupom_referenciado,sim,MyISAM,id,int(11),sim,,1,1,Fiscal: SPED / entrada de notas,descartar se ECF não for mais usado,,,SpedNF
+sped_ecf,sim,MyISAM,id,int(11),sim,,0,0,,descartar se ECF não for mais usado,,,
+sped_empresa,sim,MyISAM,codigo,char(2),,,5,1,Fiscal: SPED / entrada de notas,configuração da filial,,,sped_empresa
+sped_evento,sim,MyISAM,id,int(11),sim,,0,0,,por filial,não usada pelo piki_Simples,,
+sped_evento_registros,sim,MyISAM,id,int(11),sim,,0,0,,por filial,não usada pelo piki_Simples,,
+sped_genero,sim,MyISAM,codigo,char(2),,,1,0,Estoque / Compras,global,,,
+sped_ind_frt,sim,MyISAM,codigo,int(11),,,0,0,,global,não usada pelo piki_Simples,,
+sped_informacao_complementar,sim,MyISAM,codigo,int(11),sim,,0,0,,por filial,não usada pelo piki_Simples,,
+sped_nat400,sim,MyISAM,codigo,char(4),,,0,0,,global,não usada pelo piki_Simples,,
+sped_nf,sim,MyISAM,id,int(11),sim,sim,9,4,Fiscal: SPED / entrada de notas,por filial,,,SpedNF frmEntradasSped frmMigraSped frmSpedEnergiaEletrica
+sped_nf_c300,sim,MyISAM,id,int(11),sim,,0,0,,por filial,não usada pelo piki_Simples,,
+sped_nf_c310,sim,MyISAM,id+num_doc_canc,int(11),,,0,0,,por filial,não usada pelo piki_Simples,,
+sped_nf_energia,sim,MyISAM,id,int(11),sim,,2,1,Fiscal: SPED / entrada de notas,por filial,,,SpedNF
+sped_nf_ic,sim,MyISAM,id_nf+codigo,int(11),,,1,1,Fiscal: SPED / entrada de notas,por filial,,,SpedNF
+sped_nf_itens,sim,MyISAM,id,int(11),sim,,8,3,Fiscal: SPED / entrada de notas,por filial,,,SpedNF frmEntradasSped frmSpedEnergiaEletrica
+sped_nfc510,sim,MyISAM,id,int(11),sim,,0,0,,verificar,não usada pelo piki_Simples,,
+sped_nfc600,sim,MyISAM,id,int(11),sim,,0,0,,verificar,não usada pelo piki_Simples,,
+sped_observacoes_nf,sim,MyISAM,codigo,int(11),sim,,0,0,,por filial,não usada pelo piki_Simples,,
+sped_origem,sim,MyISAM,codigo,char(2),,,0,0,,global,não usada pelo piki_Simples,,
+sped_participante,sim,MyISAM,codigo,int(11),sim,,9,1,Fiscal: SPED / entrada de notas,global,,,SpedParticipante
+sped_pc_contabil,sim,MyISAM,id,int(11),sim,,0,0,,global,não usada pelo piki_Simples,,
+sped_redz,sim,MyISAM,id,int(11),sim,,0,0,,descartar se ECF não for mais usado,,,
+sped_redz_tot,sim,MyISAM,id,int(11),sim,,0,0,,descartar se ECF não for mais usado,,,
+sped_registros,sim,MyISAM,registro,char(4),,,0,0,,global,não usada pelo piki_Simples,,
+sped_situacao_doc,sim,MyISAM,codigo,char(2),,,1,0,Núcleo / infraestrutura,global,,,
+sped_tipo_consumo_agua,sim,MyISAM,codigo,char(2),,,0,0,,global,não usada pelo piki_Simples,,
+sped_tipo_consumo_energia,sim,MyISAM,codigo,char(2),,,0,0,,global,não usada pelo piki_Simples,,
+sped_tipo_doc_icms,sim,MyISAM,codigo,char(2),,,1,0,Núcleo / infraestrutura,global,,,
+sped_tipo_item,sim,MyISAM,codigo,char(2),,,0,0,,global,não usada pelo piki_Simples,,
+sped_tiponf_energia,sim,MyISAM,id,int(11),sim,,0,0,,global,não usada pelo piki_Simples,,
+sped_totalizador_redz,sim,MyISAM,id,int(11),sim,,0,0,,descartar se ECF não for mais usado,,,
+sped_unidades,sim,MyISAM,unidade,char(4),,,0,0,,global,não usada pelo piki_Simples,,
+tab_acertofin,sim,MyISAM,seq_ace+seq_FIN,char(7),,,2,2,Consignação / Representantes,por filial,,,Acerto frmAcerto
+tab_acertos,sim,MyISAM,seq_ace,char(7),,,14,4,Consignação / Representantes,por filial,,,Acerto frmAcerto frmAjuste frmMesclarClientes
+tab_acertosabertos,sim,MyISAM,seq_ace,char(7),,,3,3,Consignação / Representantes,por filial,,,Acerto frmAcerto frmForcaAbertos
+tab_acertoscanc,sim,MyISAM,seq_ace,char(7),,,2,1,Consignação / Representantes,por filial,,,Acerto
+tab_altpreco,sim,MyISAM,cod_pro+data_alt,char(8),,,1,1,Núcleo / infraestrutura,por filial,,,Modulo
+tab_aparencia,não,,,,,,2,1,Cadastros,configuração da filial,"citada no código, ausente no banco",,frmConfig
+tab_arranjos,não,,,,,,1,1,Núcleo / infraestrutura,global,"citada no código, ausente no banco",,BancoDados
+tab_autorizados,sim,MyISAM,cod_cli+seq_aut,char(5),,,2,2,Cadastros,global,,,Clientes frmCadCli
+tab_baixafin,sim,MyISAM,seq_bai+seq_cab,int(11),,,2,1,Relatórios,por filial,,,doc
+tab_baixaitd,sim,MyISAM,seq_itd+seq_bai,char(7),,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,frmAjuste
+tab_baixaitd2,sim,MyISAM,seq_itd+seq_cab,char(7),,,3,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,doc
+tab_baixavenfin,sim,MyISAM,num_ven+seq_bai,char(7),,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Financeira
+tab_bancos,sim,MyISAM,COD_BCO,char(3),,,4,1,"Financeiro (pagar/receber, cheques, cobrança)",global,,,frmCadBan
+tab_bolconfig,não,,,,,,3,2,"Financeiro (pagar/receber, cheques, cobrança)",configuração da filial,"citada no código, ausente no banco",,frmBolConfig frmBolInstr
+tab_boletos,não,,,,,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,"citada no código, ausente no banco",,frmBoletos
+tab_caixa,sim,MyISAM,SEQ_CAI,char(7),,,13,3,PDV / Caixa,por filial,,,BancoDados frmAjuste frmLanCaixa
+tab_caixas,sim,MyISAM,cod_cai,char(2),,,12,9,PDV / Caixa,configuração da filial,,,frmAberturaCaixa frmAcerto frmConsign frmFechaCaixa frmMonitoramentoCaixas frmMovDiarioCx frmTransfConsign frmVenda frmVendaFunc
+tab_caixasip,sim,MyISAM,cod_cai+ip_cai,char(2),,,2,2,PDV / Caixa,configuração da filial,,,frmCadCaixa frmCaixas
+tab_cancelamentos,sim,MyISAM,num_ven,char(7),,,3,2,PDV / Caixa,por filial,,,frmVenda frmVendaFunc
+tab_cargos,sim,MyISAM,COD_CAR,char(3),,,5,1,Cadastros,global,,,frmCadCargos
+tab_cargoscomiss,sim,MyISAM,cod_car+tipo_cai,char(3),,,1,0,Relatórios,por filial,,,
+tab_cat,sim,MyISAM,cod_cat,char(3),,,0,0,,global,não usada pelo piki_Simples,,
+tab_categorias,sim,MyISAM,cod_cat,char(3),,,2,2,Estoque / Compras,global,,,frmCadCat frmMesclaComp
+tab_chequedep,sim,MyISAM,seq_che+data_dep,char(7),,,2,2,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,frmControleChequesPagar frmControleChequesReceber
+tab_chequedev,sim,MyISAM,seq_che+seq_dev,char(7),,,3,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,frmDevChe
+tab_chequepag,sim,MyISAM,seq_che,char(7),,,0,0,,por filial,não usada pelo piki_Simples,,
+tab_chequerec,sim,MyISAM,seq_che,char(7),,,0,0,,por filial,não usada pelo piki_Simples,,
+tab_cheques,sim,MyISAM,seq_che,char(7),,,15,8,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Acerto Cheques Vendas frmContasPagar frmControleChequesPagar frmControleChequesReceber frmDevChe frmEditaMov
+tab_chequesback,sim,MyISAM,seq_che,char(7),,,0,0,,descartar (backup/cópia/temporária),,,
+tab_chv,sim,MyISAM,seq_cai,char(7),,,2,1,PDV / Caixa,verificar,,,BancoDados
+tab_cidades,sim,MyISAM,cod_cid,char(7),,,18,3,Cadastros,global,,,Cidades frmEdiCid frmIncCid
+tab_class,não,,,,,,2,1,Estoque / Compras,global,"citada no código, ausente no banco",,frmClass
+tab_clausulas,sim,MyISAM,seq_con+seq_cla,int(11),,,3,1,"Financeiro (pagar/receber, cheques, cobrança)",global,,,frmClausula
+tab_clientes,sim,MyISAM,cod_cli,int(6),,,27,8,Cadastros,global,,deduplicar por CPF/CNPJ ao unificar; cod_cli gerado por max()+1 em cada filial colide,Clientes frmAjuste frmCadCli frmCadCliRapido frmEdiOrgao frmMesclarClientes frmMesclarOrgao frmMesclarSetores
+tab_clientes_,sim,MyISAM,cod_cli,int(6),,,0,0,,descartar (backup/cópia/temporária),,,
+tab_clientes_copy,sim,MyISAM,cod_cli,int(6),,,0,0,,descartar (backup/cópia/temporária),,,
+tab_clientesanot,sim,MyISAM,id,int(11),sim,,4,1,Cadastros,global,,,Clientes
+tab_clientespc,sim,MyISAM,seq_spc,int(11),sim,,3,1,Cadastros,global,,,Clientes
+tab_clientetrab,sim,MyISAM,cod_cli+seq_tra,int(6),,,1,1,Cadastros,global,,,frmMesclarClientes
+tab_cmp,sim,MyISAM,seq_not,char(7),,,10,3,Relatórios,por filial,,,frmEntradasSped frmNotaEntrada frmSpedEnergiaEletrica
+tab_cobrancas,sim,MyISAM,seq_cob,char(7),,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Cobranca
+tab_codbarras,sim,MyISAM,cod_pro+cod_bar,char(8),,,7,4,Estoque / Compras,global,,,Produtos frmAjuste frmCadPro frmDePara
+tab_codigos,sim,MyISAM,table_cod+field_cod,char(30),,,2,2,"Financeiro (pagar/receber, cheques, cobrança)",verificar,,,BancoDados frmAjuste
+tab_comisscons,sim,MyISAM,seq_per,int(10),sim,,2,2,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,doc frmAjuste
+tab_comissparc,sim,MyISAM,seq_itd,char(7),,,5,3,Relatórios,por filial,,,Acerto frmAjuste frmComissParc
+tab_comissparccai,sim,MyISAM,seq_cai+seq_itd,char(7),,,1,1,Consignação / Representantes,por filial,,,Acerto
+tab_comissprov,sim,MyISAM,cod_rep+seq_com+seq_doc,int(6),,,3,3,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Acerto doc frmAjuste
+tab_composicao,não,,,,,,2,2,PDV / Caixa,global,"citada no código, ausente no banco",,BancoDados frmTroca
+tab_compras,sim,MyISAM,seq_not,char(7),,,9,4,Estoque / Compras,por filial,,,frmEdiEntr frmEntradasSped frmNotaEntrada frmSpedEnergiaEletrica
+tab_consignabertas,sim,MyISAM,seq_con,char(7),,,2,2,Consignação / Representantes,por filial,,,Consignado frmTransfConsign
+tab_consignacoes,sim,MyISAM,id,bigint(20),sim,,15,9,Consignação / Representantes,por filial,,,Acerto Consignado frmAcerto frmAjustaEstCons frmConsign frmDevolucaoConsign frmForcaAbertos frmListaDevConsign frmMigraConsignado
+tab_consignacoes_backup,sim,MyISAM,,,,,0,0,,descartar (backup/cópia/temporária),,,
+tab_consigncab,sim,MyISAM,seq_cab,char(7),,,0,0,,por filial,não usada pelo piki_Simples,,
+tab_contacob,sim,MyISAM,cod_cob,char(3),,,9,2,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,frmCadCob frmEdiContaCob
+tab_contagens,sim,MyISAM,seq_cnt,char(5),,,1,1,Estoque / Compras,por filial,,,frmContagens
+tab_contas,sim,MyISAM,cod_con,char(3),,,4,2,"Financeiro (pagar/receber, cheques, cobrança)",configuração da filial,,,frmEdiCon frmIncCon
+tab_contratos,sim,MyISAM,seq_con,int(11),,,3,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,frmContrato
+tab_controles,sim,MyISAM,cod_con,char(3),,,1,0,Estoque / Compras,global,,,
+tab_conveniados,sim,MyISAM,seq_con,int(11),,,1,1,Cadastros,global,,,Conveniado
+tab_convenios,sim,MyISAM,cod_cli,char(5),,,1,1,Cadastros,global,,,convenio
+tab_correcaorep,sim,MyISAM,seq_cor,char(7),,,0,0,,por filial,não usada pelo piki_Simples,,
+tab_crediarioven,sim,MyISAM,num_ven,char(7),,,4,2,PDV / Caixa,por filial,,,Vendas frmCrediario
+tab_cupons,não,,,,,,3,1,PDV / Caixa,descartar se ECF não for mais usado,"citada no código, ausente no banco",,Modulo
+tab_defusu,sim,MyISAM,cod_usu,char(3),,,2,1,Cadastros,global,,,frmDefUsu
+tab_descontos,sim,MyISAM,cod_car+cod_for+cod_sub,char(3),,,1,0,Consignação / Representantes,global,,,
+tab_destmovint,sim,MyISAM,cod_des,int(11),,,1,1,Estoque / Compras,por filial,,,MovInt
+tab_devconsign,sim,MyISAM,seq_dev,char(7),,,4,2,Consignação / Representantes,por filial,,,frmDevolucaoConsign frmListaDevConsign
+tab_devconsignabertas,sim,MyISAM,seq_dev,char(7),,,4,3,Consignação / Representantes,por filial,,,frmDevolucaoConsign frmForcaAbertos frmListaDevConsign
+tab_devolucoes,sim,MyISAM,num_ven+cod_pro+tipo_dev+seq_pro,char(7),,,4,2,Relatórios,por filial,,,BancoDados frmDePara
+tab_doc,sim,MyISAM,seq_doc,char(9),,,23,7,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,já tem id_doc_web: padrão de mapeamento local ↔ central já em uso,Vendas frmAcerto frmContasPagar frmEdiLan frmEditaMov frmForcaAbertos frmMesclarClientes
+tab_docback,não,,,,,,1,0,"Financeiro (pagar/receber, cheques, cobrança)",descartar (backup/cópia/temporária),"citada no código, ausente no banco",,
+tab_dochist,sim,MyISAM,seq_his,int(11),sim,,1,0,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,
+tab_dochistusu,sim,MyISAM,seq_his,int(11),sim,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,doc
+tab_docimpress,sim,MyISAM,seq_imp,int(11),sim,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,doc
+tab_ecfimp,sim,MyISAM,cod_imp+impressora_imp,char(3),,,1,1,Descartar: ECF / legado fiscal,descartar se ECF não for mais usado,,,frmImpost
+tab_embalagens,sim,MyISAM,cod_pro+qtd_emb,char(8),,,5,4,Estoque / Compras,global,,,frmCadPro frmDePara frmEntradaSped frmEntradas
+tab_espcai,sim,MyISAM,sigla_cai,char(3),,,1,1,PDV / Caixa,global,,,CAIXA
+tab_estcons,sim,MyISAM,cod_pro+cod_rep,char(8),,,6,6,Consignação / Representantes,por filial,,,Consignado frmAjustaEstCons frmAjuste frmDevolucaoConsign frmMigraConsignado frmVerificaInconsistenciaCons
+tab_estoque,não,,,,,,5,3,Estoque / Compras,verificar,"citada no código, ausente no banco",citada no código mas não existe neste banco,Produtos frmAjuste frmCadPro
+tab_etiquetas,sim,MyISAM,cod_eti,int(11),,,3,1,Estoque / Compras,global,,,Etiqueta
+tab_fabricantes,sim,MyISAM,cod_fab,char(5),,,1,0,Estoque / Compras,global,,,
+tab_fccaitmp,não,,,,,,1,1,PDV / Caixa,descartar (backup/cópia/temporária),"citada no código, ausente no banco",,frmFechaCaixa
+tab_fechacaixa,sim,MyISAM,DATA_CAI+cod_cai,date,,,0,0,,por filial,não usada pelo piki_Simples,,
+tab_fechaconsign,não,,,,,,1,1,Consignação / Representantes,por filial,"citada no código, ausente no banco",,Consignado
+tab_financeiras,sim,MyISAM,COD_FIN,char(3),,,6,1,"Financeiro (pagar/receber, cheques, cobrança)",global,,,frmCadFinan
+tab_financeiro,sim,MyISAM,seq_fin,char(7),,,5,4,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,BancoDados Financeiro frmEdiFin frmLanFin
+tab_formaspag,sim,MyISAM,cod_for,char(2),,,10,1,Relatórios,global,,,FormasPag
+tab_fornecedores,sim,MyISAM,COD_FOR,int(6),,,14,2,Estoque / Compras,global,,,Fornecedor frmIncFor
+tab_fornpcp,não,,,,,,1,1,Estoque / Compras,por filial,"citada no código, ausente no banco",,frmSujComp
+tab_fotofun,sim,MyISAM,seq_fot,int(11),,,1,0,Cadastros,global,,,
+tab_fotorep,sim,MyISAM,seq_fot,int(11),,,2,0,Consignação / Representantes,global,,,
+tab_funcionarios,sim,MyISAM,cod_fun,char(3),,,21,1,PDV / Caixa,global,,,Funcionario
+tab_grupocli,sim,MyISAM,cod_gru,char(3),,,4,1,Cadastros,global,,,Clientes
+tab_histest,não,,,,,,1,1,Estoque / Compras,por filial,"citada no código, ausente no banco",,Produtos
+tab_impostos,sim,MyISAM,cod_imp,char(3),,,2,2,Descartar: ECF / legado fiscal,descartar se ECF não for mais usado,,,Imposto frmImpost
+tab_itacertos,sim,MyISAM,seq_ace+seq_ite,char(7),,,5,2,Consignação / Representantes,por filial,,,Acerto frmAcerto
+tab_itacertosabertos,sim,MyISAM,seq_ace+seq_ite,char(7),,,2,2,Consignação / Representantes,por filial,,,Acerto frmForcaAbertos
+tab_itcmp,sim,MyISAM,seq_not+SEQ_ITE,char(7),,,5,4,Fiscal: SPED / entrada de notas,por filial,,,frmDePara frmEntradasSped frmNotaEntrada frmSpedEnergiaEletrica
+tab_itcompras,sim,MyISAM,seq_not+SEQ_ITE,char(7),,,8,2,Estoque / Compras,por filial,,,frmDePara frmEdiEntr
+tab_itcont,sim,MyISAM,seq_cnt+cod_pro,char(5),,,2,2,Estoque / Compras,por filial,,,frmContagens frmLanCont
+tab_itcorr,sim,MyISAM,seq_cor+cod_pro,char(7),,,0,0,,por filial,não usada pelo piki_Simples,,
+tab_itcup,não,,,,,,2,0,Núcleo / infraestrutura,descartar se ECF não for mais usado,"citada no código, ausente no banco",,
+tab_itdev,sim,MyISAM,NUM_DEV+COD_PRO,char(7),,,0,0,,por filial,não usada pelo piki_Simples,,
+tab_itdevconsign,sim,MyISAM,seq_dev+seq_ite,char(7),,,3,2,Consignação / Representantes,por filial,,,frmDevolucaoConsign frmListaDevConsign
+tab_itdoc,sim,MyISAM,seq_itd,char(7),,,25,12,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Acerto Cobranca Vendas doc frmAcerto frmBaixaDocReq frmCobranca frmContasPagar frmEdiContaCob frmEdiLan frmEditaMov frmVinculaDoc
+tab_itdocpre,sim,MyISAM,seq_pre,int(11),sim,,2,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,doc
+tab_itenspcp,não,,,,,,2,2,Estoque / Compras,por filial,"citada no código, ausente no banco",,frmEdiProcomp frmSujComp
+tab_itmov,sim,MyISAM,num_mov+seq_ite,char(7),,,3,3,Estoque / Compras,por filial,,,MovInt frmEdiMovInt frmMovInt
+tab_itmovext,sim,MyISAM,num_mov+seq_ite,char(7),,,1,1,Estoque / Compras,por filial,,,MovInt
+tab_itorc,não,,,,,,1,0,Estoque / Compras,por filial,"citada no código, ausente no banco",,
+tab_itperdas,sim,MyISAM,,,,,1,1,Estoque / Compras,por filial,,,frmPerdas
+tab_itrep,sim,MyISAM,seq_rep+seq_ite,char(7),,,1,1,Estoque / Compras,por filial,,,Reposicao
+tab_itsai,sim,MyISAM,NOTA_SAI+SERIE_SAI+SEQ_ITS+cod_cai+COD_PRO,char(12),,,5,2,Núcleo / infraestrutura,verificar,,,BancoDados frmDePara
+tab_ittrocas,sim,MyISAM,seq_tro+cod_pro+seq_pro,char(7),,,2,1,PDV / Caixa,por filial,,,frmTroca
+tab_itvendas,sim,MyISAM,num_ven+seq_ite,char(7),,sim,18,9,PDV / Caixa,por filial,,,Vendas frmAjuste frmDePara frmDeletarVendas frmEdiMovInt frmForcaAbertos frmTroca frmVenda frmVendaFunc
+tab_itvndcncl,não,,,,,,2,2,PDV / Caixa,por filial,"citada no código, ausente no banco",,frmVenda frmVendaFunc
+tab_juridica,sim,MyISAM,cod_cli,char(6),,,0,0,,global,não usada pelo piki_Simples,,
+tab_keys,não,,,,,,1,1,Núcleo / infraestrutura,configuração da filial,"citada no código, ausente no banco",,BancoDados
+tab_listaprod,sim,MyISAM,cod_pro,char(8),,,0,0,,descartar (backup/cópia/temporária),,,
+tab_localche,sim,MyISAM,cod_loc,char(2),,,2,0,"Financeiro (pagar/receber, cheques, cobrança)",global,,,
+tab_log,sim,MyISAM,seq_log,int(11),sim,,1,1,Núcleo / infraestrutura,por filial,,,BancoDados
+tab_lojas,não,,,,,,1,0,Núcleo / infraestrutura,configuração da filial,"citada no código, ausente no banco",citada no código mas não existe neste banco,
+tab_marcas,sim,MyISAM,cod_mar,char(3),,,3,1,Relatórios,global,,,frmMesclaComp
+tab_movext,sim,MyISAM,num_mov,char(7),,,1,1,Estoque / Compras,por filial,,,MovInt
+tab_movint,sim,MyISAM,num_mov,char(7),,,4,3,Estoque / Compras,por filial,,,MovInt frmEdiMovInt frmMovInt
+tab_notasfiscais,não,,,,,,2,2,Estoque / Compras,por filial,"citada no código, ausente no banco",,frmEntradaSped frmEntradas
+tab_orc,não,,,,,,2,1,Relatórios,por filial,"citada no código, ausente no banco",,BancoDados
+tab_orgaos,sim,MyISAM,cod_org,char(5),,,5,3,Cadastros,global,,,frmEdiOrgao frmMesclarOrgao orgao
+tab_pacotes,sim,MyISAM,seq_pac,char(7),,,1,1,PDV / Caixa,por filial,,,Pacote
+tab_pagfun,sim,MyISAM,seq_fin,char(7),,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",global,,,Financeiro
+tab_parametros,sim,MyISAM,,,,sim,1,0,Núcleo / infraestrutura,configuração da filial,,"já tem cod_emp, cod_loj e CNPJ_EMP: vira a tabela de empresas/filiais",
+tab_pedidos,não,,,,,,1,1,Núcleo / infraestrutura,por filial,"citada no código, ausente no banco",,BancoDados
+tab_perdas,sim,MyISAM,seq_per,char(7),,,3,2,Estoque / Compras,por filial,,,BancoDados frmPerdas
+tab_permgru,não,,,,,,1,0,Cadastros,global,"citada no código, ausente no banco",,
+tab_permissoes,sim,MyISAM,cod_per,char(5),,,2,1,Cadastros,global,,,Permissao
+tab_permusu,sim,MyISAM,cod_per+Cod_fun,char(3),,,0,0,,global,não usada pelo piki_Simples,,
+tab_planocontas,sim,MyISAM,cod_pla+tipo_pla,char(5),,,6,1,"Financeiro (pagar/receber, cheques, cobrança)",global,,,frmCadPlano
+tab_posicaoestoquecons,não,,,,,,1,1,Consignação / Representantes,verificar,"citada no código, ausente no banco",,Consignado
+tab_posologia,não,,,,,,1,1,PDV / Caixa,global,"citada no código, ausente no banco",,Vendas
+tab_principios,sim,MyISAM,cod_pri,char(5),,,1,1,Estoque / Compras,global,,,Principio
+tab_procomp,não,,,,,,2,2,Estoque / Compras,por filial,"citada no código, ausente no banco",,frmEdiProcomp frmSujComp
+tab_prodacerto,sim,MyISAM,seq_ace+ordem_ace,char(7),,,0,0,,por filial,não usada pelo piki_Simples,,
+tab_prodfrac,sim,MyISAM,cod_pro+matriz_pro,char(8),,,0,0,,global,não usada pelo piki_Simples,,
+tab_prodpromo,não,,,,,,1,1,Estoque / Compras,global,"citada no código, ausente no banco",,frmProdProm
+tab_produtos,sim,MyISAM,cod_pro,varchar(8),,,57,29,Estoque / Compras,global + dados por filial (separar),,"estoque (er_pro/ef_pro), preços e custos (pv_pro, cr_pro, cf_pro...) ficam numa tabela produto_filial (cod_emp, cod_pro)",BancoDados Consignado Modulo NFe Produtos Vendas frmAcerto frmAjuste frmAlteraEstInv frmBaixarEstoque frmCadPro frmContagemNova frmContagens frmDePara frmDevolucaoConsign frmEdiMovInt frmEdiPro frmForcaAbertos frmInfPro frmInventario frmMesclaComp frmMigraMovInt frmMovInt frmNotaEntrada frmPerdas frmQueima frmTransfComp frmTroca frmVendaFunc
+tab_promocoes,sim,MyISAM,seq_pro+cod_pro,char(7),,,0,0,,global,não usada pelo piki_Simples,,
+tab_queima,não,,,,,,1,1,Estoque / Compras,por filial,"citada no código, ausente no banco",,Produtos
+tab_recados,sim,MyISAM,seq_rec,int(11),sim,,1,1,Cadastros,por filial,,,Mensagem
+tab_referencias,sim,MyISAM,cod_cli+seq_ref,int(6),,,1,1,Cadastros,global,,,frmCadCli
+tab_reposicao,sim,MyISAM,seq_rep,char(7),,,2,1,Relatórios,por filial,,,Reposicao
+tab_representantes,sim,MyISAM,cod_rep,int(6),,,12,4,Consignação / Representantes,global,,,Representante frmCadRep frmEdiRep frmTransfConsign
+tab_reptip,sim,MyISAM,cod_tip+cod_rep,char(2),,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",global,,,Cobranca
+tab_resumotmp,sim,MyISAM,,,,,0,0,,descartar (backup/cópia/temporária),,,
+tab_resumotmpresult,sim,MyISAM,,,,,0,0,,descartar (backup/cópia/temporária),,,
+tab_saidas,sim,MyISAM,NOTA_SAI+SERIE_SAI+cod_cai+EMISSAO_SAI,char(12),,,7,3,Núcleo / infraestrutura,por filial,,,BancoDados Modulo frmMesclarClientes
+tab_saidasnf,não,,,,,,2,0,Fiscal: NF-e / NFC-e,por filial,"citada no código, ausente no banco",,
+tab_secoes,sim,MyISAM,cod_sec,char(3),,,9,1,Estoque / Compras,global,,,Secao
+tab_setores,sim,MyISAM,cod_set,char(5),,,17,3,Cadastros,global,,,Setores frmAjuste frmEdiSet
+tab_similares,sim,MyISAM,seq_sim+cod_pro,int(11),,,1,1,Estoque / Compras,global,,,Produtos
+tab_subsec,sim,MyISAM,cod_sub,char(3),,,8,1,Estoque / Compras,global,,,subsecAO
+tab_suspensao,sim,MyISAM,cod_pro,char(8),,,1,1,Estoque / Compras,global,,,Produtos
+tab_telefones,sim,MyISAM,,,,,13,7,Cadastros,global,,,Clientes frmAjuste frmCadCli frmCadFun frmCadRep frmIncFor frmMesclarClientes
+tab_tipocai,sim,MyISAM,cod_tip,char(2),,,1,0,"Financeiro (pagar/receber, cheques, cobrança)",global,,,
+tab_tipocob,sim,MyISAM,cod_tip,char(2),,,5,0,"Financeiro (pagar/receber, cheques, cobrança)",global,,,
+tab_tipopag,sim,MyISAM,cod_tip,char(2),,,3,0,"Financeiro (pagar/receber, cheques, cobrança)",global,,,
+tab_tipopagfun,não,,,,,,1,0,"Financeiro (pagar/receber, cheques, cobrança)",global,"citada no código, ausente no banco",,
+tab_tipopar,sim,MyISAM,cod_tip,int(2),,,1,0,Núcleo / infraestrutura,global,,,
+tab_tiporef,sim,MyISAM,cod_tip,char(2),,,0,0,,global,não usada pelo piki_Simples,,
+tab_tipoven,sim,MyISAM,COD_TIP,char(2),,,4,1,Estoque / Compras,global,,,frmIncFormasPag
+tab_transf,não,,,,,,1,1,Núcleo / infraestrutura,por filial,"citada no código, ausente no banco",,BancoDados
+tab_transferencias,não,,,,,,1,1,Núcleo / infraestrutura,por filial,"citada no código, ausente no banco",,BancoDados
+tab_trocaavulsa,sim,MyISAM,id,int(11),,,2,1,PDV / Caixa,por filial,,,Vendas
+tab_trocaavulsait,sim,MyISAM,id,int(11),sim,,1,1,PDV / Caixa,por filial,,,Vendas
+tab_trocas,sim,MyISAM,seq_tro,char(7),,,4,1,Relatórios,por filial,,,frmTroca
+tab_turncai,sim,MyISAM,cod_tur+cod_cai+data_tur,char(1),,,5,3,PDV / Caixa,por filial,,,frmAberturaCaixa frmFechaCaixa frmMovDiarioCx
+tab_turnos,sim,MyISAM,cod_tur,char(1),,,1,0,Núcleo / infraestrutura,por filial,,,
+tab_usuarios,sim,MyISAM,COD_FUN,char(3),,,7,4,Cadastros,global,,,Funcionario frmEdiUsu frmIncUsu frmMudaSenha
+tab_valescai,sim,MyISAM,seq_cai,char(7),,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Financeiro
+tab_vendaaberta,sim,MyISAM,num_ven,char(7),,,1,1,PDV / Caixa,por filial,,,Vendas
+tab_vendas,sim,MyISAM,num_ven,varchar(7),,sim,43,15,PDV / Caixa,por filial,,,Modulo Vendas frmAjuste frmCrediario frmDeletarVendas frmEfetivaVen frmFecharVenda frmForcaAbertos frmLanParcelasVen frmMesclarClientes frmPendenciaCrediario frmTipoVenda frmTroco frmVenda frmVendaFunc
+tab_venfec,sim,MyISAM,num_ven+cod_for,char(7),,,7,3,PDV / Caixa,por filial,,,Vendas frmEfetivaVen frmTipoVenda
+tab_venfin,sim,MyISAM,num_ven,varchar(7),,,4,2,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,Acerto frmEdiMovFin
+tab_vinc,sim,MyISAM,seq_vin,char(7),,,1,1,"Financeiro (pagar/receber, cheques, cobrança)",por filial,,,frmVinculaDoc
+tad_descprod,sim,MyISAM,cod_pro+cod_car,char(8),,,0,0,,global,não usada pelo piki_Simples,,
+tipo_servi,não,,,,,,1,0,Estoque / Compras,global,"citada no código, ausente no banco",,
+tipo_servico,não,,,,,,1,0,Estoque / Compras,global,"citada no código, ausente no banco",,
+tipoven,sim,MyISAM,codigo,char(1),,,0,0,,global,não usada pelo piki_Simples,,
+tmp_01,não,,,,,,1,1,Núcleo / infraestrutura,descartar (backup/cópia/temporária),"citada no código, ausente no banco",,BancoDados
+turncai,sim,MyISAM,cod_tur+cod_cai+data_tur,char(1),,,0,0,,por filial,não usada pelo piki_Simples,,
+turnos,sim,MyISAM,cod_tur,char(1),,,0,0,,por filial,não usada pelo piki_Simples,,
+vales,sim,MyISAM,id,int(11),sim,,2,1,PDV / Caixa,por filial,,,vales
+veiculo_venda,não,,,,,,1,1,PDV / Caixa,por filial,"citada no código, ausente no banco",,Vendas

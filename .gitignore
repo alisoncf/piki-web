@@ -1,0 +1,30 @@
+# credenciais
+.env
+*.env.local
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# node
+node_modules/
+dist/
+.quasar/
+
+# dados e dumps (nunca versionar dados de clientes)
+*.sql.gz
+dados/
+backup/
+*.log
+
+# editores e sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
