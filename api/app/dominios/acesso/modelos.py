@@ -87,6 +87,8 @@ class Usuario(ComDatas, Base):
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     ultimo_login: Mapped[datetime | None] = mapped_column(DateTime)
     ultima_empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id", ondelete="SET NULL"))
+    # funcionário que usa este login (opcional: nem todo funcionário tem login, nem todo login é de funcionário)
+    funcionario_id: Mapped[int | None] = mapped_column(ForeignKey("funcionario.id", ondelete="SET NULL"), unique=True)
 
     acessos: Mapped[list["UsuarioEmpresa"]] = relationship(back_populates="usuario", lazy="selectin")
 

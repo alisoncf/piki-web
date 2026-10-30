@@ -9,4 +9,6 @@ PERMISSOES: dict[str, str] = {
     "acesso.usuarios": "Ver e gerenciar usuários e seus acessos às empresas",
     "acesso.perfis": "Ver e gerenciar perfis e suas permissões",
     "acesso.empresas": "Ver e gerenciar o cadastro de empresas",
+    "funcionarios.ver": "Consultar funcionários e cargos",
+    "funcionarios.editar": "Cadastrar e alterar funcionários e cargos",
 }
