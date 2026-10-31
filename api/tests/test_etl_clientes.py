@@ -7,7 +7,9 @@ from sqlalchemy import create_engine, select, text
 
 from app.dominios.acesso import servico
 from app.dominios.cidades.modelos import Cidade, nome_de_busca
-from app.dominios.clientes.modelos import Cliente, Cobrador, GrupoCliente, Orgao, Setor
+from app.dominios.clientes.modelos import Cliente, GrupoCliente, Orgao, Setor
+from app.dominios.funcionarios.modelos import Funcionario
+from etl import mapa
 from etl.clientes import converter, importar_clientes
 from etl.funcionarios import EmpresaNaoImportada
 
@@ -35,7 +37,6 @@ def _ddl(logradouro: str) -> list[str]:
         "CREATE TABLE tab_grupocli (cod_gru TEXT, nome_gru TEXT)",
         "CREATE TABLE tab_tipopar (cod_tip INTEGER PRIMARY KEY, nome_tip TEXT)",
         "CREATE TABLE tab_cidades (cod_cid TEXT, nome_cid TEXT, uf_cid TEXT, cod_mun TEXT)",
-        "CREATE TABLE tab_contacob (cod_cob TEXT, nome_cob TEXT, excluido_cob TEXT)",
         "CREATE TABLE tab_setores (cod_set TEXT, nome_set TEXT, cobrador_set TEXT, cod_cid TEXT, cod_old TEXT, tipo_set TEXT)",
         """CREATE TABLE tab_orgaos (cod_org TEXT, nome_org TEXT, cod_gru TEXT, endereco_org TEXT, cod_set TEXT,
             fone_org TEXT, cep_org TEXT, cobrador_org TEXT, data_org DATE, Obs TEXT)""",
@@ -59,7 +60,7 @@ def _inserir(c, tabela: str, linha: dict) -> None:
 
 
 def _banco_vb6(caminho, clientes, logradouro="Logradouro_cli", setores=(), orgaos=(), grupos=(),
-               telefones=(), referencias=(), anotacoes=(), cobradores=()):
+               telefones=(), referencias=(), anotacoes=()):
     eng = create_engine(f"sqlite:///{caminho}")
     with eng.begin() as c:
         for ddl in _ddl(logradouro):
@@ -75,8 +76,6 @@ def _banco_vb6(caminho, clientes, logradouro="Logradouro_cli", setores=(), orgao
         for cod, nome, cobrador, *cidade in setores:
             _inserir(c, "tab_setores", {"cod_set": cod, "nome_set": nome, "cobrador_set": cobrador,
                                         "cod_cid": cidade[0] if cidade else "00001", "tipo_set": "BAIRRO"})
-        for cod, nome, excluido in cobradores:
-            _inserir(c, "tab_contacob", {"cod_cob": cod, "nome_cob": nome, "excluido_cob": excluido})
         for cod, nome, grupo in orgaos:
             _inserir(c, "tab_orgaos", {"cod_org": cod, "nome_org": nome, "cod_gru": grupo, "endereco_org": "",
                                        "cod_set": "00001", "fone_org": "(62) 3333-0000", "cep_org": "", "Obs": None})
@@ -102,6 +101,12 @@ def empresas(banco):
         db.add_all([Cidade(codigo_ibge=c, nome=n, uf="GO", nome_busca=nome_de_busca(n))
                     for c, n in (("5201108", "Anápolis"), ("5208707", "Goiânia"), ("5205901", "Corumbá de Goiás"),
                                  ("5201405", "Aparecida de Goiânia"))])
+        # o cobrador, como o ETL de funcionários deixaria: um cadastro só, com um código em cada loja
+        sidnei = Funcionario(nome="SIDNEI", empresa_id=e1.id)
+        db.add(sidnei)
+        db.flush()
+        mapa.gravar(db, "tab_funcionarios", e1.id, "003", sidnei.id)
+        mapa.gravar(db, "tab_funcionarios", e3.id, "010", sidnei.id)
         db.commit()
         return {"01": e1.id, "03": e3.id}
 
@@ -112,7 +117,6 @@ def matriz(tmp_path):
         tmp_path / "f01.db", [_ANA, _BETO],
         setores=[("00001", "JUNDIAÍ", "003"), ("00002", "CENTRO", "099", "00002"), ("00003", "SAO JOAO", "003", "00003"),
                  ("00004", "VILA SANTA", "", "00004")],
-        cobradores=[("003", "SIDNEI", "N"), ("004", "ANTIGO", "S")],
         orgaos=[("00007", "ESCOLA MODELO", "001")],
         grupos=[("000", "GERAL"), ("001", "SERVIDOR MUNICIPAL")],
         telefones=[(1, "(62) 99999-0000", "3"), (1, "3333-4444", "1"), (2, "62 98888-7777", "3")],
@@ -130,7 +134,6 @@ def _importar(eng, banco, codigo):
 
 def test_converter():
     d = converter(_ANA)
-    assert d["uf"] == "GO"
     assert d["cep"] == "75000000"
     assert d["data_nascimento"] is None  # 30 de fevereiro
     assert d["limite_credito"] == Decimal("550.00")
@@ -139,7 +142,7 @@ def test_converter():
     assert converter(_BETO)["bloqueado"] is True
     assert converter(_BETO)["forma_cobranca"] == "loja"
     assert d["recebe_mensagens"] is True
-    assert d["codigo_municipio"] == "5201108"
+    assert "cidade" not in d and "uf" not in d  # a cidade é a do setor
     # o logradouro manda; endereco_cli só quando os outros estão vazios
     assert (d["logradouro"], d["numero"]) == ("RUA UM QD 1 LT 2", "10")
     assert converter({**_ANA, "logradouro": ""})["logradouro"] == "R UM"
@@ -153,7 +156,7 @@ def test_empresa_precisa_existir(banco, matriz):
 def test_importa_matriz(banco, empresas, matriz):
     r = _importar(matriz, banco, "01")
     assert (r.grupos_criados, r.parentescos_criados, r.setores_criados, r.orgaos_criados) == (2, 3, 4, 1)
-    assert (r.cobradores_criados, r.cobradores, r.setores_sem_cidade) == (2, 2, 1)
+    assert (r.cobradores, r.setores_sem_cidade) == (2, 1)
     assert (r.criados, r.sem_documento, r.telefones, r.referencias, r.anotacoes) == (2, 1, 3, 1, 1)
     assert any("cobrador 099" in a for a in r.avisos)
     assert any("cidade 00003 (JUNDIAI/GO)" in a for a in r.avisos)
@@ -180,7 +183,6 @@ def test_importa_matriz(banco, empresas, matriz):
         assert setores["VILA SANTA"].cidade.nome == "Corumbá de Goiás"  # pelo começo do nome
         assert setores["SAO JOAO"].cidade is None
         assert [c.nome for c in setores["SAO JOAO"].cobradores] == ["SIDNEI"]
-        assert {c.nome: c.ativo for c in db.scalars(select(Cobrador))} == {"SIDNEI": True, "ANTIGO": False}
 
 
 def test_reimportar_nao_duplica(banco, empresas, matriz):
@@ -207,7 +209,6 @@ def test_outra_loja_junta_pelo_cpf_e_o_mais_recente_manda(banco, empresas, matri
         ],
         logradouro="logradouro_cli",
         setores=[("00009", "jundiai", "010"), ("00001", "VILA NOVA", "010")],
-        cobradores=[("010", "Sidnei", "N")],
         grupos=[("001", "Servidor Municipal")],
         telefones=[(7, "62 99999-0000", "3"), (7, "62 97777-1111", "3")],
     )
@@ -215,7 +216,7 @@ def test_outra_loja_junta_pelo_cpf_e_o_mais_recente_manda(banco, empresas, matri
     filial.dispose()
     assert (r.criados, r.ligados_por_documento, r.sem_documento) == (2, 1, 1)
     assert (r.setores_criados, r.grupos_criados) == (1, 0)  # "jundiai" é o mesmo setor "JUNDIAÍ"
-    assert (r.cobradores_criados, r.cobradores) == (0, 1)  # o mesmo SIDNEI, que já cobrava o JUNDIAÍ
+    assert r.cobradores == 1  # o mesmo SIDNEI, que já cobrava o JUNDIAÍ
     assert r.telefones == 1  # o 62 99999-0000 já existia na ANA
 
     with banco() as db:
@@ -236,7 +237,7 @@ def test_outra_loja_junta_pelo_cpf_e_o_mais_recente_manda(banco, empresas, matri
         assert len(db.scalars(select(Cliente).where(Cliente.nome == "BETO SEM CPF")).all()) == 2
         assert len(db.scalars(select(Setor)).all()) == 5
         # um cobrador para todas as lojas, em vários setores
-        sidnei = db.scalar(select(Cobrador).where(Cobrador.nome == "SIDNEI"))
+        sidnei = db.scalar(select(Funcionario).where(Funcionario.nome == "SIDNEI"))
         assert sorted(s.nome for s in db.scalars(select(Setor)) if sidnei in s.cobradores) == [
             "JUNDIAÍ", "SAO JOAO", "VILA NOVA"]
         assert len(db.scalars(select(GrupoCliente)).all()) == 2

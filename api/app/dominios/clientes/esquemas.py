@@ -23,11 +23,6 @@ def _vazio_para_none(valor: object) -> object:
     return valor
 
 
-def _uf(valor: object) -> object:
-    valor = _vazio_para_none(valor)
-    return valor.upper() if isinstance(valor, str) else valor
-
-
 class Nomeado(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -67,28 +62,12 @@ class Parentesco(ParentescoDados):
     id: int
 
 
-class CobradorDados(BaseModel):
-    nome: str = Field(min_length=1, max_length=40)
-    ativo: bool = True
-
-    @field_validator("nome", mode="before")
-    @classmethod
-    def _nome(cls, v: object) -> object:
-        return _vazio_para_none(v)
-
-
-class Cobrador(CobradorDados):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-
-
 class SetorDados(BaseModel):
     nome: str = Field(min_length=1, max_length=40)
     tipo: str | None = Field(default=None, max_length=20)
     cidade_id: int = Field(description="Cidade do IBGE; obrigatória (os setores antigos sem cidade ganham uma ao ser alterados)")
     ativo: bool = True
-    cobradores: list[int] = Field(default=[], description="Ids dos cobradores; valem para todas as lojas")
+    cobradores: list[int] = Field(default=[], description="Ids dos funcionários que cobram o setor, em qualquer loja")
 
     @field_validator("nome", "tipo", mode="before")
     @classmethod
@@ -108,7 +87,7 @@ class Setor(SetorResumo):
     tipo: str | None
     cidade_id: int | None
     ativo: bool
-    cobradores: list[Cobrador]
+    cobradores: list[Nomeado]
 
 
 class OrgaoDados(BaseModel):
@@ -201,10 +180,7 @@ class ClienteDados(BaseModel):
     complemento: str | None = Field(default=None, max_length=60)
     bairro: str | None = Field(default=None, max_length=40)
     ponto_referencia: str | None = Field(default=None, max_length=60)
-    cidade: str | None = Field(default=None, max_length=40)
-    uf: str | None = Field(default=None, pattern="^[A-Z]{2}$")
-    codigo_municipio: str | None = Field(default=None, pattern="^[0-9]{7}$", description="Código IBGE")
-    setor_id: int | None = Field(default=None, description="Setor de cobrança")
+    setor_id: int | None = Field(default=None, description="Setor de cobrança; a cidade do cliente é a do setor")
 
     grupo_id: int | None = None
     orgao_id: int | None = Field(default=None, description="Onde trabalha")
@@ -229,7 +205,7 @@ class ClienteDados(BaseModel):
 
     @field_validator(
         "nome", "rg", "inscricao_estadual", "pai", "mae", "email", "logradouro", "numero", "complemento", "bairro",
-        "ponto_referencia", "cidade", "codigo_municipio", "local_trabalho", "endereco_trabalho", "observacao", "sexo",
+        "ponto_referencia", "local_trabalho", "endereco_trabalho", "observacao", "sexo",
         mode="before",
     )
     @classmethod
@@ -240,11 +216,6 @@ class ClienteDados(BaseModel):
     @classmethod
     def _digitos(cls, v: object) -> str | None:
         return so_digitos(v) or None
-
-    @field_validator("uf", mode="before")
-    @classmethod
-    def _uf(cls, v: object) -> object:
-        return _uf(v)
 
     @field_validator("forma_cobranca")
     @classmethod
@@ -263,7 +234,6 @@ class ClienteResumo(BaseModel):
     nome: str
     cpf_cnpj: str | None
     bairro: str | None
-    cidade: str | None
     bloqueado: bool
     credito_suspenso: bool
     setor: SetorResumo | None

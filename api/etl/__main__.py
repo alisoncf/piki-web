@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> None:
     f = sub.add_parser("funcionarios", help="importa cargos, funcionários e seus telefones")
     f.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     f.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
-    c = sub.add_parser("clientes", help="importa grupos, cobradores, setores, órgãos, clientes, telefones, referências e anotações")
+    c = sub.add_parser("clientes", help="importa grupos, setores, órgãos, clientes, telefones, referências e anotações")
     c.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     c.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     c.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
@@ -71,7 +71,7 @@ def main(argv: list[str] | None = None) -> None:
             elif args.comando == "clientes":
                 r = importar_clientes(conexao, db, args.empresa)
                 print(f"grupos novos: {r.grupos_criados}, parentescos novos: {r.parentescos_criados}, "
-                      f"órgãos novos: {r.orgaos_criados}, cobradores novos: {r.cobradores_criados}")
+                      f"órgãos novos: {r.orgaos_criados}")
                 print(f"setores novos: {r.setores_criados} ({r.setores_sem_cidade} desta loja sem cidade), "
                       f"cobradores ligados a setores: {r.cobradores}")
                 print(f"clientes: {r.criados} novos ({r.sem_documento} sem CPF/CNPJ válido), "

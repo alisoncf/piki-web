@@ -1,4 +1,4 @@
-"""Cadastro de clientes, setores, cobradores, cidades, órgãos e grupos. Dados fictícios (CPF e CNPJ gerados só para teste)."""
+"""Cadastro de clientes, setores, cidades, órgãos e grupos. Dados fictícios (CPF e CNPJ gerados só para teste)."""
 import pytest
 
 from app.dominios.cidades.modelos import Cidade, nome_de_busca
@@ -49,7 +49,7 @@ def test_criar_e_consultar_cliente(cliente, cenario, admin, cidades):
     orgao = cliente.post("/orgaos", json={"nome": "Escola Modelo", "grupo_id": grupo["id"]}, headers=admin).json()
     irma = cliente.post("/parentescos", json={"nome": "Irmã"}, headers=admin).json()
     r = cliente.post("/clientes", headers=admin, json=_dados(
-        setor_id=setor["id"], orgao_id=orgao["id"], grupo_id=grupo["id"], uf="go", cep="75.110-000",
+        setor_id=setor["id"], orgao_id=orgao["id"], grupo_id=grupo["id"], cep="75.110-000",
         limite_credito="550.00", bloqueado=True, forma_cobranca="trabalho",
         telefones=[{"numero": "(62) 99999-0000", "tipo": "3"}],
         referencias=[{"nome": "Joana", "telefone": "62 3333-4444", "parentesco_id": irma["id"]}],
@@ -57,7 +57,7 @@ def test_criar_e_consultar_cliente(cliente, cenario, admin, cidades):
     assert r.status_code == 201, r.text
     criado = r.json()
     assert criado["cpf_cnpj"] == CPF_A
-    assert criado["uf"] == "GO"
+    assert "cidade" not in criado and "uf" not in criado  # a cidade é a do setor
     assert criado["cep"] == "75110000"
     assert criado["limite_credito"] == "550.00"
     assert criado["setor"]["nome"] == "Jundiaí"
@@ -152,9 +152,9 @@ def test_buscar_cidades(cliente, cenario, admin, cidades):
 
 
 def test_setor_na_cidade_com_varios_cobradores(cliente, cenario, admin, cidades):
-    um = cliente.post("/cobradores", headers=admin, json={"nome": "Sidnei"}).json()
-    dois = cliente.post("/cobradores", headers=admin, json={"nome": "Edmilson"}).json()
-    assert cliente.post("/cobradores", headers=admin, json={"nome": "SIDNEI"}).status_code == 409
+    # cobradores são funcionários, de qualquer loja
+    um = cliente.post("/funcionarios", headers=admin, json={"nome": "Sidnei", "empresa_id": cenario["e1"]}).json()
+    dois = cliente.post("/funcionarios", headers=admin, json={"nome": "Edmilson", "empresa_id": cenario["e2"]}).json()
 
     r = cliente.post("/setores", headers=admin, json={
         "nome": "Centro", "cidade_id": cidades["Anápolis"], "cobradores": [um["id"], dois["id"], um["id"]]})

@@ -3,13 +3,15 @@
 Cada filial criava os seus setores, órgãos e grupos, e os mesmos códigos
 significam coisas diferentes em cada banco. Aqui eles viram uma lista só:
 
-- grupos, órgãos e cobradores (tab_contacob) são juntados pelo nome (sem
-  acentos, sem diferenciar maiúsculas); setores, pelo nome e pela cidade;
+- grupos e órgãos são juntados pelo nome (sem acentos, sem diferenciar
+  maiúsculas); setores, pelo nome e pela cidade;
 - a cidade do setor é a do IBGE: o cod_mun da tab_cidades da loja ou, sem
   ele, o mesmo nome e UF na lista do IBGE (tabela cidade, da migração 0008),
   ou a única cidade da UF cujo nome começa assim ("CORUMBA" → Corumbá de Goiás);
-- o cobrador do setor (cobrador_set) é somado aos que o setor já tem: os
-  cobradores valem para todas as lojas.
+- o cobrador do setor (cobrador_set) é o código de um funcionário da loja; ele
+  é somado aos cobradores que o setor já tem, que valem para todas as lojas
+  (D17). Rode antes: python -m etl funcionarios;
+- o cliente não tem cidade: ela é a do setor.
 
 O cliente é um só para todas as lojas (D9):
 
@@ -39,9 +41,10 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.dominios.acesso.modelos import Empresa
 from app.dominios.clientes.modelos import (
-    AnotacaoCliente, Cliente, Cobrador, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor, TelefoneCliente,
+    AnotacaoCliente, Cliente, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor, TelefoneCliente,
 )
 from app.dominios.cidades.modelos import Cidade, nome_de_busca
+from app.dominios.funcionarios.modelos import Funcionario
 from app.nucleo.documentos import cpf_cnpj_valido, so_digitos
 from app.nucleo.legado import MapaLegado
 from etl import mapa
@@ -63,7 +66,6 @@ _ANOTACOES = text(
 )
 _GRUPOS = text("SELECT cod_gru, nome_gru FROM tab_grupocli")
 _PARENTESCOS = text("SELECT CAST(cod_tip AS CHAR), nome_tip FROM tab_tipopar")
-_COBRADORES = text("SELECT cod_cob, nome_cob, excluido_cob FROM tab_contacob")
 _SETORES = text("SELECT cod_set, nome_set, cobrador_set, cod_cid, tipo_set FROM tab_setores")
 
 @dataclass
@@ -72,7 +74,6 @@ class Resultado:
     parentescos_criados: int = 0
     setores_criados: int = 0
     setores_sem_cidade: int = 0
-    cobradores_criados: int = 0
     orgaos_criados: int = 0
     cobradores: int = 0  # ligações setor-cobrador novas
     criados: int = 0
@@ -125,22 +126,6 @@ def _importar_lista(origem: Connection, db: Session, empresa: Empresa, consulta,
             criados += 1
         mapa.gravar(db, tabela, empresa.id, codigo, item.id)
     return criados
-
-
-def _importar_cobradores(origem: Connection, db: Session, empresa: Empresa, r: Resultado) -> None:
-    por_nome = {nome_comparavel(c.nome): c for c in db.scalars(select(Cobrador))}
-    for linha in origem.execute(_COBRADORES).mappings():
-        codigo, nome = _texto(linha["cod_cob"]), _corta(linha["nome_cob"], 40)
-        if codigo is None or not nome or mapa.buscar(db, "tab_contacob", empresa.id, codigo):
-            continue
-        cobrador = por_nome.get(nome_comparavel(nome))
-        if cobrador is None:
-            cobrador = Cobrador(nome=nome, ativo=(_texto(linha["excluido_cob"]) or "N").upper() != "S")
-            db.add(cobrador)
-            db.flush()
-            por_nome[nome_comparavel(nome)] = cobrador
-            r.cobradores_criados += 1
-        mapa.gravar(db, "tab_contacob", empresa.id, codigo, cobrador.id)
 
 
 def _cidades_da_loja(origem: Connection, db: Session, r: Resultado) -> dict[str, int]:
@@ -205,12 +190,12 @@ def _importar_setores(origem: Connection, db: Session, empresa: Empresa, r: Resu
         codigo_cobrador = _codigo(linha["cobrador_set"])
         if not codigo_cobrador:
             continue
-        cobrador_id = mapa.buscar(db, "tab_contacob", empresa.id, codigo_cobrador)
+        cobrador_id = mapa.buscar(db, "tab_funcionarios", empresa.id, codigo_cobrador)
         if cobrador_id is None:
-            r.avisos.append(f"setor {codigo} ({nome}): cobrador {codigo_cobrador} não existe na tab_contacob")
+            r.avisos.append(f"setor {codigo} ({nome}): cobrador {codigo_cobrador} não encontrado entre os funcionários")
             continue
         if all(c.id != cobrador_id for c in setor.cobradores):
-            setor.cobradores.append(db.get(Cobrador, cobrador_id))
+            setor.cobradores.append(db.get(Funcionario, cobrador_id))
             r.cobradores += 1
     db.flush()
 
@@ -285,8 +270,6 @@ _COBRANCA = {"1": "domicilio", "2": "trabalho", "3": "loja"}
 def converter(linha: dict) -> dict:
     """Uma linha da tab_clientes → campos do cliente (sem documento, setores, órgão e grupo, tratados à parte)."""
     sexo = (_texto(linha.get("sexo_cli")) or "").upper()
-    uf = (_texto(linha.get("uf_cli")) or "").upper()
-    municipio = so_digitos(linha.get("cod_cid"))
     sim = lambda campo: (_texto(linha.get(campo)) or "").upper() == "S"  # noqa: E731
     # o endereço certo é o logradouro; endereco_cli é o campo antigo, usado só quando os outros estão vazios
     if _texto(linha.get("logradouro")):
@@ -311,9 +294,6 @@ def converter(linha: dict) -> dict:
         "complemento": _corta(endereco[2], 60),
         "bairro": _corta(linha.get("bairro_cli"), 40),
         "ponto_referencia": _corta(linha.get("referencia_cli"), 60),
-        "cidade": _corta(linha.get("cidade_cli"), 40),
-        "uf": uf if len(uf) == 2 else None,
-        "codigo_municipio": municipio if len(municipio) == 7 else None,
         "local_trabalho": _corta(linha.get("localtrab_cli"), 60),
         "endereco_trabalho": _corta(linha.get("endtrab_cli") or linha.get("endcom_cli"), 60),
         "telefone_trabalho": _digitos(linha.get("teltrab_cli"), 15),
@@ -523,7 +503,6 @@ def importar_clientes(origem: Connection, db: Session, codigo_empresa: str) -> R
     r = Resultado()
     r.grupos_criados = _importar_lista(origem, db, empresa, _GRUPOS, GrupoCliente, "tab_grupocli", 40)
     r.parentescos_criados = _importar_lista(origem, db, empresa, _PARENTESCOS, Parentesco, "tab_tipopar", 30)
-    _importar_cobradores(origem, db, empresa, r)
     _importar_setores(origem, db, empresa, r)
     _importar_orgaos(origem, db, empresa, r)
     db.flush()

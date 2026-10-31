@@ -1,9 +1,10 @@
 """Clientes e seus cadastros de apoio (cadastro global, D9).
 
 No VB6: tab_clientes, tab_telefones (tipo_ter = 'C'), tab_referencias,
-tab_tipopar, tab_clientesanot, tab_setores, tab_orgaos, tab_grupocli e tab_contacob. Cada loja
-tinha os seus setores, órgãos e cobradores; aqui são uma lista só. Cobradores valem para
-todas as lojas: um setor pode ter vários cobradores, e um cobrador, vários setores.
+tab_tipopar, tab_clientesanot, tab_setores, tab_orgaos e tab_grupocli. Cada loja
+tinha os seus setores e órgãos; aqui são uma lista só. O cobrador é um funcionário e vale
+para todas as lojas: um setor pode ter vários cobradores, e um cobrador, vários setores (D17).
+A cidade do cliente é a do setor, que é sempre uma cidade do IBGE.
 """
 from datetime import date, datetime
 from decimal import Decimal
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.acesso.modelos import Empresa, Usuario
 from app.dominios.cidades.modelos import Cidade
+from app.dominios.funcionarios.modelos import Funcionario
 from app.nucleo.banco import Base, ComDatas
 
 
@@ -38,21 +40,11 @@ class Parentesco(ComDatas, Base):
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class Cobrador(ComDatas, Base):
-    """Quem cobra os setores: pessoa ou destino da cobrança (escritório, advogado...). tab_contacob no VB6."""
-
-    __tablename__ = "cobrador"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    nome: Mapped[str] = mapped_column(String(40), unique=True)
-    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
-
-
 setor_cobrador = Table(
     "setor_cobrador",
     Base.metadata,
     Column("setor_id", ForeignKey("setor.id", ondelete="CASCADE"), primary_key=True),
-    Column("cobrador_id", ForeignKey("cobrador.id", ondelete="CASCADE"), primary_key=True),
+    Column("funcionario_id", ForeignKey("funcionario.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
@@ -69,8 +61,9 @@ class Setor(ComDatas, Base):
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
     cidade: Mapped[Cidade | None] = relationship(lazy="joined")
-    cobradores: Mapped[list[Cobrador]] = relationship(
-        secondary=setor_cobrador, lazy="selectin", order_by=Cobrador.nome
+    # funcionários que cobram o setor, em qualquer loja
+    cobradores: Mapped[list[Funcionario]] = relationship(
+        secondary=setor_cobrador, lazy="selectin", order_by=Funcionario.nome
     )
 
 
@@ -115,9 +108,6 @@ class Cliente(ComDatas, Base):
     complemento: Mapped[str | None] = mapped_column(String(60))
     bairro: Mapped[str | None] = mapped_column(String(40))
     ponto_referencia: Mapped[str | None] = mapped_column(String(60))
-    cidade: Mapped[str | None] = mapped_column(String(40))
-    uf: Mapped[str | None] = mapped_column(String(2))
-    codigo_municipio: Mapped[str | None] = mapped_column(String(7))  # IBGE
     setor_id: Mapped[int | None] = mapped_column(ForeignKey("setor.id"), index=True)
 
     grupo_id: Mapped[int | None] = mapped_column(ForeignKey("grupo_cliente.id"))

@@ -15,7 +15,6 @@ export const MENU = [
         filhos: [
           { titulo: 'Clientes', icone: 'people', rota: '/cadastros/clientes', permissao: 'clientes.ver' },
           { titulo: 'Setores', icone: 'map', rota: '/cadastros/setores', permissao: 'clientes.ver' },
-          { titulo: 'Cobradores', icone: 'directions_walk', rota: '/cadastros/cobradores', permissao: 'clientes.ver' },
           { titulo: 'Órgãos', icone: 'apartment', rota: '/cadastros/orgaos', permissao: 'clientes.ver' },
           { titulo: 'Grupos', icone: 'category', rota: '/cadastros/grupos-clientes', permissao: 'clientes.ver' },
           { titulo: 'Parentescos', icone: 'diversity_3', rota: '/cadastros/parentescos', permissao: 'clientes.ver' },

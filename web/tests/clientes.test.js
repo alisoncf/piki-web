@@ -21,14 +21,14 @@ const ANAPOLIS = { id: 5, codigo_ibge: '5201108', nome: 'Anápolis', uf: 'GO' }
 const SETOR = { id: 2, nome: 'Jundiaí', cidade: ANAPOLIS }
 
 const MARIA = {
-  id: 7, nome: 'Maria Teste', cpf_cnpj: '52998224725', bairro: 'Centro', cidade: 'Anápolis', bloqueado: true,
+  id: 7, nome: 'Maria Teste', cpf_cnpj: '52998224725', bairro: 'Centro', bloqueado: true,
   credito_suspenso: false, setor: SETOR,
 }
 
 const FICHA = {
   ...MARIA, tipo: 'F', rg: null, inscricao_estadual: null, data_nascimento: null, sexo: 'F', pai: null, mae: null,
-  email: null, cep: null, logradouro: 'Rua Um', numero: '10', complemento: null, ponto_referencia: null, uf: 'GO',
-  codigo_municipio: null, setor_id: 2, grupo_id: null, orgao_id: null, local_trabalho: null, endereco_trabalho: null,
+  email: null, cep: null, logradouro: 'Rua Um', numero: '10', complemento: null, ponto_referencia: null,
+  setor_id: 2, grupo_id: null, orgao_id: null, local_trabalho: null, endereco_trabalho: null,
   telefone_trabalho: null, cep_trabalho: null, setor_trabalho_id: null, setor_trabalho: null, grupo: null, orgao: null,
   forma_cobranca: 'trabalho', limite_credito: '550.00', recebe_mensagens: true, especial: false, observacao: null,
   telefones: [{ numero: '62999990000', tipo: '3' }],
@@ -147,14 +147,15 @@ describe('ficha do cliente', () => {
 })
 
 describe('setores', () => {
-  it('cidade do IBGE e vários cobradores, que valem para todas as lojas', async () => {
-    entrar(['clientes.ver', 'clientes.editar'])
-    const sidnei = { id: 1, nome: 'Sidnei', ativo: true }
-    const antigo = { id: 2, nome: 'Antigo', ativo: false }
-    const edmilson = { id: 3, nome: 'Edmilson', ativo: true }
+  it('cidade do IBGE e vários cobradores (funcionários), que valem para todas as lojas', async () => {
+    entrar(['clientes.ver', 'clientes.editar', 'funcionarios.ver'])
+    const sidnei = { id: 1, nome: 'Sidnei' }
+    const antigo = { id: 2, nome: 'Antigo' } // saiu da empresa, mas continua no setor
+    const edmilson = { id: 3, nome: 'Edmilson' }
     const setor = { ...SETOR, tipo: 'BAIRRO', cidade_id: 5, ativo: true, cobradores: [sidnei, antigo] }
     const outro = { id: 3, nome: 'Vila Nova', tipo: null, cidade: null, cidade_id: null, ativo: true, cobradores: [edmilson] }
-    responder({ '/setores': [setor, outro], '/cobradores': [sidnei, antigo, edmilson] })
+    const funcionarios = [{ ...sidnei, ativo: true }, { ...antigo, ativo: false }, { ...edmilson, ativo: true }]
+    responder({ '/setores': [setor, outro], '/funcionarios': funcionarios })
     const put = vi.spyOn(api, 'put').mockResolvedValue({ data: setor })
     const { wrapper } = await montar(SetoresPagina, '/cadastros/setores')
     expect(wrapper.text()).toContain('Anápolis - GO')

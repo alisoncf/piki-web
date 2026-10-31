@@ -1,4 +1,4 @@
-"""Regras do cadastro de clientes, setores, cobradores, órgãos e grupos."""
+"""Regras do cadastro de clientes, setores, órgãos e grupos."""
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session
 from app.dominios.cidades.modelos import Cidade
 from app.dominios.clientes import repositorio as repo
 from app.dominios.clientes.esquemas import (
-    AnotacaoDados, ClienteDados, CobradorDados, GrupoClienteDados, OrgaoDados, ParentescoDados, SetorDados,
+    AnotacaoDados, ClienteDados, GrupoClienteDados, OrgaoDados, ParentescoDados, SetorDados,
 )
 from app.dominios.clientes.modelos import (
-    AnotacaoCliente, Cliente, Cobrador, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor, TelefoneCliente,
+    AnotacaoCliente, Cliente, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor, TelefoneCliente,
 )
+from app.dominios.funcionarios.modelos import Funcionario
 from app.nucleo.documentos import cpf_cnpj_valido
 
 
@@ -100,21 +101,21 @@ def anotar(db: Session, cliente_id: int, dados: AnotacaoDados, usuario_id: int, 
 
 # setores
 
-def _conferir_setor(db: Session, dados: SetorDados, setor_id: int | None) -> list[Cobrador]:
+def _conferir_setor(db: Session, dados: SetorDados, setor_id: int | None) -> list[Funcionario]:
     _existe(db, Cidade, dados.cidade_id, "Cidade não encontrada")
     outro = repo.setor_por_nome(db, dados.nome, dados.cidade_id)
     if outro and outro.id != setor_id:
         raise Duplicado(f"Já existe o setor {outro.nome}" + (f" em {outro.cidade.nome}" if outro.cidade else ""))
     cobradores = []
     for cobrador_id in dict.fromkeys(dados.cobradores):  # sem repetir, na ordem enviada
-        cobrador = db.get(Cobrador, cobrador_id)
+        cobrador = db.get(Funcionario, cobrador_id)
         if cobrador is None:
             raise DadoInvalido("Cobrador não encontrado")
         cobradores.append(cobrador)
     return cobradores
 
 
-def _aplicar_setor(setor: Setor, dados: SetorDados, cobradores: list[Cobrador]) -> None:
+def _aplicar_setor(setor: Setor, dados: SetorDados, cobradores: list[Funcionario]) -> None:
     for campo, valor in dados.model_dump(exclude={"cobradores"}).items():
         setattr(setor, campo, valor)
     setor.cobradores = cobradores
@@ -144,33 +145,6 @@ def alterar_setor(db: Session, setor_id: int, dados: SetorDados) -> Setor:
     db.commit()
     db.refresh(setor)
     return setor
-
-
-# cobradores
-
-def _conferir_cobrador(db: Session, dados: CobradorDados, cobrador_id: int | None) -> None:
-    outro = repo.cobrador_por_nome(db, dados.nome)
-    if outro and outro.id != cobrador_id:
-        raise Duplicado(f"Já existe o cobrador {outro.nome}")
-
-
-def criar_cobrador(db: Session, dados: CobradorDados) -> Cobrador:
-    _conferir_cobrador(db, dados, None)
-    cobrador = Cobrador(**dados.model_dump())
-    db.add(cobrador)
-    db.commit()
-    return cobrador
-
-
-def alterar_cobrador(db: Session, cobrador_id: int, dados: CobradorDados) -> Cobrador:
-    cobrador = db.get(Cobrador, cobrador_id)
-    if cobrador is None:
-        raise NaoEncontrado("Cobrador não encontrado")
-    _conferir_cobrador(db, dados, cobrador_id)
-    for campo, valor in dados.model_dump().items():
-        setattr(cobrador, campo, valor)
-    db.commit()
-    return cobrador
 
 
 # órgãos

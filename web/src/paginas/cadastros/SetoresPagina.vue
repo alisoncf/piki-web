@@ -34,7 +34,7 @@
             outlined
             clearable
             label="Cobrador"
-            :options="cobradores"
+            :options="cobradoresNosSetores"
             option-value="id"
             option-label="nome"
             emit-value
@@ -84,7 +84,7 @@
               multiple
               use-chips
               label="Cobradores"
-              hint="Valem para todas as lojas"
+              hint="Funcionários; valem para todas as lojas"
               :options="cobradoresPossiveis(editando.cobradores)"
               option-value="id"
               option-label="nome"
@@ -118,7 +118,7 @@ const sessao = useSessaoStore()
 const podeEditar = computed(() => sessao.pode('clientes.editar'))
 
 const todos = ref([])
-const cobradores = ref([])
+const funcionarios = ref([])
 const carregando = ref(false)
 const busca = ref('')
 const filtroCobrador = ref(null)
@@ -152,17 +152,32 @@ function filtrar(linhas, termo) {
   return linhas.filter((s) => semAcentos(s.nome).includes(t) || semAcentos(nomeCidade(s)).includes(t))
 }
 
-// os ativos; um inativo que já está no setor continua na lista
+// quem aparece em algum setor, para o filtro (não depende de poder ver funcionários)
+const cobradoresNosSetores = computed(() => {
+  const unicos = new Map(todos.value.flatMap((s) => s.cobradores).map((c) => [c.id, c]))
+  return [...unicos.values()].sort((a, b) => a.nome.localeCompare(b.nome))
+})
+
+// funcionários ativos de cargo que cobra (ou todos os ativos, se nenhum cargo cobra);
+// os que já estão no setor continuam na lista
 function cobradoresPossiveis(escolhidos) {
-  return cobradores.value.filter((c) => c.ativo || escolhidos.includes(c.id))
+  const ativos = funcionarios.value.filter((f) => f.ativo)
+  const cobram = ativos.filter((f) => f.cargo?.cobra)
+  const lista = cobram.length ? cobram : ativos
+  const doSetor = cobradoresNosSetores.value.filter((c) => escolhidos.includes(c.id) && !lista.some((f) => f.id === c.id))
+  return [...doSetor, ...lista]
 }
 
 async function carregar() {
   carregando.value = true
   try {
-    const [s, c] = await Promise.all([api.get('/setores'), api.get('/cobradores')])
+    // a lista de funcionários só serve para escolher cobradores, e exige outra permissão
+    const [s, f] = await Promise.all([
+      api.get('/setores'),
+      sessao.pode('funcionarios.ver') ? api.get('/funcionarios') : { data: [] },
+    ])
     todos.value = s.data
-    cobradores.value = c.data
+    funcionarios.value = f.data
   } catch (e) {
     $q.notify({ type: 'negative', message: mensagemDeErro(e) })
   } finally {

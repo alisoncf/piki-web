@@ -2,7 +2,7 @@
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.dominios.clientes.modelos import Cliente, Cobrador, GrupoCliente, Orgao, Parentesco, Setor, TelefoneCliente
+from app.dominios.clientes.modelos import Cliente, GrupoCliente, Orgao, Parentesco, Setor, TelefoneCliente
 from app.nucleo.documentos import so_digitos
 
 
@@ -49,14 +49,6 @@ def setor_por_nome(db: Session, nome: str, cidade_id: int | None) -> Setor | Non
     else:
         consulta = consulta.where(Setor.cidade_id.is_(None))
     return db.scalar(consulta)
-
-
-def listar_cobradores(db: Session) -> list[Cobrador]:
-    return list(db.scalars(select(Cobrador).order_by(Cobrador.nome)))
-
-
-def cobrador_por_nome(db: Session, nome: str) -> Cobrador | None:
-    return db.scalar(select(Cobrador).where(func.lower(Cobrador.nome) == nome.strip().lower()))
 
 
 def listar_orgaos(db: Session, busca: str | None = None) -> list[Orgao]:

@@ -11,7 +11,7 @@ A nova versão tem banco único (PostgreSQL) para todas as empresas do grupo. Os
 ## Antes de começar uma tarefa
 
 1. Leia `docs/roteiro.md`: onde estamos e o que vem a seguir.
-2. Leia `docs/decisoes.md`: as decisões vigentes (D1, D5, D8 a D16) e as pendências (P1...). Não contrarie uma decisão vigente sem discutir com o Alison; se ela mudar, marque a antiga como substituída e registre a nova com data.
+2. Leia `docs/decisoes.md`: as decisões vigentes (D1, D5, D8 a D17) e as pendências (P1...). Não contrarie uma decisão vigente sem discutir com o Alison; se ela mudar, marque a antiga como substituída e registre a nova com data.
 3. Para regras de negócio do VB6, consulte `docs/legado/` (inventário por tela, mapa de tabelas e schema antigo) e o código do legado.
 
 ## Regras do domínio (D9, D10)

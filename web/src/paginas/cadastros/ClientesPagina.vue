@@ -85,7 +85,7 @@ const colunas = [
   { name: 'nome', label: 'Nome', field: 'nome', align: 'left' },
   { name: 'cpf_cnpj', label: 'CPF/CNPJ', field: 'cpf_cnpj', align: 'left', format: (v) => (v ? formatarDocumento(v) : '') },
   { name: 'bairro', label: 'Bairro', field: 'bairro', align: 'left' },
-  { name: 'cidade', label: 'Cidade', field: 'cidade', align: 'left' },
+  { name: 'cidade', label: 'Cidade', field: (c) => c.setor?.cidade?.nome ?? '', align: 'left' }, // a do setor
   { name: 'situacao', label: 'Situação', field: 'bloqueado', align: 'left' },
 ]
 

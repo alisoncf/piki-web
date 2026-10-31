@@ -100,15 +100,13 @@
             <q-input v-model="form.numero" outlined label="Número" maxlength="20" class="col-6 col-sm-4 col-md-2" />
             <q-input v-model="form.complemento" outlined label="Complemento" maxlength="60" class="col-6 col-sm-8 col-md-2" />
             <q-input v-model="form.bairro" outlined label="Bairro" maxlength="40" class="col-12 col-sm-6 col-md-3" />
-            <q-input v-model="form.cidade" outlined label="Cidade" maxlength="40" class="col-9 col-sm-4 col-md-3" />
-            <q-input v-model="form.uf" outlined label="UF" mask="AA" class="col-3 col-sm-2 col-md-1" @update:model-value="(v) => (form.uf = v?.toUpperCase())" />
             <q-input v-model="form.ponto_referencia" outlined label="Ponto de referência" maxlength="60" class="col-12 col-md-5" />
             <selecao-busca
               v-model="form.setor_id"
               :opcoes="setores"
               :rotulo="nomeSetor"
               label="Setor de cobrança"
-              hint="Bairro ou região do cobrador"
+              hint="Bairro ou região do cobrador; a cidade do cliente é a do setor"
               class="col-12 col-md-6"
             />
           </div>
@@ -289,8 +287,8 @@ function vazio() {
   return {
     nome: '', tipo: 'F', cpf_cnpj: '', rg: '', inscricao_estadual: '', data_nascimento: null, sexo: null,
     pai: '', mae: '', email: '',
-    cep: '', logradouro: '', numero: '', complemento: '', bairro: '', ponto_referencia: '', cidade: '', uf: '',
-    codigo_municipio: null, setor_id: null,
+    cep: '', logradouro: '', numero: '', complemento: '', bairro: '', ponto_referencia: '',
+    setor_id: null,
     grupo_id: null, orgao_id: null, local_trabalho: '', endereco_trabalho: '', telefone_trabalho: '', cep_trabalho: '',
     setor_trabalho_id: null,
     bloqueado: false, forma_cobranca: 'domicilio', limite_credito: 0, credito_suspenso: false,
@@ -301,7 +299,7 @@ function vazio() {
 const form = ref(vazio())
 
 function nomeSetor(s) {
-  return s ? (s.cidade ? `${s.nome} (${s.cidade.nome})` : s.nome) : ''
+  return s ? (s.cidade ? `${s.nome} (${s.cidade.nome} - ${s.cidade.uf})` : s.nome) : ''
 }
 
 function preencher(cliente) {

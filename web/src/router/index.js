@@ -43,12 +43,6 @@ export const rotas = [
         meta: { permissao: 'clientes.ver' },
       },
       {
-        path: 'cadastros/cobradores',
-        name: 'cobradores',
-        component: () => import('@/paginas/cadastros/CobradoresPagina.vue'),
-        meta: { permissao: 'clientes.ver' },
-      },
-      {
         path: 'cadastros/orgaos',
         name: 'orgaos',
         component: () => import('@/paginas/cadastros/OrgaosPagina.vue'),

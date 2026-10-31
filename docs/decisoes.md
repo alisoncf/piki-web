@@ -100,7 +100,14 @@ Cliente é um só para todas as lojas (D9), e setores (bairros e regiões de cob
 Correção do Alison sobre a D15.
 
 - **Cidades:** tabela `cidade` com os 5.571 municípios do IBGE (código, nome com acentos, UF), carregada pela migração 0008 a partir de `api/alembic/referencia/municipios_ibge.csv` (API de localidades do IBGE). O setor aponta para uma cidade (`setor.cidade_id`), escolhida numa lista, não digitada. O nome que estava na `tab_cidades` de cada loja é cadastro antigo e não é usado: o ETL acha a cidade pelo `cod_mun` (código do IBGE) ou, sem ele, pelo nome. Setor novo ou alterado precisa de cidade; os antigos sem cidade ficam assim até alguém escolher uma.
-- **Cobradores:** tabela `cobrador` (a `tab_contacob` do VB6: pessoas e destinos como escritório e advogado), uma lista só para todas as lojas. Um setor pode ter vários cobradores e um cobrador pode cobrar vários setores (`setor_cobrador` com `setor_id` e `cobrador_id`, sem loja).
+- **Cobradores:** ~~tabela `cobrador` (a `tab_contacob` do VB6), uma lista só para todas as lojas~~. Substituído pela D17 em 31/10/2026.
+
+### D17. Cobrador é funcionário; cliente sem cidade própria (31/10/2026)
+
+Decisão do Alison.
+
+- **Cobrador:** é um funcionário (o `cobrador_set` do VB6 guarda o código do funcionário). Não há tabela de cobradores. Um setor pode ter vários cobradores e um cobrador pode cobrar vários setores, sem loja (`setor_cobrador` com `setor_id` e `funcionario_id`). Setor sem cobrador não é problema.
+- **Cidade do cliente:** o cliente não tem cidade nem UF digitadas. Ele está num setor, e a cidade é a do setor, que é sempre uma cidade do IBGE (D16). O mesmo vale para o órgão.
 
 ## Substituídas
 
