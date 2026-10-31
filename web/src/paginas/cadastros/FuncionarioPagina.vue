@@ -132,9 +132,14 @@
           <div class="row q-col-gutter-md">
             <q-input v-model="form.cep" outlined label="CEP" mask="#####-###" unmasked-value class="col-12 col-sm-4 col-md-2" />
             <q-input v-model="form.logradouro" outlined label="Endereço" maxlength="60" class="col-12 col-sm-8 col-md-5" />
-            <q-input v-model="form.bairro" outlined label="Bairro" maxlength="40" class="col-12 col-sm-5 col-md-2" />
-            <q-input v-model="form.cidade" outlined label="Cidade" maxlength="40" class="col-9 col-sm-5 col-md-2" />
-            <q-input v-model="form.uf" outlined label="UF" mask="AA" class="col-3 col-sm-2 col-md-1" @update:model-value="(v) => (form.uf = v?.toUpperCase())" />
+            <selecao-busca
+              v-model="form.setor_id"
+              :opcoes="setores"
+              :rotulo="nomeSetor"
+              label="Setor"
+              hint="Bairro; a cidade é a do setor"
+              class="col-12 col-md-5"
+            />
           </div>
         </section>
 
@@ -163,6 +168,7 @@ import { useQuasar } from 'quasar'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import SelecaoBusca from '@/componentes/SelecaoBusca.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
 import { mascaraTelefone, soDigitos, TIPOS_TELEFONE } from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
@@ -178,18 +184,23 @@ const podeEditar = computed(() => sessao.pode('funcionarios.editar'))
 const carregando = ref(true)
 const salvando = ref(false)
 const cargos = ref([])
+const setores = ref([])
 const empresaAtual = ref(null)
 
 function vazio() {
   return {
     nome: '', apelido: '', cpf: '', rg: '', data_nascimento: null, sexo: null, naturalidade: '',
     empresa_id: sessao.empresa?.id ?? null, cargo_id: null, ativo: true, pode_tirar_vale: true, limite_vale: 0,
-    cep: '', logradouro: '', bairro: '', cidade: '', uf: '',
+    cep: '', logradouro: '', setor_id: null,
     conjuge: '', pai: '', mae: '', endereco_pais: '', observacao: '',
     telefones: [],
   }
 }
 const form = ref(vazio())
+
+function nomeSetor(s) {
+  return s ? (s.cidade ? `${s.nome} (${s.cidade.nome} - ${s.cidade.uf})` : s.nome) : ''
+}
 
 // lojas do usuário; a do funcionário entra mesmo que o usuário não tenha acesso a ela
 const lojas = computed(() => {
@@ -200,12 +211,19 @@ const lojas = computed(() => {
 
 onMounted(async () => {
   try {
-    const pedidos = [api.get('/cargos')]
+    // a lista de setores é de clientes; quem edita funcionários também pode lê-la
+    const pedidos = [
+      api.get('/cargos'),
+      sessao.pode('clientes.ver') || podeEditar.value ? api.get('/setores') : { data: [] },
+    ]
     if (!novo.value) pedidos.push(api.get(`/funcionarios/${rota.params.id}`))
-    const [respCargos, respFuncionario] = await Promise.all(pedidos)
+    const [respCargos, respSetores, respFuncionario] = await Promise.all(pedidos)
     cargos.value = respCargos.data.filter((c) => c.ativo || c.id === respFuncionario?.data.cargo_id)
+    setores.value = respSetores.data
     if (respFuncionario) {
-      const { id, empresa, cargo, ...dados } = respFuncionario.data
+      const { id, empresa, cargo, setor, ...dados } = respFuncionario.data
+      // sem a lista (só consulta), o setor atual basta para mostrar o nome
+      if (setor && !setores.value.some((s) => s.id === setor.id)) setores.value = [setor, ...setores.value]
       empresaAtual.value = empresa
       form.value = { ...vazio(), ...dados, limite_vale: Number(dados.limite_vale) }
     }

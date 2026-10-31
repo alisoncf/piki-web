@@ -90,20 +90,24 @@ describe('cadastro de funcionário', () => {
     await flushPromises()
 
     expect(post).toHaveBeenCalledWith('/funcionarios', expect.objectContaining({
-      nome: 'Joana Teste', empresa_id: MATRIZ.id, limite_vale: '0.00', telefones: [],
+      nome: 'Joana Teste', empresa_id: MATRIZ.id, limite_vale: '0.00', telefones: [], setor_id: null,
     }))
     expect(router.currentRoute.value.params.id).toBe('9')
   })
 
   it('existente: carrega os dados; sem permissão de editar, não mostra o salvar', async () => {
     entrar(['funcionarios.ver'])
-    vi.spyOn(api, 'get').mockImplementation(async (url) =>
+    const setor = { id: 2, nome: 'Jundiaí', cidade: { id: 5, codigo_ibge: '5201108', nome: 'Anápolis', uf: 'GO' } }
+    const get = vi.spyOn(api, 'get').mockImplementation(async (url) =>
       url === '/cargos'
         ? { data: [CARGO] }
-        : { data: { ...JOANA, limite_vale: '10.00', telefones: [{ numero: '62999990000', tipo: '3' }] } },
+        : { data: { ...JOANA, limite_vale: '10.00', telefones: [{ numero: '62999990000', tipo: '3' }], setor_id: 2, setor } },
     )
     const { wrapper } = await montar(FuncionarioPagina, '/cadastros/funcionarios/7')
     expect(wrapper.find('input[maxlength="80"]').element.value).toBe('Joana Teste')
+    // sem a lista de setores (que pede outra permissão), mostra o setor que veio na ficha
+    expect(get).not.toHaveBeenCalledWith('/setores')
+    expect(wrapper.text()).toContain('Jundiaí (Anápolis - GO)')
     expect(wrapper.text()).not.toContain('Salvar')
     expect(wrapper.find('fieldset').attributes('disabled')).toBeDefined()
   })

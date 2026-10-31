@@ -50,7 +50,6 @@
       <template #body-cell-nome="props">
         <q-td :props="props">
           <div class="text-weight-medium">{{ props.row.nome }}</div>
-          <div v-if="props.row.setor" class="text-caption text-suave">{{ props.row.setor.nome }}</div>
         </q-td>
       </template>
       <template #body-cell-situacao="props">
@@ -84,7 +83,7 @@ const paginacao = ref({ page: 1, rowsPerPage: 20, rowsNumber: 0 })
 const colunas = [
   { name: 'nome', label: 'Nome', field: 'nome', align: 'left' },
   { name: 'cpf_cnpj', label: 'CPF/CNPJ', field: 'cpf_cnpj', align: 'left', format: (v) => (v ? formatarDocumento(v) : '') },
-  { name: 'bairro', label: 'Bairro', field: 'bairro', align: 'left' },
+  { name: 'setor', label: 'Setor', field: (c) => c.setor?.nome ?? '', align: 'left' },
   { name: 'cidade', label: 'Cidade', field: (c) => c.setor?.cidade?.nome ?? '', align: 'left' }, // a do setor
   { name: 'situacao', label: 'Situação', field: 'bloqueado', align: 'left' },
 ]

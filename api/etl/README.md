@@ -55,7 +55,8 @@ Decisão D15. Lê `tab_grupocli`, `tab_tipopar` (parentescos das referências), 
 
 - Grupos, parentescos e órgãos são juntados pelo nome, e setores pelo nome e pela cidade, sem acentos e sem diferenciar maiúsculas. O mesmo código significa coisas diferentes em cada filial, por isso cada código fica no `legado_mapa` com a empresa de origem.
 - O cobrador do setor (`cobrador_set`) é o código de um funcionário da loja (D17): ele é somado aos cobradores que o setor já tem, que valem para todas as lojas. Rode antes o ETL de funcionários; código que não está no mapa de funcionários sai como aviso.
-- O cliente não tem cidade: a cidade é a do setor. A `cidade_cli`, a `uf_cli` e o `cod_cid` da `tab_clientes` não são importados.
+- O cliente não tem cidade nem bairro: são os do setor. A `bairro_cli`, a `cidade_cli`, a `uf_cli` e o `cod_cid` da `tab_clientes` não são importados.
+- O setor do funcionário (`cod_set` da `tab_funcionarios`) é ligado aqui, depois dos setores. Manda a loja onde ele está lotado; as outras só preenchem o vazio.
 - A cidade do setor é a do IBGE: pelo `cod_mun` da `tab_cidades`, ou pelo nome e UF, ou pela única cidade da UF cujo nome começa assim ("CORUMBA" → Corumbá de Goiás). A que não for achada sai como aviso, e os setores dela ficam sem cidade.
 - Cliente é juntado pelo CPF/CNPJ válido. Sem documento válido, vira cadastro próprio da filial (não junta pelo nome: em 30/10/2026, a La Viva tinha 23 mil clientes assim).
 - Manda nos dados o registro com a data de alteração mais recente (`dataalt_cli`, ou `data_cli`). Os outros só preenchem campos vazios; telefones, referências e anotações (menos as excluídas) são somados. Data e loja do cadastro são as do registro mais antigo.

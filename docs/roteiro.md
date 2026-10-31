@@ -75,7 +75,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [x] Rodar o ETL de funcionários nos bancos da matriz (01) e da La Viva (03), em cópias locais, juntando os cadastros repetidos entre filiais (pelo CPF ou pelo nome) — 30/10/2026
 - [ ] Usuários ligados a funcionários (coluna `usuario.funcionario_id` já criada)
 - [x] Cidades do IBGE e cobradores (D16, D17): setor escolhe a cidade numa lista e tem vários cobradores, que são funcionários e valem para todas as lojas; o cliente não tem cidade própria, usa a do setor; migrações 0008 e 0009 e ETL refeito nas três cópias — 31/10/2026
-- [ ] Cidade do IBGE no funcionário (hoje é texto)
+- [x] Funcionário com setor no endereço, no lugar de bairro, cidade e UF digitados; cliente sem o campo bairro (D17, migração 0010) — 31/10/2026
 - [ ] Bancos, formas de pagamento, plano de contas
 
 ## Onda 2 · Relatórios

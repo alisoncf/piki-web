@@ -37,6 +37,7 @@ def _ddl(logradouro: str) -> list[str]:
         "CREATE TABLE tab_grupocli (cod_gru TEXT, nome_gru TEXT)",
         "CREATE TABLE tab_tipopar (cod_tip INTEGER PRIMARY KEY, nome_tip TEXT)",
         "CREATE TABLE tab_cidades (cod_cid TEXT, nome_cid TEXT, uf_cid TEXT, cod_mun TEXT)",
+        "CREATE TABLE tab_funcionarios (cod_fun TEXT, cod_set TEXT)",
         "CREATE TABLE tab_setores (cod_set TEXT, nome_set TEXT, cobrador_set TEXT, cod_cid TEXT, cod_old TEXT, tipo_set TEXT)",
         """CREATE TABLE tab_orgaos (cod_org TEXT, nome_org TEXT, cod_gru TEXT, endereco_org TEXT, cod_set TEXT,
             fone_org TEXT, cep_org TEXT, cobrador_org TEXT, data_org DATE, Obs TEXT)""",
@@ -67,6 +68,9 @@ def _banco_vb6(caminho, clientes, logradouro="Logradouro_cli", setores=(), orgao
             c.execute(text(ddl))
         for cod, nome in ((0, "Outro"), (1, "Cônjuge"), (3, "Pais")):
             _inserir(c, "tab_tipopar", {"cod_tip": cod, "nome_tip": nome})
+        # o cobrador SIDNEI mora no setor 00001 (códigos 003 na matriz e 010 na filial, ver a fixture empresas)
+        for cod in ("003", "010"):
+            _inserir(c, "tab_funcionarios", {"cod_fun": cod, "cod_set": "00001"})
         # com o código do IBGE; sem ele, mas com o nome certo; e uma que não é cidade (bairro digitado como cidade)
         for cod, nome, mun in (("00001", "ANAPOLIS", "5201108"), ("00002", "GOIANIA", ""), ("00003", "JUNDIAI", ""),
                                ("00004", "CORUMBA", "")):
@@ -156,7 +160,7 @@ def test_empresa_precisa_existir(banco, matriz):
 def test_importa_matriz(banco, empresas, matriz):
     r = _importar(matriz, banco, "01")
     assert (r.grupos_criados, r.parentescos_criados, r.setores_criados, r.orgaos_criados) == (2, 3, 4, 1)
-    assert (r.cobradores, r.setores_sem_cidade) == (2, 1)
+    assert (r.cobradores, r.setores_sem_cidade, r.funcionarios_no_setor) == (2, 1, 1)
     assert (r.criados, r.sem_documento, r.telefones, r.referencias, r.anotacoes) == (2, 1, 3, 1, 1)
     assert any("cobrador 099" in a for a in r.avisos)
     assert any("cidade 00003 (JUNDIAI/GO)" in a for a in r.avisos)
@@ -183,6 +187,7 @@ def test_importa_matriz(banco, empresas, matriz):
         assert setores["VILA SANTA"].cidade.nome == "Corumbá de Goiás"  # pelo começo do nome
         assert setores["SAO JOAO"].cidade is None
         assert [c.nome for c in setores["SAO JOAO"].cobradores] == ["SIDNEI"]
+        assert setores["SAO JOAO"].cobradores[0].setor.nome == "JUNDIAÍ"  # o setor onde ele mora
 
 
 def test_reimportar_nao_duplica(banco, empresas, matriz):
@@ -238,6 +243,8 @@ def test_outra_loja_junta_pelo_cpf_e_o_mais_recente_manda(banco, empresas, matri
         assert len(db.scalars(select(Setor)).all()) == 5
         # um cobrador para todas as lojas, em vários setores
         sidnei = db.scalar(select(Funcionario).where(Funcionario.nome == "SIDNEI"))
+        # na filial ele mora no 00001 (VILA NOVA), mas manda a loja onde está lotado
+        assert sidnei.setor.nome == "JUNDIAÍ"
         assert sorted(s.nome for s in db.scalars(select(Setor)) if sidnei in s.cobradores) == [
             "JUNDIAÍ", "SAO JOAO", "VILA NOVA"]
         assert len(db.scalars(select(GrupoCliente)).all()) == 2

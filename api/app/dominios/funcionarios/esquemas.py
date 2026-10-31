@@ -4,6 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.dominios.acesso.esquemas import EmpresaResumo
+from app.dominios.cidades.esquemas import SetorResumo
 from app.nucleo.documentos import TIPOS_TELEFONE, so_digitos
 
 
@@ -69,9 +70,7 @@ class FuncionarioDados(BaseModel):
 
     cep: str | None = Field(default=None, max_length=8)
     logradouro: str | None = Field(default=None, max_length=60)
-    bairro: str | None = Field(default=None, max_length=40)
-    cidade: str | None = Field(default=None, max_length=40)
-    uf: str | None = Field(default=None, pattern="^[A-Z]{2}$")
+    setor_id: int | None = Field(default=None, description="Bairro; a cidade é a do setor")
 
     conjuge: str | None = Field(default=None, max_length=60)
     pai: str | None = Field(default=None, max_length=60)
@@ -82,7 +81,7 @@ class FuncionarioDados(BaseModel):
     telefones: list[Telefone] = []
 
     @field_validator(
-        "nome", "apelido", "rg", "naturalidade", "logradouro", "bairro", "cidade", "conjuge", "pai", "mae",
+        "nome", "apelido", "rg", "naturalidade", "logradouro", "conjuge", "pai", "mae",
         "endereco_pais", "observacao", "sexo", mode="before",
     )
     @classmethod
@@ -94,11 +93,6 @@ class FuncionarioDados(BaseModel):
     def _digitos(cls, v: object) -> str | None:
         return so_digitos(v) or None
 
-    @field_validator("uf", mode="before")
-    @classmethod
-    def _uf(cls, v: object) -> object:
-        v = _vazio_para_none(v)
-        return v.upper() if isinstance(v, str) else v
 
 
 class FuncionarioResumo(BaseModel):
@@ -121,3 +115,4 @@ class Funcionario(FuncionarioDados):
     id: int
     empresa: EmpresaResumo
     cargo: Cargo | None
+    setor: SetorResumo | None

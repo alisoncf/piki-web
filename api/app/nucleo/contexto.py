@@ -71,12 +71,12 @@ def contexto(login: Annotated[Login, Depends(login_atual)]) -> Contexto:
     return Contexto(login.usuario, login.empresa_id, perms, login.db)
 
 
-def exige(permissao: str) -> Callable[..., Contexto]:
-    """Dependência que exige uma permissão na empresa ativa."""
+def exige(*permissoes: str) -> Callable[..., Contexto]:
+    """Dependência que exige uma permissão na empresa ativa (com várias, basta uma delas)."""
 
     def _verificar(ctx: Annotated[Contexto, Depends(contexto)]) -> Contexto:
-        if permissao not in ctx.permissoes:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, f"Sem permissão: {permissao}")
+        if not any(p in ctx.permissoes for p in permissoes):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"Sem permissão: {' ou '.join(permissoes)}")
         return ctx
 
     return _verificar

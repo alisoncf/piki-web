@@ -106,7 +106,6 @@ class Cliente(ComDatas, Base):
     logradouro: Mapped[str | None] = mapped_column(String(100))
     numero: Mapped[str | None] = mapped_column(String(20))
     complemento: Mapped[str | None] = mapped_column(String(60))
-    bairro: Mapped[str | None] = mapped_column(String(40))
     ponto_referencia: Mapped[str | None] = mapped_column(String(60))
     setor_id: Mapped[int | None] = mapped_column(ForeignKey("setor.id"), index=True)
 

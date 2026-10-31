@@ -99,7 +99,6 @@
             <q-input v-model="form.logradouro" outlined label="Logradouro" maxlength="100" class="col-12 col-sm-8 col-md-6" />
             <q-input v-model="form.numero" outlined label="Número" maxlength="20" class="col-6 col-sm-4 col-md-2" />
             <q-input v-model="form.complemento" outlined label="Complemento" maxlength="60" class="col-6 col-sm-8 col-md-2" />
-            <q-input v-model="form.bairro" outlined label="Bairro" maxlength="40" class="col-12 col-sm-6 col-md-3" />
             <q-input v-model="form.ponto_referencia" outlined label="Ponto de referência" maxlength="60" class="col-12 col-md-5" />
             <selecao-busca
               v-model="form.setor_id"
@@ -287,7 +286,7 @@ function vazio() {
   return {
     nome: '', tipo: 'F', cpf_cnpj: '', rg: '', inscricao_estadual: '', data_nascimento: null, sexo: null,
     pai: '', mae: '', email: '',
-    cep: '', logradouro: '', numero: '', complemento: '', bairro: '', ponto_referencia: '',
+    cep: '', logradouro: '', numero: '', complemento: '', ponto_referencia: '',
     setor_id: null,
     grupo_id: null, orgao_id: null, local_trabalho: '', endereco_trabalho: '', telefone_trabalho: '', cep_trabalho: '',
     setor_trabalho_id: null,

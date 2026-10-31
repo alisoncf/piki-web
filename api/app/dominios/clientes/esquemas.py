@@ -4,7 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.dominios.acesso.esquemas import EmpresaResumo
-from app.dominios.cidades.esquemas import Cidade
+from app.dominios.cidades.esquemas import SetorResumo
 from app.dominios.funcionarios.esquemas import Telefone
 from app.nucleo.documentos import so_digitos
 
@@ -73,14 +73,6 @@ class SetorDados(BaseModel):
     @classmethod
     def _limpar(cls, v: object) -> object:
         return _vazio_para_none(v)
-
-
-class SetorResumo(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    nome: str
-    cidade: Cidade | None
 
 
 class Setor(SetorResumo):
@@ -178,7 +170,6 @@ class ClienteDados(BaseModel):
     logradouro: str | None = Field(default=None, max_length=100)
     numero: str | None = Field(default=None, max_length=20)
     complemento: str | None = Field(default=None, max_length=60)
-    bairro: str | None = Field(default=None, max_length=40)
     ponto_referencia: str | None = Field(default=None, max_length=60)
     setor_id: int | None = Field(default=None, description="Setor de cobrança; a cidade do cliente é a do setor")
 
@@ -204,7 +195,7 @@ class ClienteDados(BaseModel):
     referencias: list[ReferenciaDados] = []
 
     @field_validator(
-        "nome", "rg", "inscricao_estadual", "pai", "mae", "email", "logradouro", "numero", "complemento", "bairro",
+        "nome", "rg", "inscricao_estadual", "pai", "mae", "email", "logradouro", "numero", "complemento",
         "ponto_referencia", "local_trabalho", "endereco_trabalho", "observacao", "sexo",
         mode="before",
     )
@@ -233,7 +224,6 @@ class ClienteResumo(BaseModel):
     id: int
     nome: str
     cpf_cnpj: str | None
-    bairro: str | None
     bloqueado: bool
     credito_suspenso: bool
     setor: SetorResumo | None

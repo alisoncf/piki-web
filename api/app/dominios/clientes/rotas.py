@@ -77,7 +77,10 @@ def anotar(cliente_id: int, dados: AnotacaoDados, ctx: Editar) -> Cliente:
 
 
 @router.get("/setores", response_model=list[Setor])
-def listar_setores(ctx: Ver, busca: str | None = None) -> list[Setor]:
+def listar_setores(
+    ctx: Annotated[Contexto, Depends(exige("clientes.ver", "funcionarios.editar"))], busca: str | None = None
+) -> list[Setor]:
+    """Também para quem edita funcionários, que escolhe o setor (bairro) do endereço."""
     return [Setor.model_validate(s) for s in repo.listar_setores(ctx.db, busca)]
 
 

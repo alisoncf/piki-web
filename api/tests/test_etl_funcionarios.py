@@ -73,7 +73,7 @@ def _importar(eng, banco, codigo):
 
 def test_converter():
     d = converter(_ANA)
-    assert d["uf"] == "GO"
+    assert "cidade" not in d and "bairro" not in d  # vêm do setor, ligado pelo ETL de clientes
     assert d["sexo"] == "F"
     assert d["cep"] == "75000000"
     assert d["data_nascimento"] == date(1990, 5, 12)

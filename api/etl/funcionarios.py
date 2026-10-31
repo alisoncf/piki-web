@@ -98,7 +98,6 @@ def _data(valor: object) -> date | None:
 def converter(linha: dict) -> dict:
     """Uma linha da tab_funcionarios → campos do funcionário (sem loja, cargo e CPF, tratados à parte)."""
     sexo = (_texto(linha.get("sexo_fun")) or "").upper()
-    uf = (_texto(linha.get("uf_fun")) or "").upper()
     return {
         "nome": _texto(linha.get("nome_fun")),
         "apelido": _texto(linha.get("guerra_fun")),
@@ -111,9 +110,6 @@ def converter(linha: dict) -> dict:
         "limite_vale": Decimal(str(linha.get("limite_fun") or 0)).quantize(Decimal("0.01")),
         "cep": so_digitos(linha.get("cep_fun"))[:8] or None,
         "logradouro": _texto(linha.get("endereco_fun")),
-        "bairro": _texto(linha.get("bairro_fun")),
-        "cidade": _texto(linha.get("cidade_fun")),
-        "uf": uf if len(uf) == 2 else None,
         "conjuge": _texto(linha.get("conjuge_fun")),
         "pai": _texto(linha.get("pai_fun")),
         "mae": _texto(linha.get("mae_fun")),

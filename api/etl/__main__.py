@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"grupos novos: {r.grupos_criados}, parentescos novos: {r.parentescos_criados}, "
                       f"órgãos novos: {r.orgaos_criados}")
                 print(f"setores novos: {r.setores_criados} ({r.setores_sem_cidade} desta loja sem cidade), "
-                      f"cobradores ligados a setores: {r.cobradores}")
+                      f"cobradores ligados a setores: {r.cobradores}, funcionários com setor: {r.funcionarios_no_setor}")
                 print(f"clientes: {r.criados} novos ({r.sem_documento} sem CPF/CNPJ válido), "
                       f"{r.atualizados} atualizados, {r.ligados_por_documento} juntados pelo CPF/CNPJ a um cadastro que já existia")
                 print(f"telefones novos: {r.telefones}, referências: {r.referencias}, anotações: {r.anotacoes}")

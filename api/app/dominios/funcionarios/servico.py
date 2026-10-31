@@ -2,6 +2,7 @@
 from sqlalchemy.orm import Session
 
 from app.dominios.acesso.modelos import Empresa
+from app.dominios.clientes.modelos import Setor
 from app.dominios.funcionarios import repositorio as repo
 from app.dominios.funcionarios.esquemas import CargoDados, FuncionarioDados
 from app.dominios.funcionarios.modelos import Cargo, Funcionario, TelefoneFuncionario
@@ -35,6 +36,8 @@ def _conferir(db: Session, dados: FuncionarioDados, funcionario_id: int | None) 
         raise DadoInvalido("Loja não encontrada")
     if dados.cargo_id is not None and db.get(Cargo, dados.cargo_id) is None:
         raise DadoInvalido("Cargo não encontrado")
+    if dados.setor_id is not None and db.get(Setor, dados.setor_id) is None:
+        raise DadoInvalido("Setor não encontrado")
     numeros = [t.numero for t in dados.telefones]
     if len(numeros) != len(set(numeros)):
         raise DadoInvalido("Telefone repetido")

@@ -33,13 +33,13 @@ def test_cpf_valido():
 def test_criar_e_consultar_funcionario(cliente, cenario, admin):
     cargo = cliente.post("/cargos", json={"nome": "Vendedor", "vende": True}, headers=admin).json()
     r = cliente.post("/funcionarios", headers=admin, json=_dados(
-        cenario, cargo_id=cargo["id"], uf="go", cep="75000-000", limite_vale="150.50",
+        cenario, cargo_id=cargo["id"], cep="75000-000", limite_vale="150.50",
         telefones=[{"numero": "(62) 99999-0000", "tipo": "3"}],
     ))
     assert r.status_code == 201, r.text
     criado = r.json()
     assert criado["cpf"] == CPF_A
-    assert criado["uf"] == "GO"
+    assert criado["setor"] is None and "cidade" not in criado and "bairro" not in criado
     assert criado["cep"] == "75000000"
     assert criado["limite_vale"] == "150.50"
     assert criado["empresa"]["codigo"] == "01"
@@ -127,3 +127,21 @@ def test_permissoes(cliente, cenario):
     assert cliente.get("/funcionarios", headers=ana).status_code == 403
     assert cliente.get("/cargos", headers=ana).status_code == 403
     assert cliente.post("/funcionarios", headers=ana, json=_dados(cenario)).status_code == 403
+
+
+def test_bairro_e_cidade_vem_do_setor(cliente, cenario, admin, banco):
+    from app.dominios.cidades.modelos import Cidade
+    from app.dominios.clientes.modelos import Setor
+
+    with banco() as db:
+        cidade = Cidade(codigo_ibge="5201108", nome="Anápolis", uf="GO", nome_busca="anapolis")
+        setor = Setor(nome="Jundiaí", cidade=cidade)
+        db.add(setor)
+        db.commit()
+        setor_id = setor.id
+    r = cliente.post("/funcionarios", headers=admin, json=_dados(cenario, setor_id=setor_id))
+    assert r.status_code == 201, r.text
+    assert r.json()["setor"] == {"id": setor_id, "nome": "Jundiaí",
+                                 "cidade": {"id": cidade.id, "codigo_ibge": "5201108", "nome": "Anápolis", "uf": "GO"}}
+    r = cliente.post("/funcionarios", headers=admin, json=_dados(cenario, cpf=None, nome="Outro", setor_id=999))
+    assert r.status_code == 422

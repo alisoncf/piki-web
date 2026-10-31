@@ -8,3 +8,13 @@ class Cidade(BaseModel):
     codigo_ibge: str
     nome: str
     uf: str
+
+
+class SetorResumo(BaseModel):
+    """Setor (bairro) com a sua cidade: é por ele que clientes e funcionários têm cidade."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    cidade: Cidade | None

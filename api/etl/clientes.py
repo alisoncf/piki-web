@@ -11,7 +11,9 @@ significam coisas diferentes em cada banco. Aqui eles viram uma lista só:
 - o cobrador do setor (cobrador_set) é o código de um funcionário da loja; ele
   é somado aos cobradores que o setor já tem, que valem para todas as lojas
   (D17). Rode antes: python -m etl funcionarios;
-- o cliente não tem cidade: ela é a do setor.
+- o cliente não tem cidade nem bairro: são os do setor;
+- o setor do funcionário (cod_set da tab_funcionarios) também é ligado aqui,
+  porque os setores só existem depois desta importação.
 
 O cliente é um só para todas as lojas (D9):
 
@@ -67,6 +69,7 @@ _ANOTACOES = text(
 _GRUPOS = text("SELECT cod_gru, nome_gru FROM tab_grupocli")
 _PARENTESCOS = text("SELECT CAST(cod_tip AS CHAR), nome_tip FROM tab_tipopar")
 _SETORES = text("SELECT cod_set, nome_set, cobrador_set, cod_cid, tipo_set FROM tab_setores")
+_FUNCIONARIOS = text("SELECT cod_fun, cod_set FROM tab_funcionarios")
 
 @dataclass
 class Resultado:
@@ -76,6 +79,7 @@ class Resultado:
     setores_sem_cidade: int = 0
     orgaos_criados: int = 0
     cobradores: int = 0  # ligações setor-cobrador novas
+    funcionarios_no_setor: int = 0
     criados: int = 0
     atualizados: int = 0
     ligados_por_documento: int = 0
@@ -200,6 +204,19 @@ def _importar_setores(origem: Connection, db: Session, empresa: Empresa, r: Resu
     db.flush()
 
 
+def _ligar_funcionarios(origem: Connection, db: Session, empresa: Empresa, r: Resultado) -> None:
+    """Setor do endereço do funcionário. Manda a loja onde ele está lotado; as outras só preenchem o vazio."""
+    for linha in origem.execute(_FUNCIONARIOS).mappings():
+        funcionario_id = mapa.buscar(db, "tab_funcionarios", empresa.id, _texto(linha["cod_fun"]) or "")
+        setor_id = _mapeado(db, "tab_setores", empresa.id, linha["cod_set"])
+        if funcionario_id is None or setor_id is None:
+            continue
+        funcionario = db.get(Funcionario, funcionario_id)
+        if funcionario.setor_id is None or (funcionario.empresa_id == empresa.id and funcionario.setor_id != setor_id):
+            funcionario.setor_id = setor_id
+            r.funcionarios_no_setor += 1
+
+
 def _importar_orgaos(origem: Connection, db: Session, empresa: Empresa, r: Resultado) -> None:
     por_nome = {nome_comparavel(o.nome): o for o in db.scalars(select(Orgao))}
     for linha in _ler(origem, "tab_orgaos"):
@@ -292,7 +309,6 @@ def converter(linha: dict) -> dict:
         "logradouro": _corta(endereco[0], 100),
         "numero": _corta(endereco[1], 20),
         "complemento": _corta(endereco[2], 60),
-        "bairro": _corta(linha.get("bairro_cli"), 40),
         "ponto_referencia": _corta(linha.get("referencia_cli"), 60),
         "local_trabalho": _corta(linha.get("localtrab_cli"), 60),
         "endereco_trabalho": _corta(linha.get("endtrab_cli") or linha.get("endcom_cli"), 60),
@@ -504,6 +520,7 @@ def importar_clientes(origem: Connection, db: Session, codigo_empresa: str) -> R
     r.grupos_criados = _importar_lista(origem, db, empresa, _GRUPOS, GrupoCliente, "tab_grupocli", 40)
     r.parentescos_criados = _importar_lista(origem, db, empresa, _PARENTESCOS, Parentesco, "tab_tipopar", 30)
     _importar_setores(origem, db, empresa, r)
+    _ligar_funcionarios(origem, db, empresa, r)
     _importar_orgaos(origem, db, empresa, r)
     db.flush()
     _importar_clientes(origem, db, db.get(Empresa, empresa_id), r)

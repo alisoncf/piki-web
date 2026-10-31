@@ -1,12 +1,16 @@
 """Funcionários e cargos (cadastro global, D9). No VB6: tab_funcionarios, tab_cargos e tab_telefones."""
 from datetime import date
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.acesso.modelos import Empresa
 from app.nucleo.banco import Base, ComDatas
+
+if TYPE_CHECKING:  # clientes importa funcionários (cobradores do setor)
+    from app.dominios.clientes.modelos import Setor
 
 
 class Cargo(ComDatas, Base):
@@ -44,9 +48,8 @@ class Funcionario(ComDatas, Base):
 
     cep: Mapped[str | None] = mapped_column(String(8))
     logradouro: Mapped[str | None] = mapped_column(String(60))
-    bairro: Mapped[str | None] = mapped_column(String(40))
-    cidade: Mapped[str | None] = mapped_column(String(40))
-    uf: Mapped[str | None] = mapped_column(String(2))
+    # bairro e cidade vêm do setor (D17)
+    setor_id: Mapped[int | None] = mapped_column(ForeignKey("setor.id"), index=True)
 
     conjuge: Mapped[str | None] = mapped_column(String(60))
     pai: Mapped[str | None] = mapped_column(String(60))
@@ -56,6 +59,8 @@ class Funcionario(ComDatas, Base):
 
     empresa: Mapped[Empresa] = relationship(lazy="joined")
     cargo: Mapped[Cargo | None] = relationship(lazy="joined")
+    # carregado só quando pedido: o setor traz os seus cobradores, que são funcionários
+    setor: Mapped["Setor | None"] = relationship(lazy="select")
     telefones: Mapped[list["TelefoneFuncionario"]] = relationship(
         back_populates="funcionario", cascade="all, delete-orphan", order_by="TelefoneFuncionario.id", lazy="selectin"
     )

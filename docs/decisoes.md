@@ -108,6 +108,8 @@ Decisão do Alison.
 
 - **Cobrador:** é um funcionário (o `cobrador_set` do VB6 guarda o código do funcionário). Não há tabela de cobradores. Um setor pode ter vários cobradores e um cobrador pode cobrar vários setores, sem loja (`setor_cobrador` com `setor_id` e `funcionario_id`). Setor sem cobrador não é problema.
 - **Cidade do cliente:** o cliente não tem cidade nem UF digitadas. Ele está num setor, e a cidade é a do setor, que é sempre uma cidade do IBGE (D16). O mesmo vale para o órgão.
+- **Bairro:** também é o setor. O campo de bairro do cliente era de antes dos setores e saiu.
+- **Funcionário:** o endereço segue a mesma regra: logradouro e CEP digitados, bairro e cidade pelo setor (`funcionario.setor_id`). No VB6 o `cod_set` da `tab_funcionarios` existe, mas está vazio (`00000`) nos três bancos.
 
 ## Substituídas
 
