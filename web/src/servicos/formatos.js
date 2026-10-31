@@ -62,3 +62,8 @@ export function formatarDataHora(valor) {
 export function semAcentos(texto) {
   return String(texto ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 }
+
+/** Setor com a sua cidade: "Jundiaí (Anápolis - GO)". */
+export function nomeSetor(setor) {
+  return setor ? (setor.cidade ? `${setor.nome} (${setor.cidade.nome} - ${setor.cidade.uf})` : setor.nome) : ''
+}

@@ -26,6 +26,9 @@ class Configuracao(BaseSettings):
     segredo_token: str = ""
     # validade do token de login (padrão: 10 horas, um turno)
     minutos_token: int = 600
+    # consulta de CEP nas fichas de cliente e funcionário
+    viacep_url: str = "https://viacep.com.br/ws/{cep}/json/"
+    viacep_segundos: float = 5
 
     @model_validator(mode="after")
     def _segredo(self) -> "Configuracao":

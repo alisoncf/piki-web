@@ -130,11 +130,11 @@
         <section class="cartao q-pa-md q-mb-md">
           <div class="formulario__secao">Endereço</div>
           <div class="row q-col-gutter-md">
-            <q-input v-model="form.cep" outlined label="CEP" mask="#####-###" unmasked-value class="col-12 col-sm-4 col-md-2" />
+            <campo-cep v-model="form.cep" label="CEP" :buscando="buscandoCep" class="col-12 col-sm-4 col-md-2" @buscar="buscarCep" />
             <q-input v-model="form.logradouro" outlined label="Endereço" maxlength="60" class="col-12 col-sm-8 col-md-5" />
             <selecao-busca
               v-model="form.setor_id"
-              :opcoes="setores"
+              :opcoes="setoresDoCep"
               :rotulo="nomeSetor"
               label="Setor"
               hint="Bairro; a cidade é a do setor"
@@ -168,9 +168,11 @@ import { useQuasar } from 'quasar'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import CampoCep from '@/componentes/CampoCep.vue'
 import SelecaoBusca from '@/componentes/SelecaoBusca.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
-import { mascaraTelefone, soDigitos, TIPOS_TELEFONE } from '@/servicos/formatos'
+import { usarCep } from '@/servicos/cep'
+import { mascaraTelefone, nomeSetor, soDigitos, TIPOS_TELEFONE } from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
 
 const $q = useQuasar()
@@ -198,9 +200,11 @@ function vazio() {
 }
 const form = ref(vazio())
 
-function nomeSetor(s) {
-  return s ? (s.cidade ? `${s.nome} (${s.cidade.nome} - ${s.cidade.uf})` : s.nome) : ''
-}
+// o setor novo, cadastrado pela busca do CEP, é um cadastro de clientes
+const { buscando: buscandoCep, buscar: buscarCep, opcoesSetor: setoresDoCep } = usarCep(
+  form, { cep: 'cep', rua: 'logradouro', setor: 'setor_id' },
+  { setores, podeCriarSetor: computed(() => sessao.pode('clientes.editar')) },
+)
 
 // lojas do usuário; a do funcionário entra mesmo que o usuário não tenha acesso a ela
 const lojas = computed(() => {

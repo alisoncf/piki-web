@@ -1,10 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { Dialog, Notify, QLayout, QPageContainer, QSelect, Quasar } from 'quasar'
+import { Dialog, Notify, QInput, QLayout, QPageContainer, QSelect, Quasar } from 'quasar'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
+import CampoCep from '@/componentes/CampoCep.vue'
+import SelecaoBusca from '@/componentes/SelecaoBusca.vue'
 import SelecaoCidade from '@/componentes/SelecaoCidade.vue'
 import ClientePagina from '@/paginas/cadastros/ClientePagina.vue'
 import ClientesPagina from '@/paginas/cadastros/ClientesPagina.vue'
@@ -143,6 +145,114 @@ describe('ficha do cliente', () => {
     expect(wrapper.text()).not.toContain('Salvar')
     expect(wrapper.text()).not.toContain('Anotar')
     expect(wrapper.find('fieldset').attributes('disabled')).toBeDefined()
+  })
+})
+
+describe('busca do CEP', () => {
+  const JAIARA = { id: 4, nome: 'JAIARA', cidade: ANAPOLIS }
+  const OUTRA_CIDADE = { id: 8, nome: 'Centro', cidade: { id: 6, codigo_ibge: '5208707', nome: 'Goiânia', uf: 'GO' } }
+  const ENDERECO = {
+    cep: '75110010', logradouro: 'Rua Amaro Pires', complemento: null, bairro: 'Jundiaí', cidade: ANAPOLIS,
+    setor: SETOR, sugestoes: [],
+  }
+
+  // valor de um campo de texto da ficha, pelo rótulo
+  function valor(wrapper, rotulo) {
+    return wrapper.findAllComponents(QInput).find((c) => c.props('label') === rotulo).props('modelValue')
+  }
+
+  function botoes(texto) {
+    return [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === texto)
+  }
+
+  async function buscarCep(wrapper, indice = 0) {
+    const campo = wrapper.findAllComponents(CampoCep).at(indice)
+    campo.vm.$emit('update:modelValue', '75110010')
+    await flushPromises()
+    await campo.find('button[aria-label="Buscar o endereço do CEP"]').trigger('click')
+    await flushPromises()
+  }
+
+  it('traz a rua e o setor igual ao bairro', async () => {
+    entrar(['clientes.ver', 'clientes.editar'])
+    const get = responder({ '/setores': [SETOR, JAIARA, OUTRA_CIDADE], '/cep/75110010': ENDERECO })
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...FICHA, id: 9 } })
+    const { wrapper } = await montar(ClientePagina, '/cadastros/clientes/novo')
+
+    await buscarCep(wrapper)
+    expect(get).toHaveBeenCalledWith('/cep/75110010')
+    expect(valor(wrapper, 'Logradouro')).toBe('Rua Amaro Pires')
+    expect(wrapper.text()).toContain('Jundiaí (Anápolis - GO)')
+    // a lista de setores mostra só os da cidade do CEP
+    const setor = wrapper.findAllComponents(SelecaoBusca).find((s) => s.props('modelValue') === SETOR.id)
+    expect(setor.props('opcoes').map((s) => s.id)).toEqual([SETOR.id, JAIARA.id])
+
+    await wrapper.find('input[maxlength="60"]').setValue('Maria Teste')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/clientes', expect.objectContaining({
+      cep: '75110010', logradouro: 'Rua Amaro Pires', setor_id: SETOR.id, setor_trabalho_id: null,
+    }))
+  })
+
+  it('pergunta antes de trocar a rua; sem setor igual, oferece os parecidos ou cadastrar o bairro', async () => {
+    entrar(['clientes.ver', 'clientes.editar'])
+    const endereco = { ...ENDERECO, bairro: 'Jardim Jaiara', setor: null, sugestoes: [JAIARA] }
+    responder({ '/setores': [SETOR, JAIARA], '/cep/75110010': endereco })
+    const novoSetor = { id: 11, nome: 'Jardim Jaiara', cidade: ANAPOLIS }
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: novoSetor })
+    const { wrapper } = await montar(ClientePagina, '/cadastros/clientes/novo')
+    await wrapper.findAllComponents(QInput).find((c) => c.props('label') === 'Logradouro').find('input').setValue('Rua digitada')
+
+    await buscarCep(wrapper)
+    expect(document.body.textContent).toContain('Trocar "Rua digitada" por "Rua Amaro Pires"?')
+    botoes('Não').at(-1).click()
+    await flushPromises()
+    expect(valor(wrapper, 'Logradouro')).toBe('Rua digitada')
+
+    // a pergunta do setor abre quando a da rua termina de fechar
+    await vi.waitFor(() => expect(document.body.textContent)
+      .toContain('Nenhum setor de Anápolis - GO tem o nome do bairro Jardim Jaiara. É algum destes?'))
+    expect(document.body.textContent).toContain('JAIARA (Anápolis - GO)')
+    const cadastrar = [...document.querySelectorAll('.q-radio')].find((r) => r.textContent.includes('Cadastrar o setor Jardim Jaiara'))
+    cadastrar.click()
+    await flushPromises()
+    botoes('Usar').at(-1).click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/setores', { nome: 'Jardim Jaiara', tipo: null, cidade_id: 5, ativo: true, cobradores: [] })
+    expect(wrapper.text()).toContain('Jardim Jaiara (Anápolis - GO)')
+  })
+
+  it('o CEP do trabalho preenche o endereço e o setor do trabalho', async () => {
+    entrar(['clientes.ver', 'clientes.editar'])
+    responder({ '/setores': [SETOR], '/cep/75110010': ENDERECO })
+    const { wrapper } = await montar(ClientePagina, '/cadastros/clientes/novo')
+    await buscarCep(wrapper, 1)
+    const setores = wrapper.findAllComponents(SelecaoBusca).map((s) => s.props('modelValue'))
+    expect(setores).toContain(SETOR.id)
+    expect(valor(wrapper, 'Logradouro')).toBe('') // a rua de casa não muda
+    expect(valor(wrapper, 'Endereço do trabalho')).toBe('Rua Amaro Pires')
+  })
+
+  it('CEP não encontrado: avisa e não muda nada', async () => {
+    entrar(['clientes.ver', 'clientes.editar'])
+    vi.spyOn(api, 'get').mockImplementation(async (url) => {
+      if (url.startsWith('/cep/')) throw { response: { status: 404, data: { detail: 'CEP 75110-010 não encontrado' } } }
+      return { data: [SETOR] }
+    })
+    const { wrapper } = await montar(ClientePagina, '/cadastros/clientes/novo')
+    const notify = vi.spyOn(wrapper.vm.$q, 'notify')
+    await buscarCep(wrapper)
+    expect(notify).toHaveBeenCalledWith({ type: 'warning', message: 'CEP 75110-010 não encontrado' })
+    expect(valor(wrapper, 'Logradouro')).toBe('')
+  })
+
+  it('o botão só busca com o CEP completo', async () => {
+    const wrapper = mount(CampoCep, { props: { modelValue: '7511' }, global: { plugins: [Quasar] } })
+    expect(wrapper.find('button').attributes('disabled')).toBeDefined()
+    await wrapper.setProps({ modelValue: '75110010' })
+    await wrapper.find('input').trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('buscar')).toHaveLength(1)
   })
 })
 

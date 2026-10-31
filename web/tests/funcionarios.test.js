@@ -1,10 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { Notify, QLayout, QPageContainer, Quasar } from 'quasar'
+import { Dialog, Notify, QLayout, QPageContainer, Quasar } from 'quasar'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
+import CampoCep from '@/componentes/CampoCep.vue'
 import FuncionarioPagina from '@/paginas/cadastros/FuncionarioPagina.vue'
 import FuncionariosPagina from '@/paginas/cadastros/FuncionariosPagina.vue'
 import { api } from '@/servicos/api'
@@ -32,7 +33,7 @@ async function montar(componente, caminho) {
   await router.push(caminho)
   // q-page só aparece dentro de um q-layout
   const casca = { render: () => h(QLayout, () => h(QPageContainer, () => h(RouterView))) }
-  const wrapper = mount(casca, { global: { plugins: [[Quasar, { plugins: { Notify } }], router] } })
+  const wrapper = mount(casca, { global: { plugins: [[Quasar, { plugins: { Notify, Dialog } }], router] } })
   await flushPromises()
   return { wrapper, router }
 }
@@ -110,5 +111,36 @@ describe('cadastro de funcionário', () => {
     expect(wrapper.text()).toContain('Jundiaí (Anápolis - GO)')
     expect(wrapper.text()).not.toContain('Salvar')
     expect(wrapper.find('fieldset').attributes('disabled')).toBeDefined()
+  })
+})
+
+describe('CEP do funcionário', () => {
+  it('traz a rua e o setor; sem editar clientes, não oferece cadastrar o setor', async () => {
+    entrar(['funcionarios.ver', 'funcionarios.editar'])
+    const anapolis = { id: 5, codigo_ibge: '5201108', nome: 'Anápolis', uf: 'GO' }
+    const jaiara = { id: 4, nome: 'JAIARA', cidade: anapolis }
+    const respostas = {
+      '/cargos': [CARGO],
+      '/setores': [jaiara],
+      '/cep/75110010': {
+        cep: '75110010', logradouro: 'Rua Amaro Pires', complemento: null, bairro: 'Jardim Jaiara', cidade: anapolis,
+        setor: null, sugestoes: [jaiara],
+      },
+    }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: respostas[url] }))
+    const { wrapper } = await montar(FuncionarioPagina, '/cadastros/funcionarios/novo')
+    const campo = wrapper.findComponent(CampoCep)
+    campo.vm.$emit('update:modelValue', '75110010')
+    await flushPromises()
+    await campo.find('button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('input[maxlength="60"]').element.value).toBe('Rua Amaro Pires')
+    expect(document.body.textContent).toContain('JAIARA (Anápolis - GO)')
+    expect(document.body.textContent).not.toContain('Cadastrar o setor')
+    const usar = [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === 'Usar').at(-1)
+    usar.click()
+    await flushPromises()
+    expect(wrapper.text()).toContain('JAIARA (Anápolis - GO)')
   })
 })

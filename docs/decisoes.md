@@ -111,6 +111,15 @@ Decisão do Alison.
 - **Bairro:** também é o setor. O campo de bairro do cliente era de antes dos setores e saiu.
 - **Funcionário:** o endereço segue a mesma regra: logradouro e CEP digitados, bairro e cidade pelo setor (`funcionario.setor_id`). No VB6 o `cod_set` da `tab_funcionarios` existe, mas está vazio (`00000`) nos três bancos.
 
+### D18. Endereço pelo CEP (31/10/2026)
+
+Decisão do Alison.
+
+- Nas fichas de cliente (casa e trabalho) e de funcionário, um botão ao lado do CEP busca o endereço no ViaCEP pela API (`GET /cep/{cep}`). O cadastro nunca depende do ViaCEP: CEP não encontrado ou serviço fora só gera um aviso.
+- A rua vem do CEP. Se já havia uma rua digitada diferente, a tela pergunta antes de trocar.
+- O setor é procurado entre os setores ativos da cidade do CEP (pelo código do IBGE), comparando o nome sem acentos, com as abreviações comuns (Jd, Vl, St, Res, Pq) e com o tipo do setor na frente. Um setor igual é escolhido sozinho; sem igual, a tela mostra os parecidos para escolher.
+- O bairro do CEP que não existe como setor pode ser cadastrado ali mesmo como setor novo da cidade, por quem pode editar clientes.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
