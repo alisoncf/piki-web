@@ -2,7 +2,7 @@
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.dominios.clientes.modelos import Cliente, GrupoCliente, Orgao, Parentesco, Setor, TelefoneCliente
+from app.dominios.clientes.modelos import Cliente, Cobrador, GrupoCliente, Orgao, Parentesco, Setor, TelefoneCliente
 from app.nucleo.documentos import so_digitos
 
 
@@ -36,19 +36,27 @@ def cliente_por_documento(db: Session, cpf_cnpj: str) -> Cliente | None:
 
 
 def listar_setores(db: Session, busca: str | None = None) -> list[Setor]:
-    consulta = select(Setor).order_by(Setor.nome, Setor.cidade)
+    consulta = select(Setor).order_by(Setor.nome, Setor.cidade_id)
     if busca and busca.strip():
         consulta = consulta.where(func.lower(Setor.nome).like(f"%{busca.strip().lower()}%"))
     return list(db.scalars(consulta))
 
 
-def setor_por_nome(db: Session, nome: str, cidade: str | None) -> Setor | None:
+def setor_por_nome(db: Session, nome: str, cidade_id: int | None) -> Setor | None:
     consulta = select(Setor).where(func.lower(Setor.nome) == nome.strip().lower())
-    if cidade:
-        consulta = consulta.where(func.lower(Setor.cidade) == cidade.strip().lower())
+    if cidade_id is not None:
+        consulta = consulta.where(Setor.cidade_id == cidade_id)
     else:
-        consulta = consulta.where(Setor.cidade.is_(None))
+        consulta = consulta.where(Setor.cidade_id.is_(None))
     return db.scalar(consulta)
+
+
+def listar_cobradores(db: Session) -> list[Cobrador]:
+    return list(db.scalars(select(Cobrador).order_by(Cobrador.nome)))
+
+
+def cobrador_por_nome(db: Session, nome: str) -> Cobrador | None:
+    return db.scalar(select(Cobrador).where(func.lower(Cobrador.nome) == nome.strip().lower()))
 
 
 def listar_orgaos(db: Session, busca: str | None = None) -> list[Orgao]:

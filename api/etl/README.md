@@ -27,7 +27,7 @@ python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
 python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
 ```
 
-O destino é o banco do `.env`. Rode uma vez para cada banco de filial, nesta ordem: empresas, funcionários (os cobradores dos setores são funcionários) e clientes. O `--empresa` diz de qual empresa é o banco de origem.
+O destino é o banco do `.env`. Rode uma vez para cada banco de filial, nesta ordem: empresas, funcionários e clientes. A lista de cidades do IBGE vem da migração 0008 (`alembic upgrade head`). O `--empresa` diz de qual empresa é o banco de origem.
 
 ### MariaDB local sem senha
 
@@ -51,10 +51,11 @@ python -m etl funcionarios --origem "mariadb+mariadbconnector://root@127.0.0.1:3
 
 ### Clientes
 
-Decisão D15. Lê `tab_grupocli`, `tab_tipopar` (parentescos das referências), `tab_setores`, `tab_orgaos`, `tab_clientes`, `tab_telefones` (`tipo_ter = 'C'`), `tab_referencias` e `tab_clientesanot`.
+Decisão D15. Lê `tab_grupocli`, `tab_tipopar` (parentescos das referências), `tab_contacob` (cobradores), `tab_cidades`, `tab_setores`, `tab_orgaos`, `tab_clientes`, `tab_telefones` (`tipo_ter = 'C'`), `tab_referencias` e `tab_clientesanot`.
 
 - Grupos, parentescos e órgãos são juntados pelo nome, e setores pelo nome e pela cidade, sem acentos e sem diferenciar maiúsculas. O mesmo código significa coisas diferentes em cada filial, por isso cada código fica no `legado_mapa` com a empresa de origem.
-- O cobrador do setor vai para o `setor_cobrador` da empresa do banco lido. Cobrador que não está no mapa de funcionários sai como aviso.
+- Cobradores (`tab_contacob`) são juntados pelo nome e valem para todas as lojas (D16). O `cobrador_set` de cada loja é somado aos cobradores que o setor já tem; código que não está na `tab_contacob` sai como aviso.
+- A cidade do setor é a do IBGE: pelo `cod_mun` da `tab_cidades`, ou pelo nome e UF, ou pela única cidade da UF cujo nome começa assim ("CORUMBA" → Corumbá de Goiás). A que não for achada sai como aviso, e os setores dela ficam sem cidade.
 - Cliente é juntado pelo CPF/CNPJ válido. Sem documento válido, vira cadastro próprio da filial (não junta pelo nome: em 30/10/2026, a La Viva tinha 23 mil clientes assim).
 - Manda nos dados o registro com a data de alteração mais recente (`dataalt_cli`, ou `data_cli`). Os outros só preenchem campos vazios; telefones, referências e anotações (menos as excluídas) são somados. Data e loja do cadastro são as do registro mais antigo.
 - As colunas da `tab_clientes` e da `tab_orgaos` variam entre filiais; a leitura usa as que existirem e lê tudo como texto, porque datas inválidas e inteiros zerofill quebram o conector da MariaDB.

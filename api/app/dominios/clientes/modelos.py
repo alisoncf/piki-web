@@ -1,18 +1,20 @@
 """Clientes e seus cadastros de apoio (cadastro global, D9).
 
 No VB6: tab_clientes, tab_telefones (tipo_ter = 'C'), tab_referencias,
-tab_tipopar, tab_clientesanot, tab_setores, tab_orgaos e tab_grupocli. Cada loja tinha os
-seus setores e órgãos; aqui são uma lista só. O cobrador de cada setor é
-escolhido por loja (setor_cobrador).
+tab_tipopar, tab_clientesanot, tab_setores, tab_orgaos, tab_grupocli e tab_contacob. Cada loja
+tinha os seus setores, órgãos e cobradores; aqui são uma lista só. Cobradores valem para
+todas as lojas: um setor pode ter vários cobradores, e um cobrador, vários setores.
 """
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Table, Text, UniqueConstraint, func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.acesso.modelos import Empresa, Usuario
-from app.dominios.funcionarios.modelos import Funcionario
+from app.dominios.cidades.modelos import Cidade
 from app.nucleo.banco import Base, ComDatas
 
 
@@ -36,36 +38,40 @@ class Parentesco(ComDatas, Base):
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class Cobrador(ComDatas, Base):
+    """Quem cobra os setores: pessoa ou destino da cobrança (escritório, advogado...). tab_contacob no VB6."""
+
+    __tablename__ = "cobrador"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nome: Mapped[str] = mapped_column(String(40), unique=True)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+setor_cobrador = Table(
+    "setor_cobrador",
+    Base.metadata,
+    Column("setor_id", ForeignKey("setor.id", ondelete="CASCADE"), primary_key=True),
+    Column("cobrador_id", ForeignKey("cobrador.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
 class Setor(ComDatas, Base):
-    """Bairro ou região de cobrança (tab_setores). Os clientes de um setor são visitados pelo mesmo cobrador."""
+    """Bairro ou região de cobrança (tab_setores), sempre numa cidade do IBGE."""
 
     __tablename__ = "setor"
-    __table_args__ = (UniqueConstraint("nome", "cidade"),)
+    __table_args__ = (UniqueConstraint("nome", "cidade_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     nome: Mapped[str] = mapped_column(String(40))
     tipo: Mapped[str | None] = mapped_column(String(20))  # bairro, vila, setor, jardim... (tipo_set)
-    cidade: Mapped[str | None] = mapped_column(String(40))
-    uf: Mapped[str | None] = mapped_column(String(2))
+    cidade_id: Mapped[int | None] = mapped_column(ForeignKey("cidade.id"), index=True)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    cobradores: Mapped[list["SetorCobrador"]] = relationship(
-        back_populates="setor", cascade="all, delete-orphan", lazy="selectin"
+    cidade: Mapped[Cidade | None] = relationship(lazy="joined")
+    cobradores: Mapped[list[Cobrador]] = relationship(
+        secondary=setor_cobrador, lazy="selectin", order_by=Cobrador.nome
     )
-
-
-class SetorCobrador(ComDatas, Base):
-    """Quem cobra o setor em cada loja (cobrador_set no VB6, que era de cada banco)."""
-
-    __tablename__ = "setor_cobrador"
-
-    setor_id: Mapped[int] = mapped_column(ForeignKey("setor.id", ondelete="CASCADE"), primary_key=True)
-    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), primary_key=True)
-    funcionario_id: Mapped[int] = mapped_column(ForeignKey("funcionario.id"))
-
-    setor: Mapped[Setor] = relationship(back_populates="cobradores")
-    empresa: Mapped[Empresa] = relationship(lazy="joined")
-    funcionario: Mapped[Funcionario] = relationship(lazy="joined")
 
 
 class Orgao(ComDatas, Base):

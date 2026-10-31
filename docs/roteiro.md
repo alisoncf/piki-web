@@ -74,7 +74,8 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [x] Funcionários e cargos: API, telas (lista, ficha, cargos) e ETL do VB6, com cadastro global, loja de lotação e telefones (migrações 0004 e 0005) — 30/10/2026
 - [x] Rodar o ETL de funcionários nos bancos da matriz (01) e da La Viva (03), em cópias locais, juntando os cadastros repetidos entre filiais (pelo CPF ou pelo nome) — 30/10/2026
 - [ ] Usuários ligados a funcionários (coluna `usuario.funcionario_id` já criada)
-- [ ] Cidades, setores, órgãos, cargos
+- [x] Cidades do IBGE e cobradores (D16): setor escolhe a cidade numa lista e tem vários cobradores, que valem para todas as lojas; tela de cobradores; migração 0008 e ETL refeito nas três cópias — 31/10/2026
+- [ ] Cidade do IBGE também no cliente, no órgão e no funcionário (hoje é texto)
 - [ ] Bancos, formas de pagamento, plano de contas
 
 ## Onda 2 · Relatórios

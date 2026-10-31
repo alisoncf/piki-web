@@ -1,6 +1,7 @@
-"""Cadastro de clientes, setores, órgãos e grupos. Dados fictícios (CPF e CNPJ gerados só para teste)."""
+"""Cadastro de clientes, setores, cobradores, cidades, órgãos e grupos. Dados fictícios (CPF e CNPJ gerados só para teste)."""
 import pytest
 
+from app.dominios.cidades.modelos import Cidade, nome_de_busca
 from app.nucleo.documentos import cnpj_valido
 
 CPF_A = "52998224725"
@@ -19,6 +20,19 @@ def admin(cliente, cenario):
     return _auth(cliente, "caio", cenario["e1"])
 
 
+@pytest.fixture
+def cidades(banco):
+    """Algumas cidades do IBGE (a lista completa vem na migração, que os testes não rodam)."""
+    with banco() as db:
+        lista = [Cidade(codigo_ibge=c, nome=n, uf=u, nome_busca=nome_de_busca(n)) for c, n, u in [
+            ("5201108", "Anápolis", "GO"), ("5208707", "Goiânia", "GO"), ("3525904", "Jundiaí", "SP"),
+            ("5201405", "Aparecida de Goiânia", "GO"),
+        ]]
+        db.add_all(lista)
+        db.commit()
+        return {c.nome: c.id for c in lista}
+
+
 def _dados(**extra):
     return {"nome": "Maria Teste", "cpf_cnpj": "529.982.247-25", **extra}
 
@@ -29,9 +43,9 @@ def test_cnpj_valido():
     assert not cnpj_valido("11111111111111")
 
 
-def test_criar_e_consultar_cliente(cliente, cenario, admin):
+def test_criar_e_consultar_cliente(cliente, cenario, admin, cidades):
     grupo = cliente.post("/grupos-clientes", json={"nome": "Servidor municipal"}, headers=admin).json()
-    setor = cliente.post("/setores", json={"nome": "Jundiaí", "cidade": "Anápolis", "uf": "go"}, headers=admin).json()
+    setor = cliente.post("/setores", json={"nome": "Jundiaí", "cidade_id": cidades["Anápolis"]}, headers=admin).json()
     orgao = cliente.post("/orgaos", json={"nome": "Escola Modelo", "grupo_id": grupo["id"]}, headers=admin).json()
     irma = cliente.post("/parentescos", json={"nome": "Irmã"}, headers=admin).json()
     r = cliente.post("/clientes", headers=admin, json=_dados(
@@ -47,6 +61,7 @@ def test_criar_e_consultar_cliente(cliente, cenario, admin):
     assert criado["cep"] == "75110000"
     assert criado["limite_credito"] == "550.00"
     assert criado["setor"]["nome"] == "Jundiaí"
+    assert criado["setor"]["cidade"]["nome"] == "Anápolis"
     assert criado["orgao"]["nome"] == "Escola Modelo"
     assert criado["empresa_cadastro"]["codigo"] == "01"
     assert criado["telefones"] == [{"numero": "62999990000", "tipo": "3"}]
@@ -124,30 +139,50 @@ def test_anotacoes_registram_usuario_e_loja(cliente, cenario, admin):
     assert anotacao["empresa"]["codigo"] == "01"
 
 
-def test_setor_com_um_cobrador_por_loja(cliente, cenario, admin):
-    cobrador = cliente.post("/funcionarios", headers=admin, json={"nome": "Cobrador Um", "empresa_id": cenario["e1"]}).json()
-    outro = cliente.post("/funcionarios", headers=admin, json={"nome": "Cobrador Dois", "empresa_id": cenario["e2"]}).json()
-    r = cliente.post("/setores", headers=admin, json={"nome": "Centro", "cidade": "Anápolis", "cobradores": [
-        {"empresa_id": cenario["e1"], "funcionario_id": cobrador["id"]},
-        {"empresa_id": cenario["e2"], "funcionario_id": outro["id"]},
-    ]})
+def test_buscar_cidades(cliente, cenario, admin, cidades):
+    def nomes(**params):
+        return [c["nome"] for c in cliente.get("/cidades", headers=admin, params=params).json()]
+
+    # sem ligar para acentos; quem começa com o termo vem antes
+    assert nomes(busca="goiania") == ["Goiânia", "Aparecida de Goiânia"]
+    assert nomes(busca="JUNDIAI") == ["Jundiaí"]
+    assert nomes(busca="jundiai", uf="go") == []
+    assert len(nomes()) == 4
+    assert cliente.get("/cidades").status_code == 401
+
+
+def test_setor_na_cidade_com_varios_cobradores(cliente, cenario, admin, cidades):
+    um = cliente.post("/cobradores", headers=admin, json={"nome": "Sidnei"}).json()
+    dois = cliente.post("/cobradores", headers=admin, json={"nome": "Edmilson"}).json()
+    assert cliente.post("/cobradores", headers=admin, json={"nome": "SIDNEI"}).status_code == 409
+
+    r = cliente.post("/setores", headers=admin, json={
+        "nome": "Centro", "cidade_id": cidades["Anápolis"], "cobradores": [um["id"], dois["id"], um["id"]]})
     assert r.status_code == 201, r.text
-    setor = r.json()
-    assert {(c["empresa"]["codigo"], c["funcionario"]["nome"]) for c in setor["cobradores"]} == {
-        ("01", "Cobrador Um"), ("02", "Cobrador Dois")}
+    centro = r.json()
+    assert centro["cidade"] == {"id": cidades["Anápolis"], "codigo_ibge": "5201108", "nome": "Anápolis", "uf": "GO"}
+    assert [c["nome"] for c in centro["cobradores"]] == ["Edmilson", "Sidnei"]
 
-    r = cliente.put(f"/setores/{setor['id']}", headers=admin, json={"nome": "Centro", "cidade": "Anápolis", "cobradores": [
-        {"empresa_id": cenario["e1"], "funcionario_id": outro["id"]}]})
-    assert r.status_code == 200, r.text
-    assert [(c["empresa"]["codigo"], c["funcionario"]["nome"]) for c in r.json()["cobradores"]] == [("01", "Cobrador Dois")]
+    # um cobrador em vários setores
+    r = cliente.post("/setores", headers=admin, json={"nome": "Jundiaí", "cidade_id": cidades["Anápolis"],
+                                                      "cobradores": [um["id"]]})
+    assert r.status_code == 201, r.text
 
-    r = cliente.post("/setores", headers=admin, json={"nome": "Norte", "cobradores": [
-        {"empresa_id": cenario["e1"], "funcionario_id": cobrador["id"]},
-        {"empresa_id": cenario["e1"], "funcionario_id": outro["id"]}]})
-    assert r.status_code == 422
+    r = cliente.put(f"/setores/{centro['id']}", headers=admin, json={
+        "nome": "Centro", "cidade_id": cidades["Anápolis"], "cobradores": [dois["id"]]})
+    assert [c["nome"] for c in r.json()["cobradores"]] == ["Edmilson"]
+
+    # o mesmo cobrador, visto de outra loja
+    outra = _auth(cliente, "caio", cenario["e2"])
+    assert [c["nome"] for c in cliente.get("/setores", headers=outra).json()[1]["cobradores"]] == ["Sidnei"]
+
+    assert cliente.post("/setores", headers=admin, json={"nome": "Norte"}).status_code == 422  # sem cidade
+    assert cliente.post("/setores", headers=admin, json={"nome": "Norte", "cidade_id": cidades["Goiânia"],
+                                                         "cobradores": [999]}).status_code == 422
+    assert cliente.post("/setores", headers=admin, json={"nome": "Norte", "cidade_id": 999}).status_code == 422
     # mesmo nome em outra cidade é outro setor; na mesma cidade, não
-    assert cliente.post("/setores", headers=admin, json={"nome": "centro", "cidade": "Goiânia"}).status_code == 201
-    assert cliente.post("/setores", headers=admin, json={"nome": "centro", "cidade": "anápolis"}).status_code == 409
+    assert cliente.post("/setores", headers=admin, json={"nome": "centro", "cidade_id": cidades["Goiânia"]}).status_code == 201
+    assert cliente.post("/setores", headers=admin, json={"nome": "centro", "cidade_id": cidades["Anápolis"]}).status_code == 409
 
 
 def test_orgao_e_grupo_sem_repetir_nome(cliente, cenario, admin):

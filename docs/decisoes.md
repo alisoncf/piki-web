@@ -88,12 +88,19 @@ Cliente é um só para todas as lojas (D9), e setores (bairros e regiões de cob
 - **Fonte:** o ETL lê a `tab_clientes` e as tabelas ligadas de cada loja. O cadastro unificado que já existe no piki.app.br (sincronizado pelo VB6) não é usado: ele vai ser substituído pelo sistema novo.
 - **Mesmo cliente:** mesmo CPF/CNPJ válido. Sem documento válido, o cliente fica como cadastro próprio daquela loja, sem juntar pelo nome, com aviso para conferência.
 - **Quem manda nos dados:** o registro com a data de alteração mais recente (`dataalt_cli`, ou `data_cli` se estiver vazia). Os outros só preenchem campos vazios e acrescentam telefones e referências.
-- **Setores e órgãos:** juntados pelo nome (setor: nome + cidade). O cobrador do setor é escolhido por loja (`setor_cobrador`).
+- **Setores e órgãos:** juntados pelo nome (setor: nome + cidade). ~~O cobrador do setor é escolhido por loja (`setor_cobrador`).~~ Substituído pela D16 em 31/10/2026.
 - **Códigos antigos:** cada código de cada loja (`cod_cli`, `cod_set`, `cod_org`, `cod_gru`) fica no `legado_mapa`, apontando para o registro novo. É por ele que as vendas e contas antigas vão ser ligadas.
 - **Listas fixas e tabelas:** vira tabela o que a loja pode aumentar (grupos, setores, órgãos, parentescos). O que o sistema usa para decidir fica fixo no código: a forma de cobrança (`domicilio`, `trabalho`, `loja`, que diz em qual setor cobrar) e o bloqueio do cliente (`bloqueado`), porque um valor novo numa tabela não ensinaria o programa o que fazer com ele.
 - **Endereço:** o certo no VB6 é o `logradouro` (com `numero` e `complemento`); a `endereco_cli` é o campo antigo.
 - **Sem documento válido:** depois que vendas e contas forem importadas, os clientes sem CPF/CNPJ válido e sem nenhum movimento serão excluídos.
 - **Carga final:** as cópias locais servem para montar e testar. A carga de verdade será refeita direto nos bancos das lojas, por um túnel, antes da virada.
+
+### D16. Setor numa cidade do IBGE, cobradores para todas as lojas (31/10/2026)
+
+Correção do Alison sobre a D15.
+
+- **Cidades:** tabela `cidade` com os 5.571 municípios do IBGE (código, nome com acentos, UF), carregada pela migração 0008 a partir de `api/alembic/referencia/municipios_ibge.csv` (API de localidades do IBGE). O setor aponta para uma cidade (`setor.cidade_id`), escolhida numa lista, não digitada. O nome que estava na `tab_cidades` de cada loja é cadastro antigo e não é usado: o ETL acha a cidade pelo `cod_mun` (código do IBGE) ou, sem ele, pelo nome. Setor novo ou alterado precisa de cidade; os antigos sem cidade ficam assim até alguém escolher uma.
+- **Cobradores:** tabela `cobrador` (a `tab_contacob` do VB6: pessoas e destinos como escritório e advogado), uma lista só para todas as lojas. Um setor pode ter vários cobradores e um cobrador pode cobrar vários setores (`setor_cobrador` com `setor_id` e `cobrador_id`, sem loja).
 
 ## Substituídas
 

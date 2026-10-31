@@ -116,7 +116,7 @@ const colunas = [
 ]
 
 function nomeSetor(s) {
-  return s ? (s.cidade ? `${s.nome} (${s.cidade})` : s.nome) : ''
+  return s ? (s.cidade ? `${s.nome} (${s.cidade.nome})` : s.nome) : ''
 }
 
 function filtrar(linhas, termo) {

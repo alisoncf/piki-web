@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.dominios.clientes import repositorio as repo
 from app.dominios.clientes import servico
 from app.dominios.clientes.esquemas import (
-    AnotacaoDados, Cliente, ClienteDados, ClienteResumo, GrupoCliente, GrupoClienteDados, Orgao, OrgaoDados,
-    PaginaClientes, Parentesco, ParentescoDados, Setor, SetorDados,
+    AnotacaoDados, Cliente, ClienteDados, ClienteResumo, Cobrador, CobradorDados, GrupoCliente, GrupoClienteDados,
+    Orgao, OrgaoDados, PaginaClientes, Parentesco, ParentescoDados, Setor, SetorDados,
 )
 from app.nucleo.contexto import Contexto, exige
 
@@ -94,6 +94,27 @@ def alterar_setor(setor_id: int, dados: SetorDados, ctx: Editar) -> Setor:
     """Altera o setor. Os cobradores enviados substituem os que existiam."""
     try:
         return Setor.model_validate(servico.alterar_setor(ctx.db, setor_id, dados))
+    except servico.ErroCliente as e:
+        raise _http(e)
+
+
+@router.get("/cobradores", response_model=list[Cobrador])
+def listar_cobradores(ctx: Ver) -> list[Cobrador]:
+    return [Cobrador.model_validate(c) for c in repo.listar_cobradores(ctx.db)]
+
+
+@router.post("/cobradores", response_model=Cobrador, status_code=status.HTTP_201_CREATED)
+def criar_cobrador(dados: CobradorDados, ctx: Editar) -> Cobrador:
+    try:
+        return Cobrador.model_validate(servico.criar_cobrador(ctx.db, dados))
+    except servico.ErroCliente as e:
+        raise _http(e)
+
+
+@router.put("/cobradores/{cobrador_id}", response_model=Cobrador)
+def alterar_cobrador(cobrador_id: int, dados: CobradorDados, ctx: Editar) -> Cobrador:
+    try:
+        return Cobrador.model_validate(servico.alterar_cobrador(ctx.db, cobrador_id, dados))
     except servico.ErroCliente as e:
         raise _http(e)
 

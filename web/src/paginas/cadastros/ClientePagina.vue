@@ -301,7 +301,7 @@ function vazio() {
 const form = ref(vazio())
 
 function nomeSetor(s) {
-  return s ? (s.cidade ? `${s.nome} (${s.cidade})` : s.nome) : ''
+  return s ? (s.cidade ? `${s.nome} (${s.cidade.nome})` : s.nome) : ''
 }
 
 function preencher(cliente) {

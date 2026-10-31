@@ -28,8 +28,26 @@
           <q-input v-model="busca" dense outlined placeholder="Nome do setor ou cidade" clearable class="col-12 col-sm">
             <template #prepend><q-icon name="search" /></template>
           </q-input>
-          <q-toggle v-model="semCobrador" :label="`Sem cobrador em ${sessao.empresa?.nome}`" />
+          <q-select
+            v-model="filtroCobrador"
+            dense
+            outlined
+            clearable
+            label="Cobrador"
+            :options="cobradores"
+            option-value="id"
+            option-label="nome"
+            emit-value
+            map-options
+            class="col-12 col-sm-3"
+          />
+          <q-toggle v-model="semCobrador" label="Sem cobrador" />
         </div>
+      </template>
+      <template #body-cell-cobradores="props">
+        <q-td :props="props">
+          <q-chip v-for="c in props.row.cobradores" :key="c.id" dense square>{{ c.nome }}</q-chip>
+        </q-td>
       </template>
       <template #body-cell-situacao="props">
         <q-td :props="props">
@@ -53,28 +71,27 @@
               :rules="[(v) => !!v?.trim() || 'Informe o nome']"
             />
             <q-input v-model="editando.tipo" outlined label="Tipo" hint="Bairro, vila, jardim..." maxlength="20" class="col-12 col-sm-4" />
-            <q-input v-model="editando.cidade" outlined label="Cidade" maxlength="40" class="col-9" />
-            <q-input v-model="editando.uf" outlined label="UF" mask="AA" class="col-3" @update:model-value="(v) => (editando.uf = v?.toUpperCase())" />
-
-            <div class="col-12 formulario__secao q-mt-sm">Cobrador em cada loja</div>
+            <selecao-cidade
+              v-model="editando.cidade_id"
+              v-model:cidade="editando.cidade"
+              label="Cidade *"
+              class="col-12"
+              :rules="[(v) => !!v || 'Escolha a cidade']"
+            />
             <q-select
-              v-for="loja in sessao.empresas"
-              :key="loja.id"
-              v-model="editando.cobradores[loja.id]"
+              v-model="editando.cobradores"
               outlined
-              :label="loja.nome"
-              :options="cobradoresPossiveis(editando.cobradores[loja.id])"
+              multiple
+              use-chips
+              label="Cobradores"
+              hint="Valem para todas as lojas"
+              :options="cobradoresPossiveis(editando.cobradores)"
               option-value="id"
               option-label="nome"
               emit-value
               map-options
-              clearable
-              class="col-12 col-sm-6"
-            >
-              <template #prepend>
-                <q-avatar text-color="white" size="22px" font-size="11px" :style="{ background: loja.cor }">{{ loja.codigo }}</q-avatar>
-              </template>
-            </q-select>
+              class="col-12"
+            />
             <q-toggle v-model="editando.ativo" label="Ativo" class="col-12" />
           </q-card-section>
           <q-card-actions align="right">
@@ -91,6 +108,7 @@
 import { useQuasar } from 'quasar'
 import { computed, onMounted, ref } from 'vue'
 
+import SelecaoCidade from '@/componentes/SelecaoCidade.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
 import { semAcentos } from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
@@ -100,54 +118,51 @@ const sessao = useSessaoStore()
 const podeEditar = computed(() => sessao.pode('clientes.editar'))
 
 const todos = ref([])
-const funcionarios = ref([])
+const cobradores = ref([])
 const carregando = ref(false)
 const busca = ref('')
+const filtroCobrador = ref(null)
 const semCobrador = ref(false)
 const dialogo = ref(false)
 const salvando = ref(false)
-// cobradores: { empresa_id: funcionario_id }; os de lojas que o usuário não vê ficam guardados à parte
-const editando = ref({ cobradores: {} })
-const outrasLojas = ref([])
+const editando = ref({ cobradores: [] })
 
-function cobradorAqui(setor) {
-  return setor.cobradores.find((c) => c.empresa.id === sessao.empresa?.id)?.funcionario.nome ?? ''
+function nomeCidade(setor) {
+  return setor.cidade ? `${setor.cidade.nome} - ${setor.cidade.uf}` : ''
 }
 
 const colunas = [
   { name: 'nome', label: 'Nome', field: 'nome', align: 'left', sortable: true },
   { name: 'tipo', label: 'Tipo', field: 'tipo', align: 'left', sortable: true },
-  { name: 'cidade', label: 'Cidade', field: 'cidade', align: 'left', sortable: true },
-  { name: 'cobrador', label: 'Cobrador nesta loja', field: cobradorAqui, align: 'left', sortable: true },
+  { name: 'cidade', label: 'Cidade', field: nomeCidade, align: 'left', sortable: true },
+  { name: 'cobradores', label: 'Cobradores', field: 'cobradores', align: 'left' },
   { name: 'situacao', label: 'Situação', field: 'ativo', align: 'left' },
 ]
 
-const setores = computed(() => (semCobrador.value ? todos.value.filter((s) => !cobradorAqui(s)) : todos.value))
+const setores = computed(() =>
+  todos.value.filter(
+    (s) =>
+      (!semCobrador.value || !s.cobradores.length) &&
+      (!filtroCobrador.value || s.cobradores.some((c) => c.id === filtroCobrador.value)),
+  ),
+)
 
 function filtrar(linhas, termo) {
   const t = semAcentos(termo.trim())
-  return linhas.filter((s) => semAcentos(s.nome).includes(t) || semAcentos(s.cidade).includes(t))
+  return linhas.filter((s) => semAcentos(s.nome).includes(t) || semAcentos(nomeCidade(s)).includes(t))
 }
 
-// quem cobra (cargo marcado como "cobra"); sem nenhum marcado, todos os ativos. O atual fica na lista.
-function cobradoresPossiveis(atual) {
-  const ativos = funcionarios.value.filter((f) => f.ativo)
-  const cobram = ativos.filter((f) => f.cargo?.cobra)
-  const lista = cobram.length ? cobram : ativos
-  const escolhido = funcionarios.value.find((f) => f.id === atual)
-  return escolhido && !lista.includes(escolhido) ? [escolhido, ...lista] : lista
+// os ativos; um inativo que já está no setor continua na lista
+function cobradoresPossiveis(escolhidos) {
+  return cobradores.value.filter((c) => c.ativo || escolhidos.includes(c.id))
 }
 
 async function carregar() {
   carregando.value = true
   try {
-    // a lista de funcionários só serve para escolher o cobrador, e exige outra permissão
-    const [s, f] = await Promise.all([
-      api.get('/setores'),
-      sessao.pode('funcionarios.ver') ? api.get('/funcionarios') : { data: [] },
-    ])
+    const [s, c] = await Promise.all([api.get('/setores'), api.get('/cobradores')])
     todos.value = s.data
-    funcionarios.value = f.data
+    cobradores.value = c.data
   } catch (e) {
     $q.notify({ type: 'negative', message: mensagemDeErro(e) })
   } finally {
@@ -156,27 +171,26 @@ async function carregar() {
 }
 
 function abrir(setor) {
-  const visiveis = new Set(sessao.empresas.map((e) => e.id))
-  const cobradores = {}
-  outrasLojas.value = []
-  for (const c of setor?.cobradores ?? []) {
-    if (visiveis.has(c.empresa.id)) cobradores[c.empresa.id] = c.funcionario.id
-    else outrasLojas.value.push({ empresa_id: c.empresa.id, funcionario_id: c.funcionario.id })
-  }
   editando.value = setor
-    ? { id: setor.id, nome: setor.nome, tipo: setor.tipo, cidade: setor.cidade, uf: setor.uf, ativo: setor.ativo, cobradores }
-    : { nome: '', tipo: '', cidade: '', uf: '', ativo: true, cobradores }
+    ? {
+        id: setor.id,
+        nome: setor.nome,
+        tipo: setor.tipo,
+        cidade_id: setor.cidade_id,
+        cidade: setor.cidade,
+        ativo: setor.ativo,
+        cobradores: setor.cobradores.map((c) => c.id),
+      }
+    : { nome: '', tipo: '', cidade_id: null, cidade: null, ativo: true, cobradores: [] }
   dialogo.value = true
 }
 
 async function salvar() {
   salvando.value = true
   try {
-    const { id, cobradores, ...dados } = editando.value
-    const lista = Object.entries(cobradores)
-      .filter(([, funcionario]) => funcionario)
-      .map(([empresa, funcionario]) => ({ empresa_id: Number(empresa), funcionario_id: funcionario }))
-    const corpo = { ...dados, cobradores: [...lista, ...outrasLojas.value] }
+    // a cidade inteira só serve para o campo mostrar o nome; vai só o id
+    const { id, nome, tipo, cidade_id, ativo, cobradores } = editando.value
+    const corpo = { nome, tipo, cidade_id, ativo, cobradores }
     await (id ? api.put(`/setores/${id}`, corpo) : api.post('/setores', corpo))
     dialogo.value = false
     todos.value = (await api.get('/setores')).data

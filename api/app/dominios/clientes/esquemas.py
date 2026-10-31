@@ -4,6 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.dominios.acesso.esquemas import EmpresaResumo
+from app.dominios.cidades.esquemas import Cidade
 from app.dominios.funcionarios.esquemas import Telefone
 from app.nucleo.documentos import so_digitos
 
@@ -67,34 +68,32 @@ class Parentesco(ParentescoDados):
 
 
 class CobradorDados(BaseModel):
-    empresa_id: int
-    funcionario_id: int
+    nome: str = Field(min_length=1, max_length=40)
+    ativo: bool = True
+
+    @field_validator("nome", mode="before")
+    @classmethod
+    def _nome(cls, v: object) -> object:
+        return _vazio_para_none(v)
 
 
-class Cobrador(BaseModel):
+class Cobrador(CobradorDados):
     model_config = ConfigDict(from_attributes=True)
 
-    empresa: EmpresaResumo
-    funcionario: Nomeado
+    id: int
 
 
 class SetorDados(BaseModel):
     nome: str = Field(min_length=1, max_length=40)
     tipo: str | None = Field(default=None, max_length=20)
-    cidade: str | None = Field(default=None, max_length=40)
-    uf: str | None = Field(default=None, pattern="^[A-Z]{2}$")
+    cidade_id: int = Field(description="Cidade do IBGE; obrigatória (os setores antigos sem cidade ganham uma ao ser alterados)")
     ativo: bool = True
-    cobradores: list[CobradorDados] = Field(default=[], description="Um cobrador por loja, no máximo")
+    cobradores: list[int] = Field(default=[], description="Ids dos cobradores; valem para todas as lojas")
 
-    @field_validator("nome", "tipo", "cidade", mode="before")
+    @field_validator("nome", "tipo", mode="before")
     @classmethod
     def _limpar(cls, v: object) -> object:
         return _vazio_para_none(v)
-
-    @field_validator("uf", mode="before")
-    @classmethod
-    def _uf(cls, v: object) -> object:
-        return _uf(v)
 
 
 class SetorResumo(BaseModel):
@@ -102,12 +101,12 @@ class SetorResumo(BaseModel):
 
     id: int
     nome: str
-    cidade: str | None
+    cidade: Cidade | None
 
 
 class Setor(SetorResumo):
     tipo: str | None
-    uf: str | None
+    cidade_id: int | None
     ativo: bool
     cobradores: list[Cobrador]
 

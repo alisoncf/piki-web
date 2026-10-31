@@ -1,10 +1,11 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { Dialog, Notify, QLayout, QPageContainer, Quasar } from 'quasar'
+import { Dialog, Notify, QLayout, QPageContainer, QSelect, Quasar } from 'quasar'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
+import SelecaoCidade from '@/componentes/SelecaoCidade.vue'
 import ClientePagina from '@/paginas/cadastros/ClientePagina.vue'
 import ClientesPagina from '@/paginas/cadastros/ClientesPagina.vue'
 import ParentescosPagina from '@/paginas/cadastros/ParentescosPagina.vue'
@@ -16,7 +17,8 @@ import { useSessaoStore } from '@/stores/sessao'
 const MATRIZ = { id: 1, codigo: '01', nome: 'MATRIZ', cor: '#2f6fb0' }
 const FILIAL = { id: 3, codigo: '03', nome: 'FILIAL', cor: '#1f8a80' }
 const OUTRA = { id: 4, codigo: '04', nome: 'OUTRA', cor: '#888888' }
-const SETOR = { id: 2, nome: 'Jundiaí', cidade: 'Anápolis' }
+const ANAPOLIS = { id: 5, codigo_ibge: '5201108', nome: 'Anápolis', uf: 'GO' }
+const SETOR = { id: 2, nome: 'Jundiaí', cidade: ANAPOLIS }
 
 const MARIA = {
   id: 7, nome: 'Maria Teste', cpf_cnpj: '52998224725', bairro: 'Centro', cidade: 'Anápolis', bloqueado: true,
@@ -145,29 +147,44 @@ describe('ficha do cliente', () => {
 })
 
 describe('setores', () => {
-  it('guarda os cobradores das lojas que o usuário não vê', async () => {
+  it('cidade do IBGE e vários cobradores, que valem para todas as lojas', async () => {
     entrar(['clientes.ver', 'clientes.editar'])
-    const setor = {
-      ...SETOR, tipo: 'BAIRRO', uf: 'GO', ativo: true,
-      cobradores: [
-        { empresa: MATRIZ, funcionario: { id: 5, nome: 'Cobrador Um' } },
-        { empresa: OUTRA, funcionario: { id: 6, nome: 'Cobrador Outro' } },
-      ],
-    }
-    responder({ '/setores': [setor] })
+    const sidnei = { id: 1, nome: 'Sidnei', ativo: true }
+    const antigo = { id: 2, nome: 'Antigo', ativo: false }
+    const edmilson = { id: 3, nome: 'Edmilson', ativo: true }
+    const setor = { ...SETOR, tipo: 'BAIRRO', cidade_id: 5, ativo: true, cobradores: [sidnei, antigo] }
+    const outro = { id: 3, nome: 'Vila Nova', tipo: null, cidade: null, cidade_id: null, ativo: true, cobradores: [edmilson] }
+    responder({ '/setores': [setor, outro], '/cobradores': [sidnei, antigo, edmilson] })
     const put = vi.spyOn(api, 'put').mockResolvedValue({ data: setor })
     const { wrapper } = await montar(SetoresPagina, '/cadastros/setores')
-    expect(wrapper.text()).toContain('Cobrador Um') // cobrador desta loja na lista
+    expect(wrapper.text()).toContain('Anápolis - GO')
+    expect(wrapper.text()).toContain('Sidnei')
+    expect(wrapper.text()).toContain('Edmilson')
 
     await wrapper.find('tbody tr').trigger('click')
     await flushPromises()
+    expect(document.body.textContent).toContain('Anápolis - GO') // a cidade aparece no campo sem buscar
     const salvar = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Salvar'))
     salvar.closest('form').dispatchEvent(new Event('submit'))
     await flushPromises()
-    expect(put).toHaveBeenCalledWith('/setores/2', expect.objectContaining({
-      nome: 'Jundiaí',
-      cobradores: [{ empresa_id: 1, funcionario_id: 5 }, { empresa_id: 4, funcionario_id: 6 }],
-    }))
+    expect(put).toHaveBeenCalledWith('/setores/2', { nome: 'Jundiaí', tipo: 'BAIRRO', cidade_id: 5, ativo: true, cobradores: [1, 2] })
+  })
+
+  it('a cidade é buscada na API enquanto digita', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({ data: [ANAPOLIS] })
+    const wrapper = mount(SelecaoCidade, { props: { modelValue: null }, global: { plugins: [Quasar] } })
+    const select = wrapper.findComponent(QSelect)
+    const atualizar = vi.fn((f) => f())
+    select.vm.$emit('filter', 'a', atualizar, vi.fn()) // uma letra só não busca
+    expect(get).not.toHaveBeenCalled()
+    select.vm.$emit('filter', 'anap', atualizar, vi.fn())
+    await flushPromises()
+    expect(get).toHaveBeenCalledWith('/cidades', { params: { busca: 'anap', limite: 20 } })
+    expect(select.props('options')).toEqual([ANAPOLIS])
+
+    select.vm.$emit('update:modelValue', 5)
+    expect(wrapper.emitted('update:modelValue')[0]).toEqual([5])
+    expect(wrapper.emitted('update:cidade')[0]).toEqual([ANAPOLIS])
   })
 })
 
