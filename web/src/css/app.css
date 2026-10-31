@@ -16,9 +16,10 @@
   /* grafite com um toque da cor da empresa ativa; aumente o % para ficar mais colorido */
   --piki-menu-fundo: color-mix(in srgb, var(--piki-empresa) 15%, #1c1b1f);
   --piki-dourado: var(--q-accent);
-  --piki-fundo: color-mix(in srgb, var(--q-primary) 3%, white);
+  /* fundo das telas no tom da empresa ativa, para não confundir uma loja com a outra */
+  --piki-fundo: color-mix(in srgb, var(--piki-empresa) 8%, white);
   --piki-superficie: #ffffff;
-  --piki-borda: color-mix(in srgb, var(--q-primary) 8%, #f0f0f0);
+  --piki-borda: color-mix(in srgb, var(--piki-empresa) 12%, #f0f0f0);
   --piki-texto: color-mix(in srgb, var(--q-primary) 12%, #222222);
   --piki-texto-suave: color-mix(in srgb, var(--q-primary) 12%, #666666);
   --piki-sombra: color-mix(

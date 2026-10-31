@@ -27,16 +27,12 @@
 <script setup>
 import { computed } from 'vue'
 
-import { filtrarMenu, MENU } from '@/menu'
+import { filtrarMenu, MENU, telasDoMenu } from '@/menu'
 import { useSessaoStore } from '@/stores/sessao'
 
 const sessao = useSessaoStore()
 const primeiroNome = computed(() => (sessao.usuario?.nome || '').split(' ')[0])
 
-// as telas liberadas, exceto o próprio início
-const atalhos = computed(() =>
-  filtrarMenu(MENU, sessao.pode).flatMap((item) =>
-    item.filhos ? item.filhos.map((f) => ({ ...f, grupo: item.titulo })) : [],
-  ),
-)
+// as telas liberadas, em qualquer nível do menu, exceto o próprio início
+const atalhos = computed(() => telasDoMenu(filtrarMenu(MENU, sessao.pode)).filter((t) => t.rota !== '/'))
 </script>

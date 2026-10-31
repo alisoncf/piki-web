@@ -49,3 +49,13 @@ export function contemRota(item, caminho) {
   if (item.rota === '/') return caminho === '/'
   return caminho === item.rota || caminho.startsWith(`${item.rota}/`)
 }
+
+/**
+ * As telas do menu, sem os grupos, cada uma com o caminho dos grupos onde está
+ * ("Cadastros › Clientes"). São os atalhos da tela inicial.
+ */
+export function telasDoMenu(itens, grupos = []) {
+  return itens.flatMap((item) => (item.filhos
+    ? telasDoMenu(item.filhos, [...grupos, item.titulo])
+    : [{ ...item, grupo: grupos.join(' › ') }]))
+}

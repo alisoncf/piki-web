@@ -77,6 +77,8 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [x] Cidades do IBGE e cobradores (D16, D17): setor escolhe a cidade numa lista e tem vários cobradores, que são funcionários e valem para todas as lojas; o cliente não tem cidade própria, usa a do setor; migrações 0008 e 0009 e ETL refeito nas três cópias — 31/10/2026
 - [x] Funcionário com setor no endereço, no lugar de bairro, cidade e UF digitados; cliente sem o campo bairro (D17, migração 0010) — 31/10/2026
 - [x] Endereço pelo CEP (ViaCEP) nas fichas de cliente e funcionário, com o setor adivinhado pelo bairro ou cadastrado na hora (D18) — 31/10/2026
+- [x] Atalhos da tela inicial para as telas dos subgrupos do menu; fundo das telas no tom da empresa ativa — 31/10/2026
+- [ ] Nomes do VB6 hoje em maiúsculas (setores, clientes...) passarem para maiúsculas só nas iniciais; os cadastros novos já são gravados assim
 - [ ] Bancos, formas de pagamento, plano de contas
 
 ## Onda 2 · Relatórios
