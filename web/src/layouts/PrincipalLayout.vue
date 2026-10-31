@@ -76,26 +76,7 @@
 
     <q-drawer v-model="menuAberto" show-if-above :width="248" class="piki-menu">
       <q-list padding dark>
-        <template v-for="item in menu" :key="item.titulo">
-          <q-expansion-item v-if="item.filhos" :icon="item.icone" :label="item.titulo" dark default-opened>
-            <q-item
-              v-for="filho in item.filhos"
-              :key="filho.rota"
-              :to="filho.rota"
-              exact
-              clickable
-              class="q-pl-lg"
-              active-class="piki-menu__ativo"
-            >
-              <q-item-section avatar><q-icon :name="filho.icone" /></q-item-section>
-              <q-item-section>{{ filho.titulo }}</q-item-section>
-            </q-item>
-          </q-expansion-item>
-          <q-item v-else :to="item.rota" exact clickable active-class="piki-menu__ativo">
-            <q-item-section avatar><q-icon :name="item.icone" /></q-item-section>
-            <q-item-section>{{ item.titulo }}</q-item-section>
-          </q-item>
-        </template>
+        <item-menu v-for="item in menu" :key="item.titulo" :item="item" />
       </q-list>
       <assinatura-piki class="piki-menu__rodape" />
     </q-drawer>
@@ -113,6 +94,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import AssinaturaPiki from '@/componentes/AssinaturaPiki.vue'
+import ItemMenu from '@/componentes/ItemMenu.vue'
 import MarcaLoja from '@/componentes/MarcaLoja.vue'
 import { filtrarMenu, MENU } from '@/menu'
 import { mensagemDeErro } from '@/servicos/api'

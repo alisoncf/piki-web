@@ -150,6 +150,9 @@ body {
 .piki-menu__ativo .q-item__section--avatar {
   color: var(--piki-dourado);
 }
+.piki-menu__grupo-ativo {
+  color: #fff;
+}
 .piki-menu__rodape {
   position: absolute;
   left: 0;

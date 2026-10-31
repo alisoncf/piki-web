@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { filtrarMenu, MENU } from '@/menu'
+import { contemRota, filtrarMenu, MENU } from '@/menu'
 import { destino, rotas } from '@/router'
 
 function sessao({ logado = true, empresa = true, permissoes = [] } = {}) {
@@ -52,6 +52,25 @@ describe('menu por permissão', () => {
     const menu = filtrarMenu(MENU, (p) => !p || p === 'acesso.usuarios')
     const acesso = menu.find((i) => i.titulo === 'Acesso')
     expect(acesso.filhos.map((f) => f.titulo)).toEqual(['Usuários'])
+  })
+
+  it('filtra os subgrupos: Cadastros > Clientes some sem clientes.ver', () => {
+    const menu = filtrarMenu(MENU, (p) => !p || p === 'funcionarios.ver')
+    const cadastros = menu.find((i) => i.titulo === 'Cadastros')
+    expect(cadastros.filhos.map((f) => f.titulo)).toEqual(['Funcionários'])
+    expect(cadastros.filhos[0].filhos.map((f) => f.titulo)).toEqual(['Funcionários', 'Cargos'])
+  })
+
+  it('sabe de qual item e grupo é a página atual', () => {
+    const cadastros = MENU.find((i) => i.titulo === 'Cadastros')
+    const [clientes, funcionarios] = cadastros.filhos
+    expect(contemRota(cadastros, '/cadastros/clientes/7')).toBe(true)
+    expect(contemRota(clientes, '/cadastros/setores')).toBe(true)
+    expect(contemRota(funcionarios, '/cadastros/setores')).toBe(false)
+    expect(contemRota(clientes.filhos[0], '/cadastros/clientes/novo')).toBe(true)
+    expect(contemRota(clientes.filhos[0], '/cadastros/clientes-antigos')).toBe(false)
+    expect(contemRota(MENU[0], '/cadastros/clientes')).toBe(false)
+    expect(contemRota(MENU[0], '/')).toBe(true)
   })
 })
 
