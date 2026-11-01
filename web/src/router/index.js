@@ -13,6 +13,24 @@ export const rotas = [
     children: [
       { path: '', name: 'inicio', component: () => import('@/paginas/InicioPagina.vue') },
       {
+        path: 'acesso/empresas',
+        name: 'empresas',
+        component: () => import('@/paginas/acesso/EmpresasPagina.vue'),
+        meta: { permissao: 'acesso.empresas' },
+      },
+      {
+        path: 'acesso/empresas/nova',
+        name: 'empresa-nova',
+        component: () => import('@/paginas/acesso/EmpresaPagina.vue'),
+        meta: { permissao: 'acesso.empresas' },
+      },
+      {
+        path: 'acesso/empresas/:id(\\d+)',
+        name: 'empresa',
+        component: () => import('@/paginas/acesso/EmpresaPagina.vue'),
+        meta: { permissao: 'acesso.empresas' },
+      },
+      {
         path: 'acesso/usuarios',
         name: 'usuarios',
         component: () => import('@/paginas/acesso/UsuariosPagina.vue'),

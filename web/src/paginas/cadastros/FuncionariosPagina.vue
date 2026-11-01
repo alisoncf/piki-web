@@ -51,7 +51,7 @@
             size="22px"
             font-size="11px"
             class="q-mr-sm"
-            :style="{ background: props.row.empresa.cor }"
+            :style="{ background: props.row.empresa.tema.principal }"
           >
             {{ props.row.empresa.codigo }}
           </q-avatar>

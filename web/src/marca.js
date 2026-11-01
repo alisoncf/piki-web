@@ -13,12 +13,19 @@ export const SISTEMA = {
   icone: '/piki-icone.svg',
 }
 
+// cada cor do esquema da empresa (D19) e a variável do CSS (css/app.css) que ela muda
+const VARIAVEIS = { principal: '--piki-empresa', fundo: '--piki-fundo', menu: '--piki-menu-fundo' }
+
 /**
- * Mostra em que empresa o usuário está: a cor dela vai para a variável
- * --piki-empresa (faixa do cabeçalho e menu) e o nome vai para a aba do navegador.
+ * Mostra em que empresa o usuário está: o esquema de cores dela vai para as
+ * variáveis do CSS (faixa do cabeçalho, fundo das telas, menu) e o nome vai para
+ * a aba do navegador. Sem empresa, valem as cores da marca.
  */
 export function aplicarEmpresa(empresa, doc = document) {
-  if (empresa?.cor) doc.documentElement.style.setProperty('--piki-empresa', empresa.cor)
-  else doc.documentElement.style.removeProperty('--piki-empresa')
+  for (const [cor, variavel] of Object.entries(VARIAVEIS)) {
+    const valor = empresa?.tema?.[cor]
+    if (valor) doc.documentElement.style.setProperty(variavel, valor)
+    else doc.documentElement.style.removeProperty(variavel)
+  }
   doc.title = empresa ? `${empresa.nome} · ${SISTEMA.nome}` : SISTEMA.nome
 }

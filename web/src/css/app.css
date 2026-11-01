@@ -11,12 +11,11 @@
     var(--q-primary) 45%,
     color-mix(in srgb, var(--q-primary) 72%, black) 100%
   );
-  /* cor da empresa ativa (vem da API, ver marca.js); antes da escolha, a da marca */
+  /* esquema de cores da empresa ativa (vem da API, ver marca.js): --piki-empresa, --piki-fundo
+     e --piki-menu-fundo; antes da escolha da empresa, valem estes, tirados da marca */
   --piki-empresa: var(--q-primary);
-  /* grafite com um toque da cor da empresa ativa; aumente o % para ficar mais colorido */
   --piki-menu-fundo: color-mix(in srgb, var(--piki-empresa) 15%, #1c1b1f);
   --piki-dourado: var(--q-accent);
-  /* fundo das telas no tom da empresa ativa, para não confundir uma loja com a outra */
   --piki-fundo: color-mix(in srgb, var(--piki-empresa) 8%, white);
   --piki-superficie: #ffffff;
   --piki-borda: color-mix(in srgb, var(--piki-empresa) 12%, #f0f0f0);

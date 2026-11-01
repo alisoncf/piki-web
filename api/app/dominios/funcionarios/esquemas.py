@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.dominios.acesso.esquemas import EmpresaResumo
+from app.dominios.empresas.esquemas import EmpresaResumo
 from app.dominios.cidades.esquemas import SetorResumo
 from app.nucleo.documentos import TIPOS_TELEFONE, so_digitos
 

@@ -2,7 +2,8 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.dominios.acesso.modelos import Empresa, Permissao, Perfil, Usuario, UsuarioEmpresa
+from app.dominios.acesso.modelos import Permissao, Perfil, Usuario, UsuarioEmpresa
+from app.dominios.empresas.modelos import Empresa
 
 
 def usuario_por_login(db: Session, login: str) -> Usuario | None:

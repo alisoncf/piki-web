@@ -17,11 +17,10 @@ def test_fluxo_de_administracao(tmp_path, monkeypatch, capsys):
     cli.main(["criar-perfil", "--nome", "Gerente", "--permissoes", "acesso.usuarios"])
     cli.main(["criar-usuario", "--login", "maria", "--nome", "Maria"])
     cli.main(["dar-acesso", "--login", "maria", "--empresa", "01", "--perfil", "Gerente"])
-    cli.main(["cor-empresa", "--empresa", "01", "--cor", "laranja"])
 
     saida = capsys.readouterr().out
     assert "maria → empresa 01 como Gerente" in saida
-    assert "empresa 01 com a cor laranja (#d9822b)" in saida
+    assert "empresa 01 criada" in saida
     with Session(eng) as db:
         usuario = db.scalar(select(Usuario).where(Usuario.login == "maria"))
         assert usuario.hash_senha.startswith("$argon2")

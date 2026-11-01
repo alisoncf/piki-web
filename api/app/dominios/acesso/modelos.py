@@ -1,51 +1,11 @@
-"""Empresas, usuários, perfis e permissões (decisões D9 e D10)."""
+"""Usuários, perfis e permissões (decisões D9 e D10). As empresas ficam no domínio empresas."""
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, true
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.dominios.acesso.cores import cor_hex
+from app.dominios.empresas.modelos import Empresa
 from app.nucleo.banco import Base, ComDatas
-
-
-class Empresa(ComDatas, Base):
-    """Uma filial, com CNPJ próprio."""
-
-    __tablename__ = "empresa"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    # código usado no VB6 (cod_emp / sped_empresa.codigo); o ETL usa para saber de onde veio cada dado
-    codigo: Mapped[str] = mapped_column(String(2), unique=True)
-    # nome curto, mostrado na escolha e na troca de empresa (no VB6: apelido)
-    nome: Mapped[str] = mapped_column(String(60))
-    razao_social: Mapped[str | None] = mapped_column(String(100))
-    nome_fantasia: Mapped[str | None] = mapped_column(String(60))
-    cnpj: Mapped[str | None] = mapped_column(String(14), unique=True)
-    inscricao_estadual: Mapped[str | None] = mapped_column(String(20))
-    inscricao_municipal: Mapped[str | None] = mapped_column(String(20))
-    # código de regime tributário da NF-e: 1 Simples Nacional, 2 Simples com excesso, 3 Regime normal
-    crt: Mapped[str | None] = mapped_column(String(1))
-    # perfil (A, B, C) e tipo de atividade (0 industrial, 1 outros) do SPED Fiscal
-    sped_perfil: Mapped[str | None] = mapped_column(String(1))
-    sped_atividade: Mapped[str | None] = mapped_column(String(1))
-
-    uf: Mapped[str | None] = mapped_column(String(2))
-    codigo_municipio: Mapped[str | None] = mapped_column(String(7))  # IBGE
-    cep: Mapped[str | None] = mapped_column(String(8))
-    logradouro: Mapped[str | None] = mapped_column(String(60))
-    numero: Mapped[str | None] = mapped_column(String(10))
-    complemento: Mapped[str | None] = mapped_column(String(60))
-    bairro: Mapped[str | None] = mapped_column(String(60))
-    telefone: Mapped[str | None] = mapped_column(String(20))
-    email: Mapped[str | None] = mapped_column(String(200))
-
-    ativa: Mapped[bool] = mapped_column(Boolean, server_default=true(), default=True)
-    # cor de identificação na tela, um nome da paleta de cores.py; vazia = automática pelo código
-    cor: Mapped[str | None] = mapped_column(String(20))
-
-    @property
-    def cor_hex(self) -> str:
-        return cor_hex(self.cor, self.codigo)
 
 
 perfil_permissao = Table(

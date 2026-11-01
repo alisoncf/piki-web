@@ -1,7 +1,7 @@
 """Regras do cadastro de funcionários e cargos."""
 from sqlalchemy.orm import Session
 
-from app.dominios.acesso.modelos import Empresa
+from app.dominios.empresas.modelos import Empresa
 from app.dominios.clientes.modelos import Setor
 from app.dominios.funcionarios import repositorio as repo
 from app.dominios.funcionarios.esquemas import CargoDados, FuncionarioDados

@@ -2,7 +2,8 @@
 import pytest
 from sqlalchemy import create_engine, inspect, select, text
 
-from app.dominios.acesso.modelos import Empresa
+from app.dominios.cidades.modelos import Cidade
+from app.dominios.empresas.modelos import Empresa
 from etl.empresas import ConflitoEmpresa, converter, importar_empresas
 
 # estrutura da sped_empresa no VB6, com as colunas sensíveis
@@ -44,7 +45,7 @@ def test_converter_normaliza():
     assert d["inscricao_estadual"] == "101112223"
     assert d["cep"] == "75000000"
     assert d["telefone"] == "6233334444"
-    assert d["uf"] == "GO"
+    assert d["codigo_ibge"] == "5201108"
     assert d["email"] == "loja@exemplo.com"
     assert d["nome"] == "MATRIZ"
     assert d["inscricao_municipal"] is None  # texto vazio vira nulo
@@ -63,6 +64,8 @@ def test_segredos_nao_sao_lidos():
 
 def test_importa_e_e_repetivel(origem, banco):
     with origem.connect() as c, banco() as db:
+        db.add(Cidade(codigo_ibge="5201108", nome="Anápolis", uf="GO", nome_busca="anapolis"))
+        db.commit()
         r1 = importar_empresas(c, db)
         r2 = importar_empresas(c, db)
         assert r1.criadas == ["01", "03"] and r1.atualizadas == []
@@ -72,6 +75,7 @@ def test_importa_e_e_repetivel(origem, banco):
             ("01", "MATRIZ", "11222333000181"),
             ("03", "FILIAL", "44555666000110"),
         ]
+        assert empresas[0].cidade.nome == "Anápolis"
 
 
 def test_atualiza_dados_alterados(origem, banco):

@@ -7,6 +7,10 @@ código; se já existe, é atualizada; senão, é criada.
 Colunas sensíveis NÃO são lidas: senha e caminho do certificado digital e
 id/token do CSC da NFC-e. Onde guardar esses segredos no sistema novo é a
 pendência P10 em docs/decisoes.md.
+
+Também não são lidos o logo (caminho_logo) e o QR code do boleto
+(caminho_qrcodedoc): são caminhos de arquivo no computador da loja. As imagens
+são enviadas na ficha da empresa. O esquema de cores (D19) só existe no sistema novo.
 """
 import re
 from dataclasses import dataclass, field
@@ -14,12 +18,13 @@ from dataclasses import dataclass, field
 from sqlalchemy import Connection, select, text
 from sqlalchemy.orm import Session
 
-from app.dominios.acesso.modelos import Empresa
+from app.dominios.cidades.repositorio import cidade_por_codigo
+from app.dominios.empresas.modelos import Empresa
 
 # só as colunas que interessam; segredos ficam de fora da própria consulta
 _CONSULTA = text(
     """
-    SELECT codigo, cnpj, apelido, UF, IE, nome, cod_mun, im, ind_perfil, ind_atv,
+    SELECT codigo, cnpj, apelido, IE, nome, cod_mun, im, suframa, ind_perfil, ind_atv,
            fantasia, cep, endereco, numero, complemento, bairro, fone, email, crt
       FROM sped_empresa
      ORDER BY codigo
@@ -63,8 +68,9 @@ def converter(linha: dict) -> dict:
         "crt": _texto(linha.get("crt")),
         "sped_perfil": _texto(linha.get("ind_perfil")),
         "sped_atividade": _texto(linha.get("ind_atv")),
-        "uf": (_texto(linha.get("UF")) or "").upper() or None,
-        "codigo_municipio": _digitos(linha.get("cod_mun")),
+        "suframa": _texto(linha.get("suframa")),
+        # o código do IBGE vira a cidade do banco novo na importação (a UF é a da cidade)
+        "codigo_ibge": _digitos(linha.get("cod_mun")),
         "cep": _digitos(linha.get("cep")),
         "logradouro": _texto(linha.get("endereco")),
         "numero": _texto(linha.get("numero")),
@@ -80,6 +86,8 @@ def importar_empresas(origem: Connection, db: Session) -> Resultado:
     resultado = Resultado()
     for linha in origem.execute(_CONSULTA).mappings():
         dados = converter(dict(linha))
+        cidade = cidade_por_codigo(db, dados.pop("codigo_ibge") or "")
+        dados["cidade_id"] = cidade.id if cidade else None
         empresa = db.scalar(select(Empresa).where(Empresa.codigo == dados["codigo"]))
         if empresa is None:
             db.add(Empresa(**dados))

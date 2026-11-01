@@ -64,7 +64,7 @@
               <template #option="{ itemProps, opt }">
                 <q-item v-bind="itemProps">
                   <q-item-section avatar>
-                    <q-avatar text-color="white" size="24px" font-size="11px" :style="{ background: opt.cor }">{{ opt.codigo }}</q-avatar>
+                    <q-avatar text-color="white" size="24px" font-size="11px" :style="{ background: opt.tema.principal }">{{ opt.codigo }}</q-avatar>
                   </q-item-section>
                   <q-item-section>{{ opt.nome }}</q-item-section>
                 </q-item>

@@ -33,7 +33,10 @@ export const MENU = [
   {
     titulo: 'Acesso',
     icone: 'admin_panel_settings',
-    filhos: [{ titulo: 'Usuários', icone: 'group', rota: '/acesso/usuarios', permissao: 'acesso.usuarios' }],
+    filhos: [
+      { titulo: 'Empresas', icone: 'store', rota: '/acesso/empresas', permissao: 'acesso.empresas' },
+      { titulo: 'Usuários', icone: 'group', rota: '/acesso/usuarios', permissao: 'acesso.usuarios' },
+    ],
   },
 ]
 

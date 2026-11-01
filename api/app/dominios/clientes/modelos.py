@@ -14,8 +14,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.dominios.acesso.modelos import Empresa, Usuario
+from app.dominios.acesso.modelos import Usuario
 from app.dominios.cidades.modelos import Cidade
+from app.dominios.empresas.modelos import Empresa
 from app.dominios.funcionarios.modelos import Funcionario
 from app.nucleo.banco import Base, ComDatas
 

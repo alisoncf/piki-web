@@ -16,9 +16,9 @@ import { api } from '@/servicos/api'
 import { formatarDataHora, formatarDocumento, semAcentos } from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
 
-const MATRIZ = { id: 1, codigo: '01', nome: 'MATRIZ', cor: '#2f6fb0' }
-const FILIAL = { id: 3, codigo: '03', nome: 'FILIAL', cor: '#1f8a80' }
-const OUTRA = { id: 4, codigo: '04', nome: 'OUTRA', cor: '#888888' }
+const MATRIZ = { id: 1, codigo: '01', nome: 'MATRIZ', tema: { principal: '#2f6fb0', fundo: '#f5f5f5', menu: '#222222' } }
+const FILIAL = { id: 3, codigo: '03', nome: 'FILIAL', tema: { principal: '#1f8a80', fundo: '#f5f5f5', menu: '#222222' } }
+const OUTRA = { id: 4, codigo: '04', nome: 'OUTRA', tema: { principal: '#888888', fundo: '#f5f5f5', menu: '#222222' } }
 const ANAPOLIS = { id: 5, codigo_ibge: '5201108', nome: 'Anápolis', uf: 'GO' }
 const SETOR = { id: 2, nome: 'Jundiaí', cidade: ANAPOLIS }
 

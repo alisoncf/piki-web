@@ -33,7 +33,7 @@ from decimal import Decimal
 from sqlalchemy import Connection, func, select, text
 from sqlalchemy.orm import Session
 
-from app.dominios.acesso.modelos import Empresa
+from app.dominios.empresas.modelos import Empresa
 from app.dominios.funcionarios.modelos import Cargo, Funcionario, TelefoneFuncionario
 from app.nucleo.documentos import TIPOS_TELEFONE, cpf_valido, so_digitos
 from app.nucleo.legado import MapaLegado

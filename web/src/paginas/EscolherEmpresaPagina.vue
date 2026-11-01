@@ -21,7 +21,7 @@
               @click="escolher(emp)"
             >
               <q-item-section avatar>
-                <q-avatar text-color="white" size="40px" font-size="15px" class="text-weight-bold" :style="{ background: emp.cor }">
+                <q-avatar text-color="white" size="40px" font-size="15px" class="text-weight-bold" :style="{ background: emp.tema.principal }">
                   {{ emp.codigo }}
                 </q-avatar>
               </q-item-section>

@@ -1,8 +1,7 @@
 """Comandos de administração, para usar antes de existir a tela de cadastro.
 
     python -m app.cli sincronizar-permissoes
-    python -m app.cli criar-empresa --codigo 01 --nome "Loja Centro" --cnpj 00000000000100 [--cor azul]
-    python -m app.cli cor-empresa --empresa 01 --cor laranja      (--cor auto volta para a automática)
+    python -m app.cli criar-empresa --codigo 01 --nome "Loja Centro" [--cnpj 11222333000181]
     python -m app.cli criar-perfil --nome Gerente --permissoes acesso.usuarios,acesso.perfis
     python -m app.cli criar-usuario --login maria --nome "Maria da Silva" [--admin]
     python -m app.cli dar-acesso --login maria --empresa 01 --perfil Gerente
@@ -16,8 +15,9 @@ from sqlalchemy.orm import Session
 
 from app.dominios.acesso import repositorio as repo
 from app.dominios.acesso import servico
-from app.dominios.acesso.cores import PALETA
-from app.dominios.acesso.modelos import Empresa
+from app.dominios.empresas import servico as empresas
+from app.dominios.empresas.esquemas import EmpresaNova
+from app.dominios.empresas.modelos import Empresa
 from app.nucleo.banco import engine
 
 
@@ -32,16 +32,12 @@ def main(argv: list[str] | None = None) -> None:
 
     sub.add_parser("sincronizar-permissoes", help="grava no banco o catálogo de permissões do código")
 
+    # a primeira empresa: sem nenhuma, nem o administrador consegue entrar para usar a tela de empresas
     e = sub.add_parser("criar-empresa")
     e.add_argument("--codigo", required=True, help="código da filial no VB6 (cod_emp), 2 dígitos")
     e.add_argument("--nome", required=True)
     e.add_argument("--cnpj")
     e.add_argument("--razao-social")
-    e.add_argument("--cor", choices=list(PALETA), help="cor de identificação na tela; sem ela, automática")
-
-    c = sub.add_parser("cor-empresa", help="muda a cor de identificação de uma empresa")
-    c.add_argument("--empresa", required=True, help="código da empresa")
-    c.add_argument("--cor", required=True, choices=[*PALETA, "auto"])
 
     pf = sub.add_parser("criar-perfil")
     pf.add_argument("--nome", required=True)
@@ -62,14 +58,12 @@ def main(argv: list[str] | None = None) -> None:
         if args.comando == "sincronizar-permissoes":
             print(f"{servico.sincronizar_permissoes(db)} permissões novas")
         elif args.comando == "criar-empresa":
-            emp = servico.criar_empresa(db, args.codigo, args.nome, args.cnpj, args.razao_social, args.cor)
+            try:
+                dados = EmpresaNova(codigo=args.codigo, nome=args.nome, cnpj=args.cnpj, razao_social=args.razao_social)
+                emp = empresas.criar_empresa(db, dados)
+            except (ValueError, empresas.ErroEmpresa) as erro:
+                _falha(str(erro))
             print(f"empresa {emp.codigo} criada (id {emp.id})")
-        elif args.comando == "cor-empresa":
-            emp = db.scalar(select(Empresa).where(Empresa.codigo == args.empresa))
-            if not emp:
-                _falha("empresa não encontrada")
-            servico.definir_cor_empresa(db, emp, None if args.cor == "auto" else args.cor)
-            print(f"empresa {emp.codigo} com a cor {emp.cor or 'automática'} ({emp.cor_hex})")
         elif args.comando == "criar-perfil":
             perms = [x.strip() for x in args.permissoes.split(",") if x.strip()]
             try:

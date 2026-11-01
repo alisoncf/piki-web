@@ -78,6 +78,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [x] Funcionário com setor no endereço, no lugar de bairro, cidade e UF digitados; cliente sem o campo bairro (D17, migração 0010) — 31/10/2026
 - [x] Endereço pelo CEP (ViaCEP) nas fichas de cliente e funcionário, com o setor adivinhado pelo bairro ou cadastrado na hora (D18) — 31/10/2026
 - [x] Atalhos da tela inicial para as telas dos subgrupos do menu; fundo das telas no tom da empresa ativa — 31/10/2026
+- [x] Cadastro de empresas (D19): lista e ficha com dados fiscais, endereço com cidade do IBGE e busca pelo CEP, esquema de cores (principal, fundo e menu) aplicado ao entrar na empresa, logo e QR code do boleto; migração 0011 — 01/11/2026
 - [ ] Nomes do VB6 hoje em maiúsculas (setores, clientes...) passarem para maiúsculas só nas iniciais; os cadastros novos já são gravados assim
 - [ ] Bancos, formas de pagamento, plano de contas
 

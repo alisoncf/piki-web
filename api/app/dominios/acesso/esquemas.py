@@ -1,14 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-
-class EmpresaResumo(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    codigo: str
-    nome: str
-    cor: str = Field(validation_alias="cor_hex", serialization_alias="cor",
-                     description="Cor de identificação da empresa na tela (#rrggbb)")
+from app.dominios.empresas.esquemas import EmpresaResumo
 
 
 class UsuarioResumo(BaseModel):

@@ -5,9 +5,10 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import create_engine, select, text
 
-from app.dominios.acesso import servico
 from app.dominios.cidades.modelos import Cidade, nome_de_busca
 from app.dominios.clientes.modelos import Cliente, GrupoCliente, Orgao, Setor
+from app.dominios.empresas.esquemas import EmpresaNova
+from app.dominios.empresas.servico import criar_empresa
 from app.dominios.funcionarios.modelos import Funcionario
 from etl import mapa
 from etl.clientes import converter, importar_clientes
@@ -99,8 +100,8 @@ def _banco_vb6(caminho, clientes, logradouro="Logradouro_cli", setores=(), orgao
 @pytest.fixture
 def empresas(banco):
     with banco() as db:
-        e1 = servico.criar_empresa(db, "01", "MATRIZ")
-        e3 = servico.criar_empresa(db, "03", "FILIAL")
+        e1 = criar_empresa(db, EmpresaNova(codigo="01", nome="MATRIZ"))
+        e3 = criar_empresa(db, EmpresaNova(codigo="03", nome="FILIAL"))
         # parte da lista do IBGE, que no banco de verdade vem da migração
         db.add_all([Cidade(codigo_ibge=c, nome=n, uf="GO", nome_busca=nome_de_busca(n))
                     for c, n in (("5201108", "Anápolis"), ("5208707", "Goiânia"), ("5205901", "Corumbá de Goiás"),

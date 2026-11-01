@@ -79,7 +79,7 @@ Quem usa o sistema é a equipe da Requinte Enxovais, então a marca da loja apar
 
 Nome e logos ficam em `web/src/marca.js` e `web/public/`; as cores, só em `web/src/css/quasar.variables.scss` (os tons de apoio de `app.css` são derivados delas). Por enquanto a marca é fixa para todas as empresas (ver P12).
 
-Cada empresa tem uma **cor de identificação**, para o funcionário saber em que loja está: aparece numa faixa no topo do cabeçalho, no selo da empresa, numa tintura leve do menu lateral, e o nome da loja vai para a aba do navegador. Botões e links continuam na cor da marca. A cor sai de uma paleta fechada de 8 (`api/app/dominios/acesso/cores.py`); sem escolha, vem automática pelo código da empresa. Muda com `python -m app.cli cor-empresa --empresa 01 --cor laranja` (migração 0003).
+Cada empresa tem uma **cor de identificação**, para o funcionário saber em que loja está: aparece numa faixa no topo do cabeçalho, no selo da empresa, numa tintura leve do menu lateral, e o nome da loja vai para a aba do navegador. Botões e links continuam na cor da marca. ~~A cor sai de uma paleta fechada de 8; muda pela linha de comando (`cor-empresa`)~~. Substituído pela D19 em 01/11/2026.
 
 ### D15. Clientes, setores e órgãos unificados a partir dos bancos das lojas (30/10/2026)
 
@@ -119,6 +119,16 @@ Decisão do Alison.
 - A rua vem do CEP. Se já havia uma rua digitada diferente, a tela pergunta antes de trocar.
 - O setor é procurado entre os setores ativos da cidade do CEP (pelo código do IBGE), comparando o nome sem acentos, com as abreviações comuns (Jd, Vl, St, Res, Pq) e com o tipo do setor na frente. Um setor igual é escolhido sozinho; sem igual, a tela mostra os parecidos para escolher.
 - O bairro do CEP que não existe como setor pode ser cadastrado ali mesmo como setor novo da cidade, por quem pode editar clientes.
+
+### D19. Cadastro de empresas com esquema de cores (01/11/2026)
+
+Decisão do Alison.
+
+- **Tela:** Acesso › Empresas (permissão `acesso.empresas`), com lista e ficha. Os dados vêm da `sped_empresa` pelo ETL; as empresas 04 e 05 serão cadastradas pela tela. O código (01 matriz, 02 Jundiaí Casa, 03 La Viva) é dado na criação e não muda depois, porque o ETL usa o código para saber de onde veio cada dado. As empresas são um domínio próprio (`app/dominios/empresas`), separado do acesso.
+- **Esquema de cores:** cada empresa tem um `tema` com três cores, que o administrador escolhe na ficha: `principal` (faixa do cabeçalho, selo, troca de empresa), `fundo` (fundo das telas) e `menu` (menu lateral). O esquema é aplicado ao entrar ou trocar de empresa. Botões e links continuam na cor da marca (D14). A ficha tem prévia e um botão que gera fundo e menu a partir da cor principal. Empresa sem esquema recebe um automático pelo código.
+- **Endereço:** a cidade é uma cidade do IBGE (lista, como no setor); o bairro é texto, porque setor é região de cobrança de clientes. O CEP busca rua, bairro e cidade (D18).
+- **Imagens:** o logo dos relatórios e o QR code do boleto de cobrança (no VB6, `caminho_logo` e `caminho_qrcodedoc`, caminhos de arquivo na loja) são enviados na ficha e guardados no banco (`empresa_imagem`), em PNG ou JPEG de até 1 MB. Qualquer usuário logado pode lê-los, porque saem em relatórios e boletos.
+- **Fica de fora:** certificado digital, senha, CSC e token da NFC-e (P10). `cpf` e `fax` da `sped_empresa` não são usados.
 
 ## Substituídas
 

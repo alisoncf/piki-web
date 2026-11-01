@@ -41,7 +41,7 @@ from decimal import Decimal
 from sqlalchemy import Connection, inspect, select, text
 from sqlalchemy.orm import Session, selectinload
 
-from app.dominios.acesso.modelos import Empresa
+from app.dominios.empresas.modelos import Empresa
 from app.dominios.clientes.modelos import (
     AnotacaoCliente, Cliente, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor, TelefoneCliente,
 )

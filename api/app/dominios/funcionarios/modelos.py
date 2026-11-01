@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.dominios.acesso.modelos import Empresa
+from app.dominios.empresas.modelos import Empresa
 from app.nucleo.banco import Base, ComDatas
 
 if TYPE_CHECKING:  # clientes importa funcionários (cobradores do setor)

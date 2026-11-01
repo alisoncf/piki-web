@@ -5,15 +5,20 @@ import { api, mensagemDeErro } from '@/servicos/api'
 import { nomeSetor, soDigitos } from '@/servicos/formatos'
 
 /**
- * Busca do endereço pelo CEP numa ficha (cliente, funcionário). Preenche a rua e
- * escolhe o setor que a API achou igual ao bairro. A rua já digitada só é
- * trocada se a pessoa confirmar; sem setor igual, ela escolhe entre os parecidos
- * ou cadastra o bairro como setor novo (se puder editar setores).
+ * Busca do endereço pelo CEP numa ficha (cliente, funcionário, empresa). Preenche
+ * a rua e, conforme a ficha, o setor que a API achou igual ao bairro ou o bairro
+ * e a cidade. O que já estava preenchido só é trocado se a pessoa confirmar; sem
+ * setor igual, ela escolhe entre os parecidos ou cadastra o bairro como setor
+ * novo (se puder editar setores).
  *
- * `campos` diz onde ficam o CEP, a rua e o setor no `form`; `setores` é a lista
- * da tela, onde entram os setores que vierem da busca.
+ * `campos` diz onde ficam no `form` o CEP e a rua, e o setor (cliente,
+ * funcionário) ou o bairro e a cidade (empresa). `setores` é a lista da tela,
+ * onde entram os setores que vierem da busca; `cidade` guarda a cidade escolhida
+ * ({ id, nome, uf }), que o campo de cidade usa para mostrar o nome.
  */
-export function usarCep(form, campos, { setores, podeCriarSetor, limiteRua = 60 }) {
+export function usarCep(form, campos, {
+  setores = ref([]), podeCriarSetor = computed(() => false), cidade: cidadeEscolhida = ref(null), limiteRua = 60,
+} = {}) {
   const $q = useQuasar()
   const buscando = ref(false)
   // cidade do último CEP buscado: enquanto o CEP for o mesmo, a lista de setores mostra só os dela
@@ -41,12 +46,25 @@ export function usarCep(form, campos, { setores, podeCriarSetor, limiteRua = 60 
     form.value[campos.setor] = setor.id
   }
 
-  async function trocarRua(logradouro) {
-    const nova = logradouro?.slice(0, limiteRua)
-    const atual = form.value[campos.rua]?.trim()
-    if (!nova || atual === nova) return
-    if (atual && !(await perguntar({ title: 'Endereço do CEP', message: `Trocar "${atual}" por "${nova}"?` }))) return
-    form.value[campos.rua] = nova
+  async function trocarTexto(campo, valor, limite) {
+    const novo = valor?.slice(0, limite)
+    const atual = form.value[campo]?.trim()
+    if (!novo || atual === novo) return
+    if (atual && !(await perguntar({ title: 'Endereço do CEP', message: `Trocar "${atual}" por "${novo}"?` }))) return
+    form.value[campo] = novo
+  }
+
+  async function trocarCidade(nova) {
+    const atual = cidadeEscolhida.value
+    if (!nova || form.value[campos.cidade] === nova.id) return
+    if (form.value[campos.cidade] && atual) {
+      const trocar = await perguntar({
+        title: 'Cidade do CEP', message: `Trocar ${atual.nome} - ${atual.uf} por ${nova.nome} - ${nova.uf}?`,
+      })
+      if (!trocar) return
+    }
+    form.value[campos.cidade] = nova.id
+    cidadeEscolhida.value = nova
   }
 
   async function escolherSetor(dados) {
@@ -114,8 +132,13 @@ export function usarCep(form, campos, { setores, podeCriarSetor, limiteRua = 60 
     }
     cepBuscado = form.value[campos.cep]
     cidade.value = dados.cidade
-    await trocarRua(dados.logradouro)
-    await escolherSetor(dados)
+    await trocarTexto(campos.rua, dados.logradouro, limiteRua)
+    if (campos.bairro) await trocarTexto(campos.bairro, dados.bairro, 60)
+    if (campos.cidade) {
+      if (dados.cidade) await trocarCidade(dados.cidade)
+      else $q.notify({ type: 'warning', message: 'A cidade do CEP não está na lista do IBGE; escolha a cidade' })
+    }
+    if (campos.setor) await escolherSetor(dados)
   }
 
   return { buscando, buscar, opcoesSetor }

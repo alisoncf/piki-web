@@ -5,7 +5,8 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import create_engine, select, text
 
-from app.dominios.acesso import servico
+from app.dominios.empresas.esquemas import EmpresaNova
+from app.dominios.empresas.servico import criar_empresa
 from app.dominios.funcionarios.modelos import Cargo, Funcionario
 from etl.funcionarios import EmpresaNaoImportada, converter, importar_funcionarios
 
@@ -48,8 +49,8 @@ def _banco_vb6(caminho, funcionarios, cargos, telefones=()):
 @pytest.fixture
 def empresas(banco):
     with banco() as db:
-        e1 = servico.criar_empresa(db, "01", "MATRIZ")
-        e3 = servico.criar_empresa(db, "03", "FILIAL")
+        e1 = criar_empresa(db, EmpresaNova(codigo="01", nome="MATRIZ"))
+        e3 = criar_empresa(db, EmpresaNova(codigo="03", nome="FILIAL"))
         return {"01": e1.id, "03": e3.id}
 
 

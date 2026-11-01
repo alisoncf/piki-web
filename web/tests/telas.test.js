@@ -43,7 +43,7 @@ describe('tela de login', () => {
     vi.spyOn(api, 'post').mockResolvedValue({
       data: {
         access_token: 't', usuario: { id: 1, login: 'bia', nome: 'Bia', administrador: false },
-        empresa: null, empresas: [{ id: 1, codigo: '01', nome: 'MATRIZ' }, { id: 3, codigo: '03', nome: 'LA VIVA' }],
+        empresa: null, empresas: [{ id: 1, codigo: '01', nome: 'MATRIZ', tema: { principal: '#2f6fb0', fundo: '#eef3f9', menu: '#1f2835' } }, { id: 3, codigo: '03', nome: 'LA VIVA', tema: { principal: '#1f8a80', fundo: '#edf6f5', menu: '#1d2f2f' } }],
         ultima_empresa_id: null,
       },
     })
@@ -61,7 +61,7 @@ describe('escolha de empresa', () => {
   it('lista as empresas do usuário e marca a última usada', () => {
     const sessao = useSessaoStore()
     sessao.usuario = { nome: 'Bia Souza' }
-    sessao.empresas = [{ id: 1, codigo: '01', nome: 'MATRIZ' }, { id: 3, codigo: '03', nome: 'LA VIVA' }]
+    sessao.empresas = [{ id: 1, codigo: '01', nome: 'MATRIZ', tema: { principal: '#2f6fb0', fundo: '#eef3f9', menu: '#1f2835' } }, { id: 3, codigo: '03', nome: 'LA VIVA', tema: { principal: '#1f8a80', fundo: '#edf6f5', menu: '#1d2f2f' } }]
     sessao.ultimaEmpresaId = 3
     const { wrapper } = montar(EscolherEmpresaPagina)
     expect(wrapper.text()).toContain('Olá, Bia')

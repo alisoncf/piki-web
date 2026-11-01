@@ -7,6 +7,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.config import configuracao
 from app.dominios.acesso import servico
+from app.dominios.empresas.esquemas import EmpresaNova
+from app.dominios.empresas.servico import criar_empresa
 from app.main import app
 from app.nucleo import seguranca
 from app.nucleo.banco import sessao
@@ -61,11 +63,9 @@ def cenario(banco):
     A empresa 03 está desativada.
     """
     with banco() as db:
-        e1 = servico.criar_empresa(db, "01", "Loja Centro", "11111111000101")
-        e2 = servico.criar_empresa(db, "02", "Loja Bairro", "22222222000102")
-        e3 = servico.criar_empresa(db, "03", "Loja Fechada", "33333333000103")
-        e3.ativa = False
-        db.commit()
+        e1 = criar_empresa(db, EmpresaNova(codigo="01", nome="Loja Centro"))
+        e2 = criar_empresa(db, EmpresaNova(codigo="02", nome="Loja Bairro"))
+        e3 = criar_empresa(db, EmpresaNova(codigo="03", nome="Loja Fechada", ativa=False))
         gerente = servico.criar_perfil(db, "Gerente", ["acesso.usuarios", "acesso.perfis"])
         consulta = servico.criar_perfil(db, "Consulta", [])
         ana = servico.criar_usuario(db, "ana", "Ana Lima", "senha-ana")

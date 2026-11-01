@@ -16,7 +16,7 @@
           :loading="trocando"
           aria-label="Trocar de empresa"
         >
-          <q-avatar text-color="white" size="22px" font-size="11px" class="q-mr-sm" :style="{ background: sessao.empresa?.cor }">
+          <q-avatar text-color="white" size="22px" font-size="11px" class="q-mr-sm" :style="{ background: sessao.empresa?.tema.principal }">
             {{ sessao.empresa?.codigo }}
           </q-avatar>
           <span class="text-weight-medium">{{ sessao.empresa?.nome }}</span>
@@ -33,7 +33,7 @@
                 @click="trocar(emp)"
               >
                 <q-item-section avatar>
-                  <q-avatar text-color="white" size="sm" :style="{ background: emp.cor }">{{ emp.codigo }}</q-avatar>
+                  <q-avatar text-color="white" size="sm" :style="{ background: emp.tema.principal }">{{ emp.codigo }}</q-avatar>
                 </q-item-section>
                 <q-item-section>{{ emp.nome }}</q-item-section>
                 <q-item-section v-if="emp.id === sessao.empresa?.id" side>
@@ -44,7 +44,7 @@
           </q-menu>
         </q-btn>
         <div v-else class="piki-empresa q-px-sm q-py-xs row items-center no-wrap">
-          <q-avatar text-color="white" size="22px" font-size="11px" class="q-mr-sm" :style="{ background: sessao.empresa?.cor }">
+          <q-avatar text-color="white" size="22px" font-size="11px" class="q-mr-sm" :style="{ background: sessao.empresa?.tema.principal }">
             {{ sessao.empresa?.codigo }}
           </q-avatar>
           <span class="text-weight-medium">{{ sessao.empresa?.nome }}</span>
