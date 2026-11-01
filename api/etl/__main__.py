@@ -77,6 +77,9 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"clientes: {r.criados} novos ({r.sem_documento} sem CPF/CNPJ válido), "
                       f"{r.atualizados} atualizados, {r.ligados_por_documento} juntados pelo CPF/CNPJ a um cadastro que já existia")
                 print(f"telefones novos: {r.telefones}, referências: {r.referencias}, anotações: {r.anotacoes}")
+                print(f"descartados (sem CPF/CNPJ válido ou nome sem sentido): {r.descartados}, "
+                      f"excluídos do banco novo: {r.excluidos}, mantidos por dívida em aberto: {r.mantidos_por_divida}, "
+                      f"nomes corrigidos: {r.nomes_corrigidos}")
                 _avisos(r.avisos, args.avisos)
     except (ConflitoEmpresa, EmpresaNaoImportada) as erro:
         print(f"erro: {erro}", file=sys.stderr)

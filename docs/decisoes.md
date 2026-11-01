@@ -141,6 +141,17 @@ Decisão do Alison.
 - A falta de documentos não bloqueia a venda a prazo.
 - **Onde ficam os arquivos:** fora do banco, numa pasta do servidor (padrão) ou num MinIO, escolhidos no `.env` (`PIKI_ARQUIVOS`); o banco guarda só a chave (`app/nucleo/arquivos.py`). A pasta precisa entrar no backup.
 
+### D21. Clientes sem CPF/CNPJ válido ou com nome sem sentido ficam de fora (01/11/2026)
+
+Decisão do Alison.
+
+- Na importação do VB6, não entram clientes sem CPF/CNPJ válido nem com nome sem sentido (vazio, sem letras, "TESTE", um endereço no lugar do nome). Vale para todas as lojas e continua valendo nas reimportações.
+- A exceção é quem tem parcela de crediário em aberto na loja (`tab_itdoc.reman_itd` > 0): fica, para não perder a dívida, e a ficha avisa que o CPF precisa ser corrigido.
+- Os que já tinham sido importados foram excluídos. Fica o cliente que veio também de outra loja ou que já tem documentos enviados no sistema novo.
+- Erros de digitação no nome são corrigidos na importação: zero no lugar da letra O ("D0S SANTOS") e pedaços de endereço no fim ("N.470", "Q 3 L 2").
+- Continua mandando o cadastro alterado por último, de qualquer loja (D15).
+- Resultado em 01/11/2026, com o `requinte` atualizado: de 80.657 clientes ficaram 56.000. Saíram 921 da matriz, 1.125 da Jundiaí e 23.272 da La Viva (quase nenhum cliente de lá tem CPF). Ficaram 184 sem CPF válido, todos da matriz, por terem parcela em aberto.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.

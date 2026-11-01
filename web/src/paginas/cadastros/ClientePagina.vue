@@ -3,6 +3,8 @@
     <div class="row items-center q-mb-md">
       <q-btn flat round dense icon="arrow_back" aria-label="Voltar" class="q-mr-sm" :to="{ name: 'clientes' }" />
       <div class="piki-titulo col">{{ novo ? 'Novo cliente' : form.nome || 'Cliente' }}</div>
+      <!-- só fica sem documento quem veio do VB6 com dívida em aberto (D21): o CPF precisa ser corrigido -->
+      <q-badge v-if="!novo && !carregando && !form.cpf_cnpj" color="warning" text-color="dark" class="q-mr-xs">Sem CPF/CNPJ: corrigir</q-badge>
       <q-badge v-if="!novo && form.bloqueado" color="negative" class="q-mr-xs">Bloqueado</q-badge>
       <q-badge v-if="!novo && form.credito_suspenso" color="warning" text-color="dark">Crédito suspenso</q-badge>
     </div>

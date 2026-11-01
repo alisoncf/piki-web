@@ -80,6 +80,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [x] Atalhos da tela inicial para as telas dos subgrupos do menu; fundo das telas no tom da empresa ativa — 31/10/2026
 - [x] Cadastro de empresas (D19): lista e ficha com dados fiscais, endereço com cidade do IBGE e busca pelo CEP, esquema de cores (principal, fundo e menu) aplicado ao entrar na empresa, logo e QR code do boleto; migração 0011 — 01/11/2026
 - [x] Documentos digitais do cliente para o crediário (D20): envio de arquivo ou foto, permissão própria pela LGPD, arquivos numa pasta do servidor ou no MinIO; migração 0013 — 01/11/2026
+- [x] Clientes atualizados pelo `requinte`; sem CPF/CNPJ válido ou com nome sem sentido ficam de fora, menos quem tem dívida em aberto (D21) — 01/11/2026
 - [ ] Nomes do VB6 hoje em maiúsculas (setores, clientes...) passarem para maiúsculas só nas iniciais; os cadastros novos já são gravados assim
 - [ ] Bancos, formas de pagamento, plano de contas
 

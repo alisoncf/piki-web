@@ -58,7 +58,9 @@ Decisão D15. Lê `tab_grupocli`, `tab_tipopar` (parentescos das referências), 
 - O cliente não tem cidade nem bairro: são os do setor. A `bairro_cli`, a `cidade_cli`, a `uf_cli` e o `cod_cid` da `tab_clientes` não são importados.
 - O setor do funcionário (`cod_set` da `tab_funcionarios`) é ligado aqui, depois dos setores. Manda a loja onde ele está lotado; as outras só preenchem o vazio.
 - A cidade do setor é a do IBGE: pelo `cod_mun` da `tab_cidades`, ou pelo nome e UF, ou pela única cidade da UF cujo nome começa assim ("CORUMBA" → Corumbá de Goiás). A que não for achada sai como aviso, e os setores dela ficam sem cidade.
-- Cliente é juntado pelo CPF/CNPJ válido. Sem documento válido, vira cadastro próprio da filial (não junta pelo nome: em 30/10/2026, a La Viva tinha 23 mil clientes assim).
+- Cliente é juntado pelo CPF/CNPJ válido.
+- Cliente sem CPF/CNPJ válido ou com nome sem sentido ("TESTE", "+", um endereço) não é importado (D21), a não ser que tenha parcela de crediário em aberto na loja (`tab_doc` com `tipo_ter = 'C'` e `tab_itdoc.reman_itd` > 0). Se já estava no banco novo, é excluído, menos quando veio também de outra loja ou tem documentos enviados no sistema novo. Os que ficam por causa da dívida são cadastro próprio da filial (sem documento, não há como juntar com outra loja).
+- Erros de digitação no nome são corrigidos: zero no lugar da letra O e pedaços de endereço no fim do nome ("N.470", "Q 3 L 2").
 - Manda nos dados o registro com a data de alteração mais recente (`dataalt_cli`, ou `data_cli`). Os outros só preenchem campos vazios; telefones, referências e anotações (menos as excluídas) são somados. Data e loja do cadastro são as do registro mais antigo.
 - As colunas da `tab_clientes` e da `tab_orgaos` variam entre filiais; a leitura usa as que existirem e lê tudo como texto, porque datas inválidas e inteiros zerofill quebram o conector da MariaDB.
 - O endereço vem de `logradouro`, `numero` e `complemento`; se estiverem vazios, de `logradouro_cli`, `numero_cli` e `complemento_cli`; a `endereco_cli` (campo antigo) só quando os dois estão vazios.

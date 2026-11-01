@@ -23,6 +23,14 @@ O cliente é um só para todas as lojas (D9):
 3. senão, cria. Sem documento válido não há como saber se é a mesma pessoa de
    outra loja, então o cliente fica como cadastro próprio desta filial.
 
+Cadastros que não servem não entram (D21): sem CPF/CNPJ válido ou com nome sem
+sentido ("TESTE", "+", um endereço no lugar do nome). A exceção é quem tem
+parcela de crediário em aberto nesta loja, que fica para não perder a dívida.
+Se um desses já tinha sido importado, ele é excluído do banco novo, a não ser
+que tenha vindo também de outra loja ou já tenha documentos enviados no
+sistema novo. Erros de digitação no nome são corrigidos: zero no lugar da
+letra O ("D0S SANTOS") e o número da casa no fim ("MARIA N.470").
+
 Quem manda nos dados é o registro com a data de alteração mais recente
 (dataalt_cli, ou data_cli se estiver vazia). Os outros só preenchem os campos
 vazios. Telefones, referências e anotações de todas as lojas são somados.
@@ -32,18 +40,20 @@ As colunas da tab_clientes não são iguais em todas as filiais
 (Logradouro_cli ou logradouro_cli, telefones só em algumas), por isso a
 leitura usa as colunas que existirem.
 """
+import re
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Connection, inspect, select, text
+from sqlalchemy import Connection, delete, inspect, select, text
 from sqlalchemy.orm import Session, selectinload
 
 from app.dominios.empresas.modelos import Empresa
 from app.dominios.clientes.modelos import (
-    AnotacaoCliente, Cliente, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor, TelefoneCliente,
+    AnotacaoCliente, Cliente, DocumentoCliente, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor,
+    TelefoneCliente,
 )
 from app.dominios.cidades.modelos import Cidade, nome_de_busca
 from app.dominios.funcionarios.modelos import Funcionario
@@ -70,6 +80,11 @@ _GRUPOS = text("SELECT cod_gru, nome_gru FROM tab_grupocli")
 _PARENTESCOS = text("SELECT CAST(cod_tip AS CHAR), nome_tip FROM tab_tipopar")
 _SETORES = text("SELECT cod_set, nome_set, cobrador_set, cod_cid, tipo_set FROM tab_setores")
 _FUNCIONARIOS = text("SELECT cod_fun, cod_set FROM tab_funcionarios")
+# clientes com parcela de crediário em aberto (saldo em reman_itd); tipo_ter 'C' = documento de cliente
+_COM_DIVIDA = text(
+    "SELECT DISTINCT CAST(d.cod_ter AS CHAR) FROM tab_doc d JOIN tab_itdoc i ON i.seq_doc = d.seq_doc"
+    " WHERE d.tipo_ter = 'C' AND d.excluido_doc <> 'S' AND i.reman_itd > 0"
+)
 
 @dataclass
 class Resultado:
@@ -84,6 +99,10 @@ class Resultado:
     atualizados: int = 0
     ligados_por_documento: int = 0
     sem_documento: int = 0
+    descartados: int = 0  # sem documento válido ou com nome sem sentido, e sem dívida em aberto
+    excluidos: int = 0  # descartados que já estavam no banco novo
+    mantidos_por_divida: int = 0
+    nomes_corrigidos: int = 0
     telefones: int = 0
     referencias: int = 0
     anotacoes: int = 0
@@ -280,6 +299,35 @@ def _documento(linha: dict, r: Resultado) -> str | None:
     return None
 
 
+# "0" no meio de letras é a letra O (D0S SANTOS, PAUL0)
+_ZERO_NA_PALAVRA = re.compile(r"(?<=[A-Za-zÀ-ÿ])0|0(?=[A-Za-zÀ-ÿ])")
+# pedaços de endereço no fim do nome: "N.470", "N 160", "Q 3 L 2", "R06 N142", um CPF
+_LETRAS_DE_ENDERECO = {"N", "N.", "Nº", "N°", "Q", "QD", "L", "LT", "C"}
+_ENDERECO = re.compile(r"^(RUA|R\.|AV\.?|AVENIDA|ALAMEDA|TRAVESSA|QUADRA|QD\.?|RODOVIA)\s", re.IGNORECASE)
+
+
+def corrigir_nome(nome: object) -> str | None:
+    v = _texto(nome)
+    if not v:
+        return None
+    # palavra com outros dígitos (R06) é endereço, não erro de digitação
+    palavras = [p if re.search(r"[1-9]", p) else _ZERO_NA_PALAVRA.sub("O", p) for p in v.split()]
+    # as letras (Q, L, N...) só saem depois de um número: "MARIA C" é a inicial do sobrenome
+    no_endereco = False
+    while len(palavras) > 1 and (re.search(r"\d", palavras[-1])
+                                 or (no_endereco and palavras[-1].upper() in _LETRAS_DE_ENDERECO)):
+        no_endereco = True
+        palavras.pop()
+    return " ".join(palavras)
+
+
+def nome_sem_sentido(nome: str | None) -> bool:
+    """Cadastro que não é de uma pessoa ou empresa: vazio, sem letras, TESTE, um endereço."""
+    v = nome_comparavel(nome)
+    return (len(v.replace(" ", "")) < 3 or not re.search(r"[A-Z]{2}", v)
+            or re.search(r"\bTESTE\b", v) is not None or _ENDERECO.match(v) is not None)
+
+
 # cobranca_cli do VB6 → FORMAS_COBRANCA
 _COBRANCA = {"1": "domicilio", "2": "trabalho", "3": "loja"}
 
@@ -297,7 +345,7 @@ def converter(linha: dict) -> dict:
         endereco = (linha.get("endereco_cli"), linha.get("numero_cli") or linha.get("numero"),
                     linha.get("complemento_cli") or linha.get("complemento"))
     return {
-        "nome": _corta(linha.get("nome_cli"), 60),
+        "nome": _corta(corrigir_nome(linha.get("nome_cli")), 60),
         "rg": _corta(linha.get("rg_cli"), 20),
         "inscricao_estadual": _corta(linha.get("ie_cli"), 20),
         "data_nascimento": _data(linha.get("datanasc_cli")),
@@ -417,32 +465,44 @@ def _importar_clientes(origem: Connection, db: Session, empresa: Empresa, r: Res
     setores = _mapa_da_empresa(db, "tab_setores", empresa.id)
     orgaos = _mapa_da_empresa(db, "tab_orgaos", empresa.id)
     grupos = _mapa_da_empresa(db, "tab_grupocli", empresa.id)
+    com_divida = {str(int(c)) for (c,) in origem.execute(_COM_DIVIDA) if (c or "").strip().isdigit()}
 
     lote: list[dict] = []
     for linha in _ler(origem, "tab_clientes", "cod_cli"):
         lote.append(linha)
         if len(lote) == _LOTE:
             _importar_lote(db, empresa, lote, extras, por_codigo, por_documento, anotacoes_importadas,
-                           setores, orgaos, grupos, r)
+                           setores, orgaos, grupos, com_divida, r)
             lote = []
     if lote:
         _importar_lote(db, empresa, lote, extras, por_codigo, por_documento, anotacoes_importadas,
-                       setores, orgaos, grupos, r)
+                       setores, orgaos, grupos, com_divida, r)
 
 
 def _importar_lote(db: Session, empresa: Empresa, lote: list[dict], extras: _Extras, por_codigo: dict[str, int],
                    por_documento: dict[str, int], anotacoes_importadas: set[str], setores: dict[str, int],
-                   orgaos: dict[str, int], grupos: dict[str, int], r: Resultado) -> None:
+                   orgaos: dict[str, int], grupos: dict[str, int], com_divida: set[str], r: Resultado) -> None:
     preparados = []
+    descartados = []
     for linha in lote:
         # zerofill ou não, o código vai para o mapa sem os zeros à esquerda
         codigo = str(_int(linha["cod_cli"]) if _int(linha["cod_cli"]) is not None else linha["cod_cli"]).strip()
         dados = converter(linha)
-        if not dados["nome"]:
-            r.avisos.append(f"cliente {codigo} sem nome: ignorado")
-            continue
         documento = _documento(linha, r)
+        if dados["nome"] != _texto(linha.get("nome_cli")) and dados["nome"]:
+            r.nomes_corrigidos += 1
+        motivo = ("nome sem sentido" if nome_sem_sentido(dados["nome"])
+                  else None if documento else "sem CPF/CNPJ válido")
+        if motivo and codigo in com_divida:
+            r.mantidos_por_divida += 1
+            r.avisos.append(f"cliente {codigo} ({dados['nome']}): {motivo}, mantido por ter parcela em aberto")
+        elif motivo:
+            r.descartados += 1
+            r.avisos.append(f"cliente {codigo} ({dados['nome']}): {motivo}, não importado")
+            descartados.append(codigo)
+            continue
         preparados.append((codigo, linha, dados, documento))
+    _excluir_descartados(db, empresa, descartados, por_codigo, r)
 
     # carrega de uma vez os clientes já existentes que este lote vai alterar
     ids = {por_codigo.get(c) or (d and por_documento.get(d)) for c, _, _, d in preparados} - {None}
@@ -507,6 +567,33 @@ def _importar_lote(db: Session, empresa: Empresa, lote: list[dict], extras: _Ext
             por_documento[cliente.cpf_cnpj] = cliente.id
     db.flush()
     db.expunge_all()
+
+
+def _excluir_descartados(db: Session, empresa: Empresa, codigos: list[str], por_codigo: dict[str, int],
+                         r: Resultado) -> None:
+    """Os descartados que já tinham sido importados desta loja saem do banco novo.
+
+    Fica o cliente que veio também de outra loja (só perde a ligação com esta) ou
+    que já tem documentos enviados no sistema novo.
+    """
+    ids = {por_codigo.pop(c): c for c in codigos if c in por_codigo}
+    if not ids:
+        return
+    db.execute(delete(MapaLegado).where(MapaLegado.tabela == "tab_clientes", MapaLegado.empresa_id == empresa.id,
+                                        MapaLegado.codigo.in_(list(ids.values()))))
+    de_outra_loja = set(db.scalars(select(MapaLegado.novo_id).where(
+        MapaLegado.tabela == "tab_clientes", MapaLegado.novo_id.in_(list(ids)))))
+    com_documentos = set(db.scalars(select(DocumentoCliente.cliente_id).where(
+        DocumentoCliente.cliente_id.in_(list(ids))).group_by(DocumentoCliente.cliente_id)))
+    for cliente in db.scalars(select(Cliente).where(Cliente.id.in_(list(ids)))):
+        if cliente.id in de_outra_loja or cliente.id in com_documentos:
+            continue
+        if anotacoes := [a.id for a in cliente.anotacoes]:
+            db.execute(delete(MapaLegado).where(MapaLegado.tabela == "tab_clientesanot",
+                                                MapaLegado.novo_id.in_(anotacoes)))
+        db.delete(cliente)
+        r.excluidos += 1
+    db.flush()
 
 
 def importar_clientes(origem: Connection, db: Session, codigo_empresa: str) -> Resultado:

@@ -6,12 +6,12 @@ import pytest
 from sqlalchemy import create_engine, select, text
 
 from app.dominios.cidades.modelos import Cidade, nome_de_busca
-from app.dominios.clientes.modelos import Cliente, GrupoCliente, Orgao, Setor
+from app.dominios.clientes.modelos import AnotacaoCliente, Cliente, GrupoCliente, Orgao, Setor
 from app.dominios.empresas.esquemas import EmpresaNova
 from app.dominios.empresas.servico import criar_empresa
 from app.dominios.funcionarios.modelos import Funcionario
 from etl import mapa
-from etl.clientes import converter, importar_clientes
+from etl.clientes import converter, corrigir_nome, importar_clientes, nome_sem_sentido
 from etl.funcionarios import EmpresaNaoImportada
 
 CPF_A = "52998224725"
@@ -42,6 +42,8 @@ def _ddl(logradouro: str) -> list[str]:
         "CREATE TABLE tab_setores (cod_set TEXT, nome_set TEXT, cobrador_set TEXT, cod_cid TEXT, cod_old TEXT, tipo_set TEXT)",
         """CREATE TABLE tab_orgaos (cod_org TEXT, nome_org TEXT, cod_gru TEXT, endereco_org TEXT, cod_set TEXT,
             fone_org TEXT, cep_org TEXT, cobrador_org TEXT, data_org DATE, Obs TEXT)""",
+        "CREATE TABLE tab_doc (seq_doc INTEGER PRIMARY KEY, cod_ter TEXT, tipo_ter TEXT, excluido_doc TEXT)",
+        "CREATE TABLE tab_itdoc (seq_itd INTEGER PRIMARY KEY, seq_doc INTEGER, reman_itd REAL)",
     ]
 
 
@@ -62,7 +64,7 @@ def _inserir(c, tabela: str, linha: dict) -> None:
 
 
 def _banco_vb6(caminho, clientes, logradouro="Logradouro_cli", setores=(), orgaos=(), grupos=(),
-               telefones=(), referencias=(), anotacoes=()):
+               telefones=(), referencias=(), anotacoes=(), dividas=()):
     eng = create_engine(f"sqlite:///{caminho}")
     with eng.begin() as c:
         for ddl in _ddl(logradouro):
@@ -94,6 +96,10 @@ def _banco_vb6(caminho, clientes, logradouro="Logradouro_cli", setores=(), orgao
         for id_, cod, texto, excluido in anotacoes:
             _inserir(c, "tab_clientesanot", {"id": id_, "cod_cli": cod, "anotacao": texto,
                                              "datahora": "2021-10-27 15:49:46", "cod_usu": "058", "excluido": excluido})
+        # dividas: (cod_cli, saldo da parcela); saldo zero é parcela paga
+        for seq, (cod, saldo) in enumerate(dividas, start=1):
+            _inserir(c, "tab_doc", {"seq_doc": seq, "cod_ter": f"{cod:06d}", "tipo_ter": "C", "excluido_doc": "N"})
+            _inserir(c, "tab_itdoc", {"seq_itd": seq, "seq_doc": seq, "reman_itd": saldo})
     return eng
 
 
@@ -127,6 +133,7 @@ def matriz(tmp_path):
         telefones=[(1, "(62) 99999-0000", "3"), (1, "3333-4444", "1"), (2, "62 98888-7777", "3")],
         referencias=[(1, "LOJA VIZINHA", "3311-0000", 1)],
         anotacoes=[(10, 1, "PAGA EM DIA", "N"), (11, 1, "APAGADA", "S")],
+        dividas=[(2, 80.0)],  # o BETO, sem CPF, ainda deve: fica (D21)
     )
     yield eng
     eng.dispose()
@@ -165,7 +172,8 @@ def test_importa_matriz(banco, empresas, matriz):
     assert (r.criados, r.sem_documento, r.telefones, r.referencias, r.anotacoes) == (2, 1, 3, 1, 1)
     assert any("cobrador 099" in a for a in r.avisos)
     assert any("cidade 00003 (JUNDIAI/GO)" in a for a in r.avisos)
-    assert not any("BETO" in a for a in r.avisos)  # CPF só de zeros é "sem CPF", não aviso
+    assert (r.mantidos_por_divida, r.descartados) == (1, 0)
+    assert any("BETO SEM CPF): sem CPF/CNPJ válido, mantido por ter parcela em aberto" in a for a in r.avisos)
 
     with banco() as db:
         ana = db.scalar(select(Cliente).where(Cliente.cpf_cnpj == CPF_A))
@@ -220,7 +228,7 @@ def test_outra_loja_junta_pelo_cpf_e_o_mais_recente_manda(banco, empresas, matri
     )
     r = _importar(filial, banco, "03")
     filial.dispose()
-    assert (r.criados, r.ligados_por_documento, r.sem_documento) == (2, 1, 1)
+    assert (r.criados, r.ligados_por_documento, r.sem_documento, r.descartados) == (1, 1, 0, 1)
     assert (r.setores_criados, r.grupos_criados) == (1, 0)  # "jundiai" é o mesmo setor "JUNDIAÍ"
     assert r.cobradores == 1  # o mesmo SIDNEI, que já cobrava o JUNDIAÍ
     assert r.telefones == 1  # o 62 99999-0000 já existia na ANA
@@ -239,8 +247,8 @@ def test_outra_loja_junta_pelo_cpf_e_o_mais_recente_manda(banco, empresas, matri
 
         carla = db.scalar(select(Cliente).where(Cliente.cpf_cnpj == CPF_B))
         assert carla.setor.nome == "VILA NOVA"  # o código 00001 da filial não é o 00001 da matriz
-        # sem CPF, o BETO da filial não é juntado ao da matriz
-        assert len(db.scalars(select(Cliente).where(Cliente.nome == "BETO SEM CPF")).all()) == 2
+        # sem CPF e sem dívida, o BETO da filial não entra; o da matriz (que deve) fica
+        assert len(db.scalars(select(Cliente).where(Cliente.nome == "BETO SEM CPF")).all()) == 1
         assert len(db.scalars(select(Setor)).all()) == 5
         # um cobrador para todas as lojas, em vários setores
         sidnei = db.scalar(select(Funcionario).where(Funcionario.nome == "SIDNEI"))
@@ -257,3 +265,60 @@ def test_outra_loja_junta_pelo_cpf_e_o_mais_recente_manda(banco, empresas, matri
         ana = db.scalar(select(Cliente).where(Cliente.cpf_cnpj == CPF_A))
         assert ana.nome == "ANA FICTICIA SILVA"
         assert ana.data_alteracao == date(2023, 3, 3)
+
+
+def test_nomes_corrigidos_e_sem_sentido():
+    assert corrigir_nome("JOANA FICTICIA D0S SANTOS") == "JOANA FICTICIA DOS SANTOS"
+    assert corrigir_nome("PAUL0 FICTICIO") == "PAULO FICTICIO"
+    assert corrigir_nome("ANA FICTICIA N.470") == "ANA FICTICIA"
+    assert corrigir_nome("BIA FICTICIA N 160 ") == "BIA FICTICIA"
+    assert corrigir_nome("CARLA FICTICIA 12345678900") == "CARLA FICTICIA"
+    assert corrigir_nome("LOJA 011 FICTICIA LTDA") == "LOJA 011 FICTICIA LTDA"  # número no meio fica
+    assert corrigir_nome("DORA FICTICIA  Q 3 L 2") == "DORA FICTICIA"
+    assert corrigir_nome("EDU FICTICIO R06 N142") == "EDU FICTICIO"
+    assert corrigir_nome("MARIA FICTICIA PRAD0") == "MARIA FICTICIA PRADO"
+    assert corrigir_nome("MARIA C") == "MARIA C"  # inicial do sobrenome, não endereço
+    for nome in ("TESTE", "teste loja", "+", "5", "214564156", "RUA DAS FLORES Q 1 L 2 CASA", None, ""):
+        assert nome_sem_sentido(corrigir_nome(nome)), nome
+    for nome in ("JOANA", "ANA FICTICIA", "FICTICIA E CIA LTDA", "RUANA FICTICIA"):
+        assert not nome_sem_sentido(nome), nome
+
+
+def test_descartados_saem_do_banco_novo(banco, empresas, tmp_path):
+    """Sem CPF válido ou com nome sem sentido, e sem dívida em aberto: não entra, e sai se já tinha entrado."""
+    linhas = [
+        {**_ANA, "cod_cli": 1, "nome_cli": "ANA D0S SANTOS N.10"},
+        {**_BETO, "cod_cli": 2},  # sem CPF, sem dívida
+        {**_BETO, "cod_cli": 3, "nome_cli": "CARLA SEM CPF"},  # sem CPF, deve
+        {**_ANA, "cod_cli": 4, "nome_cli": "TESTE", "cpf_cli": CPF_B},  # CPF válido, nome sem sentido
+        {**_BETO, "cod_cli": 5, "nome_cli": "DORA SEM CPF"},  # sem CPF, parcela já paga
+    ]
+    eng = _banco_vb6(tmp_path / "f01.db", linhas, dividas=[(3, 50.0), (5, 0.0)],
+                     anotacoes=[(20, 2, "LIGAR DEPOIS", "N")])
+    r = _importar(eng, banco, "01")
+    assert (r.criados, r.descartados, r.mantidos_por_divida, r.excluidos, r.nomes_corrigidos) == (2, 3, 1, 0, 1)
+    with banco() as db:
+        assert sorted(c.nome for c in db.scalars(select(Cliente))) == ["ANA DOS SANTOS", "CARLA SEM CPF"]
+
+    # cadastros importados antes da regra (aqui, gravados à mão) são excluídos na próxima importação
+    with banco() as db:
+        beto = Cliente(nome="BETO SEM CPF", data_cadastro=date(2010, 1, 1), empresa_cadastro_id=empresas["01"])
+        beto.anotacoes.append(AnotacaoCliente(texto="LIGAR DEPOIS"))
+        teste = Cliente(nome="TESTE", cpf_cnpj=CPF_B, data_cadastro=date(2010, 1, 1))
+        dora = Cliente(nome="DORA SEM CPF", data_cadastro=date(2010, 1, 1))
+        db.add_all([beto, teste, dora])
+        db.flush()
+        for cod, cliente in (("2", beto), ("4", teste), ("5", dora)):
+            mapa.gravar(db, "tab_clientes", empresas["01"], cod, cliente.id)
+        mapa.gravar(db, "tab_clientesanot", empresas["01"], "20", beto.anotacoes[0].id)
+        # a DORA também veio de outra loja: fica, só perde a ligação com esta
+        mapa.gravar(db, "tab_clientes", empresas["03"], "9", dora.id)
+        db.commit()
+    r = _importar(eng, banco, "01")
+    eng.dispose()
+    assert (r.descartados, r.excluidos) == (3, 2)
+    with banco() as db:
+        assert sorted(c.nome for c in db.scalars(select(Cliente))) == ["ANA DOS SANTOS", "CARLA SEM CPF", "DORA SEM CPF"]
+        assert mapa.buscar(db, "tab_clientes", empresas["01"], "5") is None
+        assert mapa.buscar(db, "tab_clientesanot", empresas["01"], "20") is None
+
