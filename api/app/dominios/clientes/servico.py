@@ -1,6 +1,9 @@
 """Regras do cadastro de clientes, setores, órgãos e grupos."""
+import uuid
 from datetime import date
+from pathlib import PurePath
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.dominios.cidades.modelos import Cidade
@@ -9,9 +12,11 @@ from app.dominios.clientes.esquemas import (
     AnotacaoDados, ClienteDados, GrupoClienteDados, OrgaoDados, ParentescoDados, SetorDados,
 )
 from app.dominios.clientes.modelos import (
-    AnotacaoCliente, Cliente, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor, TelefoneCliente,
+    AnotacaoCliente, Cliente, DocumentoCliente, GrupoCliente, Orgao, Parentesco, ReferenciaCliente, Setor,
+    TelefoneCliente,
 )
 from app.dominios.funcionarios.modelos import Funcionario
+from app.nucleo.arquivos import Armazenamento
 from app.nucleo.documentos import cpf_cnpj_valido
 
 
@@ -230,3 +235,71 @@ def alterar_parentesco(db: Session, parentesco_id: int, dados: ParentescoDados) 
         setattr(parentesco, campo, valor)
     db.commit()
     return parentesco
+
+
+# documentos (crediário)
+
+TIPOS_DE_DOCUMENTO = {
+    "identidade": "Identidade (RG ou CNH)",
+    "cpf": "CPF",
+    "endereco": "Comprovante de endereço",
+    "renda": "Comprovante de renda",
+    "contrato": "Ficha ou contrato de crediário assinado",
+    "foto": "Foto do cliente",
+    "outro": "Outro",
+}
+TAMANHO_MAXIMO_DOCUMENTO = 5 * 1024 * 1024
+# reconhecidos pelo começo do arquivo, não pelo nome
+_FORMATOS = {b"%PDF-": ("application/pdf", ".pdf"), b"\x89PNG\r\n\x1a\n": ("image/png", ".png"),
+             b"\xff\xd8\xff": ("image/jpeg", ".jpg")}
+
+
+def _documento(db: Session, cliente_id: int, documento_id: int) -> DocumentoCliente:
+    documento = db.get(DocumentoCliente, documento_id)
+    if documento is None or documento.cliente_id != cliente_id or documento.removido_em is not None:
+        raise NaoEncontrado("Documento não encontrado")
+    return documento
+
+
+def listar_documentos(db: Session, cliente_id: int) -> list[DocumentoCliente]:
+    return repo.documentos_do_cliente(db, obter_cliente(db, cliente_id).id)
+
+
+def enviar_documento(db: Session, arquivos: Armazenamento, cliente_id: int, tipo: str, descricao: str | None,
+                     nome_arquivo: str | None, conteudo: bytes, usuario_id: int, empresa_id: int) -> DocumentoCliente:
+    cliente = obter_cliente(db, cliente_id)
+    if tipo not in TIPOS_DE_DOCUMENTO:
+        raise DadoInvalido(f"Tipo de documento desconhecido: {tipo}")
+    if not conteudo:
+        raise DadoInvalido("Arquivo vazio")
+    if len(conteudo) > TAMANHO_MAXIMO_DOCUMENTO:
+        raise DadoInvalido("O arquivo passa de 5 MB")
+    formato = next((f for inicio, f in _FORMATOS.items() if conteudo.startswith(inicio)), None)
+    if formato is None:
+        raise DadoInvalido("Envie um PDF ou uma imagem JPEG ou PNG")
+    tipo_conteudo, extensao = formato
+    chave = f"clientes/{cliente.id}/{uuid.uuid4().hex}{extensao}"
+    arquivos.gravar(chave, conteudo, tipo_conteudo)
+    documento = DocumentoCliente(
+        cliente_id=cliente.id, tipo=tipo, descricao=(descricao or "").strip()[:60] or None,
+        nome_arquivo=PurePath((nome_arquivo or "").replace("\\", "/")).name[:120] or f"documento{extensao}",
+        tipo_conteudo=tipo_conteudo, tamanho=len(conteudo), chave=chave, usuario_id=usuario_id, empresa_id=empresa_id,
+    )
+    db.add(documento)
+    db.commit()
+    db.refresh(documento)
+    return documento
+
+
+def ler_documento(db: Session, arquivos: Armazenamento, cliente_id: int, documento_id: int) -> tuple[DocumentoCliente, bytes]:
+    documento = _documento(db, cliente_id, documento_id)
+    return documento, arquivos.ler(documento.chave)
+
+
+def remover_documento(db: Session, cliente_id: int, documento_id: int, usuario_id: int) -> None:
+    """Tira da lista; o registro e o arquivo ficam, com quem removeu e quando."""
+    documento = _documento(db, cliente_id, documento_id)
+    documento.removido_em = func.now()
+    documento.removido_por_id = usuario_id
+    db.commit()
+

@@ -191,3 +191,31 @@ class AnotacaoCliente(Base):
     cliente: Mapped[Cliente] = relationship(back_populates="anotacoes")
     empresa: Mapped[Empresa | None] = relationship(lazy="joined")
     usuario: Mapped[Usuario | None] = relationship(lazy="joined")
+
+
+class DocumentoCliente(Base):
+    """Documento digitalizado do cliente para o crediário: identidade, comprovante de endereço...
+
+    O arquivo fica fora do banco (app/nucleo/arquivos.py); aqui ficam a chave e quem enviou.
+    Remover só tira da lista: o registro e o arquivo ficam, com quem removeu e quando.
+    Fora do relacionamento do Cliente de propósito: só quem tem clientes.documentos vê (LGPD).
+    """
+
+    __tablename__ = "cliente_documento"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cliente_id: Mapped[int] = mapped_column(ForeignKey("cliente.id", ondelete="CASCADE"), index=True)
+    tipo: Mapped[str] = mapped_column(String(20))  # ver TIPOS_DE_DOCUMENTO em servico.py
+    descricao: Mapped[str | None] = mapped_column(String(60))
+    nome_arquivo: Mapped[str] = mapped_column(String(120))  # como veio do computador ou do celular
+    tipo_conteudo: Mapped[str] = mapped_column(String(30))
+    tamanho: Mapped[int] = mapped_column(Integer)
+    chave: Mapped[str] = mapped_column(String(200), unique=True)
+    data_hora: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id"))
+    removido_em: Mapped[datetime | None] = mapped_column(DateTime)
+    removido_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+
+    empresa: Mapped[Empresa | None] = relationship(lazy="joined")
+    usuario: Mapped[Usuario | None] = relationship(lazy="joined", foreign_keys=[usuario_id])

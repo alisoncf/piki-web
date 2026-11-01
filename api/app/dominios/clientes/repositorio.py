@@ -2,7 +2,9 @@
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.dominios.clientes.modelos import Cliente, GrupoCliente, Orgao, Parentesco, Setor, TelefoneCliente
+from app.dominios.clientes.modelos import (
+    Cliente, DocumentoCliente, GrupoCliente, Orgao, Parentesco, Setor, TelefoneCliente,
+)
 from app.nucleo.documentos import so_digitos
 
 
@@ -76,3 +78,13 @@ def listar_parentescos(db: Session) -> list[Parentesco]:
 
 def parentesco_por_nome(db: Session, nome: str) -> Parentesco | None:
     return db.scalar(select(Parentesco).where(func.lower(Parentesco.nome) == nome.strip().lower()))
+
+
+def documentos_do_cliente(db: Session, cliente_id: int) -> list[DocumentoCliente]:
+    """Os que não foram removidos, do mais novo para o mais antigo."""
+    return list(db.scalars(
+        select(DocumentoCliente)
+        .where(DocumentoCliente.cliente_id == cliente_id, DocumentoCliente.removido_em.is_(None))
+        .order_by(DocumentoCliente.data_hora.desc(), DocumentoCliente.id.desc())
+    ))
+

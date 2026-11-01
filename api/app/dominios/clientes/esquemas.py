@@ -3,8 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.dominios.empresas.esquemas import EmpresaResumo
 from app.dominios.cidades.esquemas import SetorResumo
+from app.dominios.empresas.esquemas import EmpresaResumo
 from app.dominios.funcionarios.esquemas import Telefone
 from app.nucleo.documentos import so_digitos
 
@@ -247,3 +247,20 @@ class Cliente(ClienteDados):
     empresa_cadastro: EmpresaResumo | None
     referencias: list[Referencia]
     anotacoes: list[Anotacao]
+
+
+class Documento(BaseModel):
+    """Documento do cliente, sem o arquivo (que vem por /clientes/{id}/documentos/{id}/arquivo)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    tipo: str
+    descricao: str | None
+    nome_arquivo: str
+    tipo_conteudo: str
+    tamanho: int
+    data_hora: datetime
+    empresa: EmpresaResumo | None
+    usuario: Nomeado | None
+

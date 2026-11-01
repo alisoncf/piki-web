@@ -256,6 +256,13 @@
         <div v-else class="text-suave">Nenhuma anotação.</div>
       </section>
     </q-form>
+
+    <documentos-cliente
+      v-if="!novo && !carregando && sessao.pode('clientes.documentos')"
+      :key="rota.params.id"
+      :cliente-id="Number(rota.params.id)"
+      :pode-remover="podeEditar"
+    />
   </q-page>
 </template>
 
@@ -265,6 +272,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import CampoCep from '@/componentes/CampoCep.vue'
+import DocumentosCliente from '@/componentes/DocumentosCliente.vue'
 import SelecaoBusca from '@/componentes/SelecaoBusca.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
 import { usarCep } from '@/servicos/cep'

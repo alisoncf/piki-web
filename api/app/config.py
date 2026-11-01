@@ -1,6 +1,7 @@
 import secrets
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,6 +30,14 @@ class Configuracao(BaseSettings):
     # consulta de CEP nas fichas de cliente e funcionário
     viacep_url: str = "https://viacep.com.br/ws/{cep}/json/"
     viacep_segundos: float = 5
+    # arquivos enviados (documentos de clientes): numa pasta do servidor ou num MinIO (app/nucleo/arquivos.py)
+    arquivos: Literal["pasta", "minio"] = "pasta"
+    arquivos_pasta: str = str(RAIZ / "arquivos")
+    minio_endereco: str = "localhost:9000"
+    minio_usuario: str = ""
+    minio_senha: str = ""
+    minio_bucket: str = "piki"
+    minio_https: bool = False
 
     @model_validator(mode="after")
     def _segredo(self) -> "Configuracao":

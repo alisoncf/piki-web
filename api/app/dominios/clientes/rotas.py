@@ -1,13 +1,16 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
 from app.dominios.clientes import repositorio as repo
 from app.dominios.clientes import servico
 from app.dominios.clientes.esquemas import (
-    AnotacaoDados, Cliente, ClienteDados, ClienteResumo, GrupoCliente, GrupoClienteDados,
+    AnotacaoDados, Cliente, ClienteDados, ClienteResumo, Documento, GrupoCliente, GrupoClienteDados,
     Orgao, OrgaoDados, PaginaClientes, Parentesco, ParentescoDados, Setor, SetorDados,
 )
+from app.nucleo.arquivos import ArquivoNaoEncontrado, Armazenamento, armazenamento
 from app.nucleo.contexto import Contexto, exige
 
 router = APIRouter(tags=["clientes"])
@@ -20,6 +23,9 @@ _STATUS = {
 
 Ver = Annotated[Contexto, Depends(exige("clientes.ver"))]
 Editar = Annotated[Contexto, Depends(exige("clientes.editar"))]
+# documentos do crediário: só para quem trabalha com crediário (LGPD)
+Documentos = Annotated[Contexto, Depends(exige("clientes.documentos"))]
+Arquivos = Annotated[Armazenamento, Depends(armazenamento)]
 
 
 def _http(erro: servico.ErroCliente) -> HTTPException:
@@ -72,6 +78,63 @@ def anotar(cliente_id: int, dados: AnotacaoDados, ctx: Editar) -> Cliente:
     """Acrescenta uma anotação, com o usuário e a loja de quem anotou."""
     try:
         return Cliente.model_validate(servico.anotar(ctx.db, cliente_id, dados, ctx.usuario.id, ctx.empresa_id))
+    except servico.ErroCliente as e:
+        raise _http(e)
+
+
+@router.get("/clientes/{cliente_id}/documentos", response_model=list[Documento])
+def listar_documentos(cliente_id: int, ctx: Documentos) -> list[Documento]:
+    """Documentos do crediário (identidade, comprovantes...), do mais novo para o mais antigo."""
+    try:
+        return [Documento.model_validate(d) for d in servico.listar_documentos(ctx.db, cliente_id)]
+    except servico.ErroCliente as e:
+        raise _http(e)
+
+
+@router.post(
+    "/clientes/{cliente_id}/documentos",
+    response_model=Documento,
+    status_code=status.HTTP_201_CREATED,
+    openapi_extra={"requestBody": {"required": True, "content": {"application/pdf": {}, "image/jpeg": {}, "image/png": {}}}},
+)
+async def enviar_documento(
+    cliente_id: int, pedido: Request, ctx: Documentos, arquivos: Arquivos,
+    tipo: Annotated[str, Query(description=", ".join(servico.TIPOS_DE_DOCUMENTO))],
+    descricao: Annotated[str | None, Query(max_length=60, description="Frente, verso, conta de luz...")] = None,
+    nome: Annotated[str | None, Query(description="Nome do arquivo no computador ou no celular")] = None,
+) -> Documento:
+    """O arquivo (PDF, JPEG ou PNG, até 5 MB) vai no corpo, sem formulário. Registra o usuário e a loja."""
+    conteudo = await pedido.body()
+    try:
+        documento = servico.enviar_documento(
+            ctx.db, arquivos, cliente_id, tipo, descricao, nome, conteudo, ctx.usuario.id, ctx.empresa_id
+        )
+    except servico.ErroCliente as e:
+        raise _http(e)
+    return Documento.model_validate(documento)
+
+
+@router.get("/clientes/{cliente_id}/documentos/{documento_id}/arquivo", response_class=Response)
+def baixar_documento(cliente_id: int, documento_id: int, ctx: Documentos, arquivos: Arquivos) -> Response:
+    try:
+        documento, conteudo = servico.ler_documento(ctx.db, arquivos, cliente_id, documento_id)
+    except servico.ErroCliente as e:
+        raise _http(e)
+    except ArquivoNaoEncontrado:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "O arquivo do documento não foi encontrado no armazenamento")
+    return Response(conteudo, media_type=documento.tipo_conteudo, headers={
+        "Content-Disposition": f"inline; filename*=UTF-8''{quote(documento.nome_arquivo)}",
+        # dado pessoal: o navegador não guarda cópia
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
+
+
+@router.delete("/clientes/{cliente_id}/documentos/{documento_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remover_documento(cliente_id: int, documento_id: int, ctx: Documentos, _: Editar) -> None:
+    """Tira o documento da lista (pede também clientes.editar). O arquivo fica guardado, com quem removeu."""
+    try:
+        servico.remover_documento(ctx.db, cliente_id, documento_id, ctx.usuario.id)
     except servico.ErroCliente as e:
         raise _http(e)
 

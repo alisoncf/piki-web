@@ -17,6 +17,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# arquivos no MinIO em vez de numa pasta (PIKI_ARQUIVOS=minio)
+minio = ["minio>=7.2"]
 # leitura dos bancos MariaDB das filiais, usada pelo ETL
 legado = [
     "pymysql>=1.1",

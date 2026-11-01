@@ -130,6 +130,17 @@ Decisão do Alison.
 - **Imagens:** o logo dos relatórios e o QR code do boleto de cobrança (no VB6, `caminho_logo` e `caminho_qrcodedoc`, caminhos de arquivo na loja) são enviados na ficha e guardados no banco (`empresa_imagem`), em PNG ou JPEG de até 1 MB. Qualquer usuário logado pode lê-los, porque saem em relatórios e boletos.
 - **Fica de fora:** certificado digital, senha, CSC e token da NFC-e (P10). `cpf` e `fax` da `sped_empresa` não são usados.
 
+### D20. Documentos digitais do cliente para o crediário (01/11/2026)
+
+Decisão do Alison.
+
+- Na ficha do cliente, a seção **Documentos** recebe arquivos (PDF, JPEG ou PNG, até 5 MB) ou fotos tiradas na hora pela câmera do celular ou tablet. As fotos são reduzidas no navegador (1600 px, JPEG) antes de enviar.
+- Tipos: identidade (RG ou CNH), CPF, comprovante de endereço, comprovante de renda, ficha ou contrato de crediário assinado, foto do cliente e outro. Cada um com descrição opcional (frente, verso...) e vários arquivos por tipo. Documento não vence.
+- **LGPD:** só quem trabalha com crediário vê e envia, pela permissão `clientes.documentos`, separada de `clientes.ver`. Remover pede também `clientes.editar`, e só tira da lista: o arquivo e o registro ficam, com quem removeu e quando. O navegador não guarda cópia dos arquivos (`Cache-Control: no-store`).
+- O documento é do cliente (cadastro global): todas as lojas veem; fica registrado quem enviou e de qual loja.
+- A falta de documentos não bloqueia a venda a prazo.
+- **Onde ficam os arquivos:** fora do banco, numa pasta do servidor (padrão) ou num MinIO, escolhidos no `.env` (`PIKI_ARQUIVOS`); o banco guarda só a chave (`app/nucleo/arquivos.py`). A pasta precisa entrar no backup.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.

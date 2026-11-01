@@ -50,6 +50,26 @@ export const FORMAS_COBRANCA = [
   { value: 'loja', label: 'Pagamento na loja' },
 ]
 
+// tipos de documento do crediário (mesmos códigos da API, TIPOS_DE_DOCUMENTO em clientes/servico.py)
+export const TIPOS_DOCUMENTO = [
+  { value: 'identidade', label: 'Identidade (RG ou CNH)' },
+  { value: 'cpf', label: 'CPF' },
+  { value: 'endereco', label: 'Comprovante de endereço' },
+  { value: 'renda', label: 'Comprovante de renda' },
+  { value: 'contrato', label: 'Ficha ou contrato de crediário assinado' },
+  { value: 'foto', label: 'Foto do cliente' },
+  { value: 'outro', label: 'Outro' },
+]
+
+export function nomeTipoDocumento(tipo) {
+  return TIPOS_DOCUMENTO.find((t) => t.value === tipo)?.label ?? tipo
+}
+
+/** Tamanho de arquivo para exibir: 312 KB, 1,4 MB. */
+export function formatarTamanho(bytes) {
+  return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`
+}
+
 /** Data e hora da API (sem fuso) para exibir: 27/10/2021 15:49. */
 export function formatarDataHora(valor) {
   if (!valor) return ''
