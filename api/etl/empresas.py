@@ -54,6 +54,12 @@ def _digitos(valor: object) -> str | None:
     return v or None
 
 
+def _codigo(valor: object, validos: str) -> str | None:
+    """Um dos códigos de uma letra aceitos; fora deles, vazio, para ser escolhido na ficha."""
+    v = (_texto(valor) or "").upper()
+    return v if len(v) == 1 and v in validos else None
+
+
 def converter(linha: dict) -> dict:
     """Uma linha da sped_empresa → campos da tabela empresa."""
     email = _texto(linha.get("email"))
@@ -65,9 +71,10 @@ def converter(linha: dict) -> dict:
         "nome_fantasia": _texto(linha.get("fantasia")),
         "inscricao_estadual": _digitos(linha.get("IE")),
         "inscricao_municipal": _texto(linha.get("im")),
-        "crt": _texto(linha.get("crt")),
-        "sped_perfil": _texto(linha.get("ind_perfil")),
-        "sped_atividade": _texto(linha.get("ind_atv")),
+        "crt": _codigo(linha.get("crt"), "123"),
+        # nos bancos das lojas o ind_perfil está '1', que não é perfil do SPED (o VB6 gera o arquivo sempre com A)
+        "sped_perfil": _codigo(linha.get("ind_perfil"), "ABC"),
+        "sped_atividade": _codigo(linha.get("ind_atv"), "01"),
         "suframa": _texto(linha.get("suframa")),
         # o código do IBGE vira a cidade do banco novo na importação (a UF é a da cidade)
         "codigo_ibge": _digitos(linha.get("cod_mun")),

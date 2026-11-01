@@ -49,6 +49,10 @@ def test_converter_normaliza():
     assert d["email"] == "loja@exemplo.com"
     assert d["nome"] == "MATRIZ"
     assert d["inscricao_municipal"] is None  # texto vazio vira nulo
+    # códigos fiscais: o ind_perfil '1' das lojas não é perfil do SPED (A, B ou C)
+    assert (d["crt"], d["sped_perfil"], d["sped_atividade"]) == ("1", None, "1")
+    assert converter({**_LOJA_A, "ind_perfil": "b", "crt": "9"})["sped_perfil"] == "B"
+    assert converter({**_LOJA_A, "crt": "9"})["crt"] is None
 
 
 def test_segredos_nao_sao_lidos():
