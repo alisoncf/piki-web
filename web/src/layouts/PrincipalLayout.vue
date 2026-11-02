@@ -1,5 +1,6 @@
 <template>
-  <q-layout view="hHh lpR fFf">
+  <!-- L maiúsculo: o menu fica fixo e só a página rola -->
+  <q-layout view="hHh LpR fFf">
     <q-header class="piki-cabecalho">
       <q-toolbar class="q-gutter-x-sm">
         <q-btn flat round dense icon="menu" color="grey-8" aria-label="Abrir menu" @click="menuAberto = !menuAberto" />
@@ -75,10 +76,13 @@
     </q-header>
 
     <q-drawer v-model="menuAberto" show-if-above :width="248" class="piki-menu">
-      <q-list padding dark>
-        <item-menu v-for="item in menu" :key="item.titulo" :item="item" />
-      </q-list>
-      <assinatura-piki class="piki-menu__rodape" />
+      <div class="column no-wrap fit">
+        <!-- a lista rola sozinha quando não cabe; a assinatura fica sempre no pé -->
+        <q-list padding dark class="col scroll">
+          <item-menu v-for="item in menu" :key="item.titulo" :item="item" />
+        </q-list>
+        <assinatura-piki class="piki-menu__rodape" />
+      </div>
     </q-drawer>
 
     <q-page-container>
