@@ -47,7 +47,9 @@ export const useSessaoStore = defineStore('sessao', () => {
     return (partes[0][0] + (partes.length > 1 ? partes.at(-1)[0] : '')).toUpperCase()
   })
 
+  // uma permissão, ou uma lista em que basta ter qualquer uma (como o exige() da API)
   function pode(permissao) {
+    if (Array.isArray(permissao)) return permissao.some((p) => permissoes.value.includes(p))
     return !permissao || permissoes.value.includes(permissao)
   }
 

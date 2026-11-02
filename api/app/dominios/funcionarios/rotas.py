@@ -22,7 +22,8 @@ def _http(erro: servico.ErroFuncionario) -> HTTPException:
 
 @router.get("/funcionarios", response_model=list[FuncionarioResumo])
 def listar_funcionarios(
-    ctx: Annotated[Contexto, Depends(exige("funcionarios.ver"))],
+    # o caixa escolhe o funcionário do vale e da comissão
+    ctx: Annotated[Contexto, Depends(exige("funcionarios.ver", "caixa.operar"))],
     busca: Annotated[str | None, Query(description="Parte do nome, do apelido ou do CPF")] = None,
     empresa_id: Annotated[int | None, Query(description="Só os lotados nesta loja")] = None,
     so_ativos: bool = False,

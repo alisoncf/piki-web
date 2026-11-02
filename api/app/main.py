@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.dominios.acesso.rotas import router as acesso
+from app.dominios.caixa.rotas import router as caixa
 from app.dominios.cidades.rotas import router as cidades
 from app.dominios.clientes.rotas import router as clientes
 from app.dominios.empresas.rotas import router as empresas
@@ -29,3 +30,4 @@ app.include_router(fornecedores)
 app.include_router(produtos)
 app.include_router(estoque)
 app.include_router(entradas)
+app.include_router(caixa)

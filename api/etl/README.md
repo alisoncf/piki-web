@@ -27,6 +27,7 @@ python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
 python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
 python -m etl fornecedores --origem "mysql+pymysql://..." --empresa 01 --avisos fornecedores-01.txt
 python -m etl usuarios --origem "mysql+pymysql://..." --empresa 01
+python -m etl caixa --origem "mysql+pymysql://..." --empresa 01
 python -m etl estoque --origem "mysql+pymysql://..." --empresa 01 --avisos estoque-01.txt
 python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun" --avisos produtos.txt
 ```
@@ -118,6 +119,14 @@ Decisão D24. Lê a `tab_produtos` e a `tab_consignacoes` de cada loja. Rode ant
 - Cada diferença de saldo vira um movimento "Saldo do VB6"; na reimportação entra só a diferença. Produto sem saldo, reservado e localização não ganha linha.
 - É o saldo de partida: depois ele vai ser refeito a partir do inventário de 31/12/2025, com as notas desde então.
 
+### Formas de pagamento e caixas
+
+Decisão D26. Lê `tab_formaspag` e `tab_caixas` de cada loja.
+
+- As formas viram uma por tipo (`tipo_cai`): DIN, PIX, CRT, CRD, DUP (Crediário), CRP, DEP, VAL. As "1X DUP" a "10X DUP" são uma forma só, com o máximo de parcelas; as marcadas como gerenciais dizem a partir de quando as parcelas pedem autorização. Cheque entra desativado. Cartão de crédito fica com até 12 parcelas (o VB6 não guarda máximo).
+- Cada código antigo da forma (e do caixa) fica no `legado_mapa`, para as vendas antigas.
+- Os caixas são da loja, com os nomes do VB6; o "SEM CAIXA" (00) entra desativado.
+
 ## Situação
 
 | Parte | Status |
@@ -132,4 +141,5 @@ Decisão D24. Lê a `tab_produtos` e a `tab_consignacoes` de cada loja. Rode ant
 | Importação de usuários (`usuarios.py`) | pronta, com testes |
 | Importação de produtos, seções e subseções (`produtos.py`) | pronta, com testes |
 | Importação do estoque de cada loja (`estoque.py`) | pronta, com testes |
+| Importação das formas de pagamento e caixas (`caixa.py`) | pronta, com testes |
 | Demais domínios | acompanham as ondas do roteiro |

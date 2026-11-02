@@ -3,6 +3,7 @@
 Ao criar um domínio novo com tabelas, acrescente o import aqui.
 """
 from app.dominios.acesso import modelos as acesso  # noqa: F401
+from app.dominios.caixa import modelos as caixa  # noqa: F401
 from app.dominios.cidades import modelos as cidades  # noqa: F401
 from app.dominios.clientes import modelos as clientes  # noqa: F401
 from app.dominios.empresas import modelos as empresas  # noqa: F401

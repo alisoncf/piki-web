@@ -5,6 +5,7 @@
     python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
     python -m etl fornecedores --origem "mysql+pymysql://..." --empresa 01
     python -m etl usuarios --origem "mysql+pymysql://..." --empresa 01
+    python -m etl caixa --origem "mysql+pymysql://..." --empresa 01
     python -m etl estoque --origem "mysql+pymysql://..." --empresa 02
     python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun"
 
@@ -22,6 +23,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.nucleo.banco import engine
+from etl.caixa import importar_caixa
 from etl.clientes import importar_clientes
 from etl.empresas import ConflitoEmpresa, importar_empresas
 from etl.fornecedores import importar_fornecedores
@@ -71,6 +73,9 @@ def main(argv: list[str] | None = None) -> None:
     es.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     es.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     es.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
+    cx = sub.add_parser("caixa", help="importa as formas de pagamento e os caixas de uma loja")
+    cx.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
+    cx.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     args = p.parse_args(argv)
     # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
     sys.stdout.reconfigure(encoding="utf-8")
@@ -138,6 +143,10 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"linhas de estoque novas: {r.linhas}, movimentos de saldo: {r.movimentos}, "
                       f"produtos com saldo negativo: {r.negativos}, códigos que não são da matriz: {r.ignorados}")
                 _avisos(r.avisos, args.avisos)
+            elif args.comando == "caixa":
+                r = importar_caixa(conexao, db, args.empresa)
+                print(f"formas de pagamento novas: {r.formas}, caixas novos: {r.caixas}")
+                _avisos(r.avisos, None)
     except (ConflitoEmpresa, EmpresaNaoImportada) as erro:
         print(f"erro: {erro}", file=sys.stderr)
         sys.exit(1)

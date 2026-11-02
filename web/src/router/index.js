@@ -188,6 +188,30 @@ export const rotas = [
         meta: { permissao: 'entradas.ver' },
       },
       {
+        path: 'caixa',
+        name: 'caixa',
+        component: () => import('@/paginas/caixa/CaixaPagina.vue'),
+        meta: { permissao: ['caixa.operar', 'caixa.conferir'] },
+      },
+      {
+        path: 'caixa/sessoes/:id(\\d+)',
+        name: 'sessao-caixa',
+        component: () => import('@/paginas/caixa/SessaoCaixaPagina.vue'),
+        meta: { permissao: ['caixa.operar', 'caixa.conferir'] },
+      },
+      {
+        path: 'caixa/formas',
+        name: 'formas-pagamento',
+        component: () => import('@/paginas/caixa/FormasPagamentoPagina.vue'),
+        meta: { permissao: 'caixa.configurar' },
+      },
+      {
+        path: 'caixa/caixas',
+        name: 'caixas',
+        component: () => import('@/paginas/caixa/CaixasPagina.vue'),
+        meta: { permissao: 'caixa.configurar' },
+      },
+      {
         path: 'cadastros/cargos',
         name: 'cargos',
         component: () => import('@/paginas/cadastros/CargosPagina.vue'),

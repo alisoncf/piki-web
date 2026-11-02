@@ -1,5 +1,5 @@
 /**
- * Menu principal. Cada item pode exigir uma permissão (mesmo código usado na
+ * Menu principal. Cada item pode exigir uma permissão, ou uma lista em que basta uma (mesmo código usado na
  * API, ver api/app/nucleo/permissoes.py); itens sem permissão somem, e grupos
  * que ficam vazios também. Grupos podem ter subgrupos, em qualquer nível.
  */
@@ -38,6 +38,15 @@ export const MENU = [
           { titulo: 'Cargos', icone: 'work_outline', rota: '/cadastros/cargos', permissao: 'funcionarios.ver' },
         ],
       },
+    ],
+  },
+  {
+    titulo: 'Caixa',
+    icone: 'point_of_sale',
+    filhos: [
+      { titulo: 'Caixa', icone: 'point_of_sale', rota: '/caixa', permissao: ['caixa.operar', 'caixa.conferir'] },
+      { titulo: 'Formas de pagamento', icone: 'payments', rota: '/caixa/formas', permissao: 'caixa.configurar' },
+      { titulo: 'Caixas da loja', icone: 'storefront', rota: '/caixa/caixas', permissao: 'caixa.configurar' },
     ],
   },
   {

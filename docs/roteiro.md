@@ -131,9 +131,15 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 ## Onda 7 · PDV e caixa
 
 - [ ] Definir o formato do PDV: desktop ou web com agente local para impressora e TEF
-- [ ] Venda, troco, NFC-e
+- [ ] NFC-e e canhoto de retirada
 - [ ] TEF (SiTef)
-- [ ] Abertura e fechamento de caixa, trocas, vales, cartão presente
+- [x] Formas de pagamento e caixa (D26): caixas da loja, abertura com fundo de troco, entradas e saídas, fechamento com conferência cega (migração 0019); ETL das formas e caixas rodado nas três cópias — 02/11/2026
+- [ ] Venda (D26): vendedor monta, caixa recebe, desconto pela forma com limite do perfil e autorização, venda aberta vence em 10 dias
+- [ ] Crediário na venda: limite do cliente, parcelas e carnê
+- [ ] Trocas, cancelamento, entrega, cartão presente
+- [ ] Controle de vales por funcionário
+- [ ] Conciliação do cartão pelo extrato da financeira
+- [ ] Importação do histórico de vendas do VB6
 - [ ] Operação offline com sincronização
 
 ## Virada das filiais

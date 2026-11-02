@@ -217,6 +217,29 @@ Decisão do Alison: a entrada é pelo XML da NF-e, e a nota tem que ser da empre
 - Permissões: `entradas.ver` e `entradas.lancar`.
 - Ficam para depois: buscar as notas direto na SEFAZ (com o certificado), devolução ao fornecedor e o SPED.
 
+### D26. Vendas, formas de pagamento e caixa (02/11/2026)
+
+Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) venda, (3) crediário, (4) NFC-e, (5) trocas, cancelamento, entrega e cartão presente, (6) importação do histórico.
+
+**Venda (regras para a etapa 2)**
+- O vendedor monta a venda no balcão e o caixa recebe.
+- O desconto vem da forma de pagamento escolhida (os 5% à vista), até o limite do perfil; acima, pede a senha de quem pode mais, e fica registrado quem autorizou. Parcelas acima do limite da forma também pedem a gerência.
+- O desconto pode ser dado no item ou no total, mas é a mesma coisa: o do total é rateado entre os itens, e cada item guarda por quanto foi vendido de fato.
+- A venda aberta vence em 10 dias.
+- Cartão: registra o número de parcelas; a baixa vem depois, pelo extrato da financeira. O pagamento integrado (TEF, por um intermediário) fica para uma etapa própria.
+- Crediário: cliente cadastrado, sem bloqueio e dentro do limite; o carnê sai na hora.
+- Toda venda gera a NFC-e e um canhoto para retirar o produto no pacote; há impressora térmica e impressora comum.
+- Histórico: importar todas as vendas do VB6 (ou os últimos 10 anos, se ficar lento).
+
+**Formas de pagamento** (lista única para todas as lojas)
+- Uma forma por tipo (dinheiro, PIX, cartão de crédito, de débito, crediário, cartão presente, depósito, vale): as "1X DUP" a "10X DUP" do VB6 viram o "Crediário" com até 10 parcelas, e a parcela é escolhida na venda. Cada forma tem desconto, máximo de parcelas, até quantas não pedem autorização, intervalo e ordem na tela. O cheque deixou de existir (entra desativado, só para as vendas antigas).
+
+**Caixa**
+- O caixa é o ponto de recebimento (Cx 02, Consignado, Crediário...), não a pessoa: várias pessoas lançam no mesmo caixa, e cada lançamento guarda quem fez. Os nomes do VB6 continuam.
+- Abre com o fundo de troco e fecha com conferência cega: quem fecha informa o que contou em dinheiro e em cada forma que teve lançamento, sem ver o esperado; a diferença aparece depois de fechar. Quem tem `caixa.conferir` vê o saldo esperado e os fechamentos.
+- Lançamentos avulsos de entrada e saída: troco (entrada e retirada), despesa, vale de funcionário e comissão de cobrador. O controle dos vales por funcionário fica para depois. Lançamento errado é estornado (continua na lista, com quem estornou).
+- Permissões: `caixa.operar`, `caixa.conferir` e `caixa.configurar`.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
