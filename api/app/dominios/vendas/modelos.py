@@ -6,10 +6,10 @@ cada item: o dado no total é rateado entre os itens (menos os em queima, que n�
 têm desconto), e cada item diz por quanto foi vendido de fato. A venda aberta ou
 fechada vence em 10 dias.
 """
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, UniqueConstraint, false
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.acesso.modelos import Usuario
@@ -78,9 +78,9 @@ class Venda(ComDatas, Base):
     recebida_em: Mapped[datetime | None] = mapped_column(DateTime)
     recebida_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     valor_recebido: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # o que o cliente deu, no dinheiro
-    # no crediário: o que foi pago na hora, em outra forma; o resto vira o carnê
-    entrada: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
-    forma_entrada_id: Mapped[int | None] = mapped_column(ForeignKey("forma_pagamento.id"))
+    # crediário: a data de onde contam os vencimentos (a 1ª parcela vence um intervalo depois)
+    data_base: Mapped[date | None] = mapped_column(Date)
+    modelo_nota: Mapped[str] = mapped_column(String(2), server_default="65", default="65")  # 65 NFC-e, 55 NF-e
     # quem autorizou o crediário acima do limite disponível do cliente
     limite_autorizado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     cancelada_em: Mapped[datetime | None] = mapped_column(DateTime)
@@ -96,7 +96,8 @@ class Venda(ComDatas, Base):
     entrega: Mapped["EntregaVenda | None"] = relationship(
         back_populates="venda", cascade="all, delete-orphan", lazy="joined")
     forma_pagamento: Mapped[FormaPagamento | None] = relationship(foreign_keys=[forma_pagamento_id], lazy="joined")
-    forma_entrada: Mapped[FormaPagamento | None] = relationship(foreign_keys=[forma_entrada_id], lazy="joined")
+    pagamentos: Mapped[list["PagamentoVenda"]] = relationship(
+        back_populates="venda", cascade="all, delete-orphan", order_by="PagamentoVenda.ordem", lazy="selectin")
     desconto_autorizado_por: Mapped[Usuario | None] = relationship(foreign_keys=[desconto_autorizado_por_id], lazy="joined")
     parcelas_autorizadas_por: Mapped[Usuario | None] = relationship(
         foreign_keys=[parcelas_autorizadas_por_id], lazy="joined")
@@ -111,12 +112,20 @@ class Venda(ComDatas, Base):
 
     @property
     def pago_na_hora(self) -> Decimal:
-        """No crediário, só a entrada; nas outras formas, o total."""
-        return self.total if self.entrada is None else self.entrada
+        """O que o cliente pagou no caixa (no crediário, a entrada; o resto é o carnê)."""
+        return sum((p.valor for p in self.pagamentos), Decimal("0.00"))
+
+    @property
+    def a_prazo(self) -> Decimal:
+        return self.total - self.pago_na_hora if self.situacao == "recebida" else Decimal("0.00")
 
     @property
     def troco(self) -> Decimal | None:
-        return None if self.valor_recebido is None else self.valor_recebido - self.pago_na_hora
+        """Só do dinheiro: o que o cliente deu menos o que ficou no dinheiro."""
+        if self.valor_recebido is None:
+            return None
+        return self.valor_recebido - sum((p.valor for p in self.pagamentos if p.forma_pagamento.tipo == "dinheiro"),
+                                         Decimal("0.00"))
 
 
 class ItemVenda(Base):
@@ -162,3 +171,19 @@ class EntregaVenda(Base):
 
     venda: Mapped[Venda] = relationship(back_populates="entrega")
     cidade: Mapped[Cidade | None] = relationship(lazy="joined")
+
+
+class PagamentoVenda(Base):
+    """Uma parte do que foi pago no caixa: um pouco no PIX, um pouco no cartão... (no crediário, a entrada)."""
+
+    __tablename__ = "venda_pagamento"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    venda_id: Mapped[int] = mapped_column(ForeignKey("venda.id", ondelete="CASCADE"), index=True)
+    ordem: Mapped[int] = mapped_column(Integer)
+    forma_pagamento_id: Mapped[int] = mapped_column(ForeignKey("forma_pagamento.id"))
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    parcelas: Mapped[int] = mapped_column(Integer, default=1)  # no cartão de crédito
+
+    venda: Mapped[Venda] = relationship(back_populates="pagamentos")
+    forma_pagamento: Mapped[FormaPagamento] = relationship(lazy="joined")

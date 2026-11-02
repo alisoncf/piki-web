@@ -51,6 +51,18 @@
           <span class="text-weight-medium">{{ sessao.empresa?.nome }}</span>
         </div>
 
+        <!-- o caixa em que este computador está -->
+        <q-btn v-if="caixaDaMaquina.caixa && sessao.pode('caixa.operar')" flat no-caps dense icon="point_of_sale" :label="caixaDaMaquina.caixa.nome" aria-label="Caixa deste computador">
+          <q-menu anchor="bottom right" self="top right">
+            <q-list style="min-width: 220px">
+              <q-item-label header>Este computador recebe no {{ caixaDaMaquina.caixa.nome }}</q-item-label>
+              <q-item v-close-popup clickable :to="{ name: 'vendas' }"><q-item-section>Vendas para receber</q-item-section></q-item>
+              <q-item v-close-popup clickable :to="{ name: 'caixa' }"><q-item-section>Ir para o caixa</q-item-section></q-item>
+              <q-item v-close-popup clickable @click="caixaDaMaquina.sair()"><q-item-section>Sair do caixa neste computador</q-item-section></q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
+
         <!-- usuário -->
         <q-btn flat round dense aria-label="Usuário">
           <q-avatar color="accent" text-color="dark" size="34px" font-size="13px" class="text-weight-bold">
@@ -106,9 +118,11 @@ import ItemMenu from '@/componentes/ItemMenu.vue'
 import MarcaLoja from '@/componentes/MarcaLoja.vue'
 import { filtrarMenu, MENU } from '@/menu'
 import { mensagemDeErro } from '@/servicos/api'
+import { useCaixaDaMaquinaStore } from '@/stores/caixaDaMaquina'
 import { useSessaoStore } from '@/stores/sessao'
 
 const sessao = useSessaoStore()
+const caixaDaMaquina = useCaixaDaMaquinaStore()
 const roteador = useRouter()
 const rota = useRoute()
 const $q = useQuasar()

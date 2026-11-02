@@ -1,11 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { Dialog, Notify, QInput, QLayout, QPageContainer, Quasar } from 'quasar'
+import { Dialog, Notify, QInput, QLayout, QPageContainer, QSelect, Quasar } from 'quasar'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
 import CarnePagina from '@/paginas/vendas/CarnePagina.vue'
+import RecebimentoPagina from '@/paginas/vendas/RecebimentoPagina.vue'
 import VendaPagina from '@/paginas/vendas/VendaPagina.vue'
 import VendasPagina from '@/paginas/vendas/VendasPagina.vue'
 import { api } from '@/servicos/api'
@@ -39,6 +40,7 @@ async function montar(componente, caminho) {
       { path: '/vendas', name: 'vendas', component: componente === VendasPagina ? componente : vazio },
       { path: '/vendas/:id', name: 'venda', component: componente === VendaPagina ? componente : vazio },
       { path: '/vendas/:id/carne', name: 'carne', component: componente === CarnePagina ? componente : vazio },
+      { path: '/vendas/:id/receber', name: 'receber-venda', component: componente === RecebimentoPagina ? componente : vazio },
     ],
   })
   await router.push(caminho)
@@ -131,67 +133,98 @@ describe('vendas', () => {
     expect(wrapper.text()).toContain('Desconto autorizado por Ana Gerente')
   })
 
-  it('o caixa recebe no caixa aberto e lembra dele', async () => {
+  it('o caixa recebe no caixa deste computador, um pouco em cada forma', async () => {
     entrar()
-    const noDinheiro = { ...COM_ITEM, forma_pagamento: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' }, situacao: 'fechada', comprador: 'José' }
-    vi.spyOn(api, 'get').mockImplementation(gets(noDinheiro))
-    const recebida = { ...noDinheiro, situacao: 'recebida', valor_recebido: '120.00', troco: '20.00', recebida_por: DAVI, sessao_caixa: { id: 11, caixa: { id: 5, nome: 'Cx 02' } }, recebida_em: '2026-11-02T11:00:00' }
-    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: recebida })
-    const { wrapper } = await montar(VendaPagina, '/vendas/3')
+    localStorage.setItem('piki.caixa', JSON.stringify({ empresa_id: 1, id: 5, nome: 'Cx 02' }))
+    const fechada = { ...COM_ITEM, situacao: 'fechada', comprador: 'José', forma_pagamento: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' } }
+    vi.spyOn(api, 'get').mockImplementation(gets(fechada))
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...fechada, situacao: 'recebida', troco: '10.00', carne: null } })
+    const { wrapper, router } = await montar(RecebimentoPagina, '/vendas/3/receber')
+    expect(wrapper.text()).toContain('Cx 02')
+    expect(wrapper.text()).toContain('José')
 
-    await botao(wrapper, 'Receber').trigger('click')
+    const valores = () => wrapper.findAllComponents(QInput).filter((c) => c.props('label') === 'Valor')
+    await valores()[0].vm.$emit('update:modelValue', '40')
     await flushPromises()
-    const valor = wrapper.findAllComponents(QInput).find((c) => c.props('label') === 'Valor recebido')
-    await valor.vm.$emit('update:modelValue', '120')
+    expect(wrapper.text()).toMatch(/Falta lançar\s*R\$\s60,00/)
+    await botao(wrapper, 'Outra forma').trigger('click') // entra o cartão, já com o que falta
     await flushPromises()
-    expect(document.body.textContent).toContain('Troco R$')
-    document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
+    expect(valores()[1].props('modelValue')).toBe('60.00')
+    const recebido = wrapper.findAllComponents(QInput).find((c) => c.props('label')?.startsWith('Valor que o cliente deu'))
+    await recebido.vm.$emit('update:modelValue', '50')
     await flushPromises()
-    expect(post).toHaveBeenCalledWith('/vendas/3/receber', { sessao_caixa_id: 11, valor_recebido: '120', autorizacao: null })
-    expect(localStorage.getItem('piki.caixa')).toBe('5')
-    expect(wrapper.text()).toContain('Recebida por Davi Vendedor no Cx 02')
-  })
+    expect(wrapper.text()).toMatch(/Troco\s*R\$\s10,00/)
 
-  it('no crediário mostra o limite do cliente e recebe com entrada', async () => {
-    entrar()
-    const credito = { limite: '500.00', em_aberto: '200.00', disponivel: '300.00', impedimento: null }
-    const noCrediario = {
-      ...COM_ITEM, forma_pagamento: { id: 9, nome: 'Crediário', tipo: 'crediario' }, parcelas: 2, situacao: 'fechada',
-      cliente: { id: 8, nome: 'Freguesa Ficticia', cpf_cnpj: null, bloqueado: false }, credito,
-    }
-    const getPadrao = gets(noCrediario)
-    vi.spyOn(api, 'get').mockImplementation((url, opcoes) =>
-      url === '/formas-pagamento' ? Promise.resolve({ data: [DINHEIRO, CARTAO, CREDIARIO] }) : getPadrao(url, opcoes),
-    )
-    const recebida = {
-      ...noCrediario, situacao: 'recebida', credito: null, entrada: '40.00', forma_entrada: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' },
-      valor_recebido: '50.00', troco: '10.00', recebida_por: DAVI, sessao_caixa: { id: 11, caixa: { id: 5, nome: 'Cx 02' } }, recebida_em: '2026-11-02T11:00:00',
-      carne: { id: 21, valor: '60.00', parcelas: [{ numero: 1, vencimento: '2026-12-02', valor: '30.00', aberto: '30.00' }, { numero: 2, vencimento: '2027-01-02', valor: '30.00', aberto: '30.00' }] },
-    }
-    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: recebida })
-    const { wrapper, router } = await montar(VendaPagina, '/vendas/3')
-    expect(wrapper.text()).toContain('Em aberto (todas as lojas)')
-    expect(wrapper.text()).toMatch(/Disponível\s*R\$\s300,00/)
-    expect(wrapper.text()).not.toContain('Passa do disponível')
-
-    await botao(wrapper, 'Receber').trigger('click')
-    await flushPromises()
-    expect(document.body.textContent).toMatch(/Carnê: 2x de R\$\s50,00/)
-    const campo = (rotulo) => wrapper.findAllComponents(QInput).find((c) => c.props('label')?.startsWith(rotulo))
-    await campo('Entrada').vm.$emit('update:modelValue', '40')
-    await flushPromises()
-    expect(document.body.textContent).toMatch(/Carnê: 2x de R\$\s30,00/)
-    await campo('Valor recebido').vm.$emit('update:modelValue', '50')
-    await campo('Primeiro vencimento').vm.$emit('update:modelValue', '2026-12-02')
-    await flushPromises()
-    expect(document.body.textContent).toContain('Troco R$')
-    document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
+    await botao(wrapper, 'Confirmar recebimento').trigger('click')
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/vendas/3/receber', {
-      sessao_caixa_id: 11, valor_recebido: '50', entrada: '40', forma_entrada_id: 1, primeiro_vencimento: '2026-12-02', autorizacao: null,
+      sessao_caixa_id: 11, valor_recebido: '50.00', data_base: null, modelo_nota: '65', autorizacao: null,
+      pagamentos: [{ forma_pagamento_id: 1, valor: '40.00', parcelas: 1 }, { forma_pagamento_id: 2, valor: '60.00', parcelas: 1 }],
+    })
+    expect(router.currentRoute.value.name).toBe('vendas')
+  })
+
+  it('sem caixa neste computador não recebe', async () => {
+    entrar()
+    vi.spyOn(api, 'get').mockImplementation(gets({ ...COM_ITEM, situacao: 'fechada', forma_pagamento: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' } }))
+    const { wrapper } = await montar(RecebimentoPagina, '/vendas/3/receber')
+    expect(wrapper.text()).toContain('Este computador não está em nenhum caixa')
+    expect(botao(wrapper, 'Confirmar recebimento').attributes('disabled')).toBeDefined()
+  })
+
+  it('no crediário a entrada é opcional e as parcelas contam da data base', async () => {
+    entrar()
+    localStorage.setItem('piki.caixa', JSON.stringify({ empresa_id: 1, id: 5, nome: 'Cx 02' }))
+    const credito = { limite: '500.00', em_aberto: '200.00', disponivel: '300.00', impedimento: null }
+    const noCrediario = {
+      ...COM_ITEM, situacao: 'fechada', forma_pagamento: { id: 9, nome: 'Crediário', tipo: 'crediario' }, parcelas: 2,
+      cliente: { id: 8, nome: 'Freguesa Ficticia', cpf_cnpj: null, bloqueado: false }, comprador: 'Freguesa Ficticia', credito,
+    }
+    const padrao = gets(noCrediario)
+    vi.spyOn(api, 'get').mockImplementation((url, opcoes) =>
+      url === '/formas-pagamento' ? Promise.resolve({ data: [DINHEIRO, CARTAO, CREDIARIO] }) : padrao(url, opcoes),
+    )
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...noCrediario, situacao: 'recebida', carne: { id: 21 } } })
+    const { wrapper, router } = await montar(RecebimentoPagina, '/vendas/3/receber')
+    expect(wrapper.text()).toContain('Sem entrada')
+    const data = wrapper.findAllComponents(QInput).find((c) => c.props('label') === 'Data base')
+    await data.vm.$emit('update:modelValue', '2026-01-31')
+    await flushPromises()
+    expect(wrapper.text()).toMatch(/1\/2 · vence 28\/02\/2026\s*R\$\s50,00/)
+
+    await botao(wrapper, 'Lançar entrada').trigger('click')
+    await flushPromises()
+    const valor = wrapper.findAllComponents(QInput).find((c) => c.props('label') === 'Valor')
+    await valor.vm.$emit('update:modelValue', '40')
+    await flushPromises()
+    expect(wrapper.text()).toMatch(/2\/2 · vence 31\/03\/2026\s*R\$\s30,00/)
+    await botao(wrapper, 'NF-e (55)').trigger('click')
+    await botao(wrapper, 'Confirmar recebimento').trigger('click')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/vendas/3/receber', {
+      sessao_caixa_id: 11, valor_recebido: null, data_base: '2026-01-31', modelo_nota: '55', autorizacao: null,
+      pagamentos: [{ forma_pagamento_id: 1, valor: '40.00', parcelas: 1 }],
     })
     expect(router.currentRoute.value.name).toBe('carne')
-    expect(router.currentRoute.value.query.imprimir).toBe('1')
+  })
+
+  it('no caixa, trocar para uma forma com outro desconto avisa e recalcula', async () => {
+    entrar()
+    localStorage.setItem('piki.caixa', JSON.stringify({ empresa_id: 1, id: 5, nome: 'Cx 02' }))
+    const fechada = { ...COM_ITEM, situacao: 'fechada', desconto: '5.00', total: '95.00', forma_pagamento: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' } }
+    vi.spyOn(api, 'get').mockImplementation(gets(fechada))
+    const noCartao = { ...fechada, desconto: '0.00', total: '100.00', forma_pagamento: { id: 2, nome: 'Cartão de crédito', tipo: 'cartao_credito' } }
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: noCartao })
+    const { wrapper } = await montar(RecebimentoPagina, '/vendas/3/receber')
+    const forma = wrapper.findAllComponents(QSelect).find((c) => c.props('label') === 'Forma')
+    await forma.vm.$emit('update:modelValue', 2)
+    await flushPromises()
+    expect(document.body.textContent).toContain('O desconto da venda passa a ser o de Cartão de crédito')
+    document.querySelectorAll('.q-dialog button')[1].click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/vendas/3/forma', { forma_pagamento_id: 2, parcelas: 1, autorizacao: null })
+    const valor = wrapper.findAllComponents(QInput).find((c) => c.props('label') === 'Valor')
+    expect(valor.props('modelValue')).toBe('100.00')
   })
 
   it('o carnê mostra uma parcela por bloco', async () => {

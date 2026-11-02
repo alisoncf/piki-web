@@ -236,10 +236,18 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - O desconto permitido é o maior entre o da forma de pagamento, o do perfil de quem está vendendo e o de quem já autorizou na venda. Acima disso, a tela pede o login e a senha de alguém com limite maior, e a venda guarda quem autorizou. Parcelas acima do "sem autorização" da forma pedem alguém com a permissão `vendas.autorizar`.
 - Ao escolher (ou trocar) a forma, o desconto dela vale para todos os itens, substituindo o que havia. O desconto no total, em % ou em reais, é rateado pelo valor de cada item (os centavos que sobram vão no maior); o item que entra depois leva o mesmo %. O desconto também pode ser dado direto no item.
 - O preço do item é o de queima, quando o produto tem; senão, o de venda.
-- Uma forma de pagamento por venda, como no VB6.
+- ~~Uma forma de pagamento por venda~~. Substituído em 02/11/2026: a venda tem a forma que dá o desconto, e no caixa o cliente paga em uma ou mais formas (ver "Recebimento no caixa").
 - A venda aberta não reserva estoque; a baixa acontece quando o caixa recebe, e o estoque pode ficar negativo, com aviso. O recebimento lança a entrada no caixa (motivo "venda"), que só é desfeita pela venda.
 - Numeração própria por loja. A venda aberta pode ser cancelada com o motivo; a recebida, só pela devolução (etapa 5).
 - Permissões: `vendas.ver`, `vendas.vender` e `vendas.autorizar`; quem recebe precisa de `caixa.operar`.
+
+**Recebimento no caixa (02/11/2026)**
+- Pedido do Alison. O computador fica no caixa: quem entra num caixa aberto (ou o abre) deixa aquele computador nele, e as vendas são recebidas ali sem escolher o caixa. O caixa aparece no cabeçalho, com "Sair do caixa neste computador"; fechar o caixa tira o computador dele. Fica guardado no navegador, por loja.
+- A tela de recebimento é própria (o "troco" do VB6). O caixa da loja abre as vendas fechadas direto nela.
+- **Trocar a forma no caixa:** o cliente pode mudar de ideia (era crédito, vai no débito ou no PIX). Se o desconto da forma nova é outro, ele vale para todos os itens e o desconto que tinha sido dado sai, com aviso (o VB6 também cancelava o desconto); se é o mesmo, o desconto fica. As parcelas do crediário também podem mudar ali, com as mesmas autorizações.
+- **Várias formas:** o cliente paga em uma ou mais formas (um pouco no PIX, um pouco no cartão), e cada uma entra no caixa na sua forma. Fora do crediário, o lançado tem de fechar o total; o troco é só do dinheiro (o que o cliente deu menos o que ficou no dinheiro). No cartão de crédito, cada pagamento tem suas parcelas, com a autorização acima do limite da forma.
+- **Nota:** o caixa escolhe NFC-e (modelo 65, o normal) ou NF-e (modelo 55, pede o cliente cadastrado com CPF ou CNPJ). Por enquanto só fica guardado na venda; a emissão é a etapa 4.
+- Do troco do VB6 ficaram para depois: desconto gerencial no caixa, vale de funcionário, cartão presente, mudar o valor ou a data de uma parcela do carnê, tipo de cobrança, "lançar mais tarde" e cliente promocional.
 
 **Ajustes da venda (02/11/2026)**
 - Pedido do Alison. O vendedor **fecha** a venda com o cliente, e só a venda fechada vai para o caixa, que a acha pelo nome de quem comprou (a lista do caixa começa nas fechadas). Para fechar: itens, forma de pagamento e o nome de quem compra (o crediário pede o cliente cadastrado; a entrega, o endereço). A venda fechada não muda; o vendedor ou o caixa reabre, e ela sai da fila do caixa. Fechada também vence em 10 dias.
@@ -251,9 +259,9 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - Regras do Alison: o limite restante do cliente é o limite de crédito menos todas as parcelas em aberto (em todas as lojas). O carnê não tem entrada; se o cliente pagar uma parte na hora, o caixa informa a entrada ao receber. Não há juros no crediário; pode haver juros de atraso ao receber a parcela.
 - O crediário pede o cliente cadastrado. Cliente bloqueado ou com o crédito suspenso não compra no crediário, nem com autorização.
 - Ao escolher o crediário, a venda mostra o limite do cliente, o que está em aberto e o disponível. Acima do disponível, o caixa pede o login e a senha de quem tem `vendas.autorizar` (ou uma entrada maior), e a venda guarda quem autorizou. No VB6 o limite só aparecia na tela, sem bloquear.
-- A entrada é paga numa forma que não seja o crediário (com troco, se for no dinheiro). O resto é dividido nas parcelas escolhidas na venda, iguais e sem juros; os centavos que sobram vão na última, como no VB6.
-- O primeiro vencimento é escolhido pelo caixa (sugere um mês depois de hoje; não pode ser antes de hoje). As outras vencem no mesmo dia dos meses seguintes (intervalo de 30 dias na forma); se o dia não existe no mês, no último dia dele.
-- No caixa entram a entrada, na forma em que foi paga, e o valor a prazo, na forma Crediário (como o DUP do VB6).
+- A entrada é paga em uma ou mais formas que não sejam o crediário (com troco, se tiver dinheiro). O resto é dividido nas parcelas escolhidas na venda, iguais e sem juros; os centavos que sobram vão na última, como no VB6.
+- ~~O primeiro vencimento é escolhido pelo caixa~~ (substituído em 02/11/2026). O caixa escolhe a **data base** (hoje, se não mudar; até um mês atrás, como no VB6), e a 1ª parcela vence um intervalo depois dela (um mês, com o intervalo de 30 dias da forma). As outras vencem no mesmo dia dos meses seguintes; se o dia não existe no mês, no último dia dele.
+- No caixa entram a entrada, em cada forma em que foi paga, e o valor a prazo, na forma Crediário (como o DUP do VB6).
 - O carnê é uma conta a receber da loja que vendeu, com as parcelas (o que falta pagar de cada uma). Sai na janela de impressão do navegador logo depois de receber, e pode ser impresso de novo pela venda. Cada parcela tem o canhoto, que fica na loja, e a parte do cliente.
 - Ficam para depois: a baixa das parcelas (em qualquer loja, com os juros de atraso), o contrato impresso e a importação das parcelas em aberto do VB6. Até essa importação, o "em aberto" só soma os carnês do sistema novo.
 

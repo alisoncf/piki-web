@@ -8,7 +8,7 @@
         <q-btn v-if="(aberta || fechada) && podeVender" flat no-caps color="negative" icon="close" label="Cancelar venda" @click="cancelar" />
         <q-btn v-if="fechada && (podeVender || podeReceber)" flat no-caps icon="lock_open" label="Reabrir" class="q-ml-sm" @click="reabrir" />
         <q-btn v-if="aberta && podeVender" unelevated no-caps color="primary" icon="done_all" label="Fechar venda" class="q-ml-sm" :loading="fechando" @click="fechar" />
-        <q-btn v-if="fechada && podeReceber" unelevated no-caps color="primary" icon="point_of_sale" label="Receber" class="q-ml-sm" @click="abrirRecebimento" />
+        <q-btn v-if="fechada && podeReceber" unelevated no-caps color="primary" icon="point_of_sale" label="Receber" class="q-ml-sm" :to="{ name: 'receber-venda', params: { id: venda.id } }" />
       </template>
     </div>
 
@@ -227,9 +227,7 @@
             <div class="col text-weight-medium">Carnê {{ venda.carne.id }}</div>
             <q-btn flat dense no-caps color="primary" icon="print" label="Imprimir carnê" :to="{ name: 'carne', params: { id: venda.id } }" />
           </div>
-          <div v-if="Number(venda.entrada)" class="row justify-between text-caption">
-            <span>Entrada ({{ venda.forma_entrada?.nome }})</span><span>{{ formatarMoeda(venda.entrada) }}</span>
-          </div>
+          <div class="text-caption text-suave">A prazo {{ formatarMoeda(venda.a_prazo) }}, contado de {{ formatarDataHora(venda.data_base) }}</div>
           <div v-for="p in venda.carne.parcelas" :key="p.numero" class="row justify-between text-caption">
             <span>{{ p.numero }}/{{ venda.carne.parcelas.length }} · vence {{ formatarDataHora(p.vencimento) }}</span>
             <span>{{ formatarMoeda(p.valor) }}</span>
@@ -242,6 +240,9 @@
           <div v-if="aberta || fechada">Vence em {{ formatarDataHora(venda.vence_em).slice(0, 10) }}</div>
           <template v-if="venda.situacao === 'recebida'">
             <div>Recebida por {{ venda.recebida_por?.nome }} no {{ venda.sessao_caixa?.caixa.nome }} · {{ formatarDataHora(venda.recebida_em) }}</div>
+            <div v-for="(pg, i) in venda.pagamentos" :key="i">
+              {{ pg.forma_pagamento.nome }}<template v-if="pg.parcelas > 1"> em {{ pg.parcelas }}x</template>: {{ formatarMoeda(pg.valor) }}
+            </div>
             <div v-if="venda.troco !== null">Recebido {{ formatarMoeda(venda.valor_recebido) }} · troco {{ formatarMoeda(venda.troco) }}</div>
           </template>
           <div v-if="venda.situacao === 'cancelada'">
@@ -296,84 +297,20 @@
       </q-card>
     </q-dialog>
 
-    <!-- autorização de quem pode mais -->
-    <q-dialog v-model="autorizacao.aberto" @hide="responderAutorizacao(null)">
-      <q-card class="cartao-estreito">
-        <q-form @submit.prevent="responderAutorizacao({ login: autorizacao.login, senha: autorizacao.senha })">
-          <q-card-section class="piki-titulo">Autorização</q-card-section>
-          <q-card-section class="q-gutter-sm q-pt-none">
-            <div>{{ autorizacao.mensagem }}</div>
-            <q-input v-model="autorizacao.login" outlined autofocus label="Login de quem autoriza" autocomplete="off" />
-            <q-input v-model="autorizacao.senha" outlined type="password" label="Senha" autocomplete="new-password" />
-          </q-card-section>
-          <q-card-actions align="right">
-            <q-btn v-close-popup flat no-caps label="Cancelar" />
-            <q-btn type="submit" color="primary" unelevated no-caps label="Autorizar" />
-          </q-card-actions>
-        </q-form>
-      </q-card>
-    </q-dialog>
-
-    <!-- receber no caixa -->
-    <q-dialog v-model="recebimento.aberto">
-      <q-card class="cartao-estreito">
-        <q-form @submit.prevent="receber">
-          <q-card-section class="piki-titulo">Receber {{ formatarMoeda(venda?.total) }}</q-card-section>
-          <q-card-section class="q-gutter-sm q-pt-none">
-            <div>{{ forma?.nome }}<template v-if="venda?.parcelas > 1"> em {{ venda.parcelas }}x</template></div>
-            <q-select
-              v-model="recebimento.sessao_caixa_id"
-              outlined
-              label="Caixa *"
-              :options="caixasAbertos"
-              option-value="id"
-              option-label="nome"
-              emit-value
-              map-options
-              :hint="caixasAbertos.length ? '' : 'Nenhum caixa aberto nesta loja'"
-            />
-            <template v-if="crediario">
-              <q-input v-model="recebimento.entrada" outlined autofocus type="number" step="0.01" min="0" prefix="R$" label="Entrada (se o cliente pagar uma parte agora)" />
-              <q-select
-                v-if="entrada > 0"
-                v-model="recebimento.forma_entrada_id"
-                outlined
-                label="Forma da entrada *"
-                :options="formasDaEntrada"
-                option-value="id"
-                option-label="nome"
-                emit-value
-                map-options
-              />
-              <q-input v-model="recebimento.primeiro_vencimento" outlined type="date" stack-label label="Primeiro vencimento *" />
-              <div class="text-weight-medium">
-                Carnê: {{ venda.parcelas }}x de {{ formatarMoeda(aPrazo / venda.parcelas) }}
-                <span class="text-caption text-suave">({{ formatarMoeda(aPrazo) }} a prazo, sem juros)</span>
-              </div>
-            </template>
-            <template v-if="formaNaMao?.tipo === 'dinheiro'">
-              <q-input v-model="recebimento.valor_recebido" outlined :autofocus="!crediario" type="number" step="0.01" min="0" prefix="R$" label="Valor recebido" />
-              <div v-if="troco > 0" class="text-h6">Troco {{ formatarMoeda(troco) }}</div>
-            </template>
-          </q-card-section>
-          <q-card-actions align="right">
-            <q-btn v-close-popup flat no-caps label="Cancelar" />
-            <q-btn type="submit" color="primary" unelevated no-caps label="Receber" :loading="recebimento.enviando" :disable="!recebimento.sessao_caixa_id" />
-          </q-card-actions>
-        </q-form>
-      </q-card>
-    </q-dialog>
+    <dialogo-autorizacao :estado="autorizacao" @responder="responderAutorizacao" />
   </q-page>
 </template>
 
 <script setup>
 import { useQuasar } from 'quasar'
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 import CampoCep from '@/componentes/CampoCep.vue'
+import DialogoAutorizacao from '@/componentes/DialogoAutorizacao.vue'
 import SelecaoCidade from '@/componentes/SelecaoCidade.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
+import { usarAutorizacao } from '@/servicos/autorizacao'
 import { usarCep } from '@/servicos/cep'
 import { formatarCodigoProduto, formatarDataHora, formatarMoeda, formatarQuantidade, mascaraTelefone } from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
@@ -382,12 +319,9 @@ const SITUACOES = { aberta: 'Aberta', fechada: 'Fechada', recebida: 'Recebida', 
 const CORES = { aberta: 'warning', fechada: 'primary', recebida: 'positive', cancelada: 'grey', vencida: 'grey-7' }
 const SEM_CONSUMIDOR = { nome: '', cpf: '', aniversario: '', telefone: '', email: '' }
 const SEM_ENTREGA = { taxa: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade_id: null, ponto_referencia: '', telefone: '' }
-// o caixa em que esta máquina recebe (um caixa por ponto)
-const CAIXA_DA_MAQUINA = 'piki.caixa'
 
 const $q = useQuasar()
 const rota = useRoute()
-const roteador = useRouter()
 const sessao = useSessaoStore()
 
 const venda = ref(null)
@@ -406,9 +340,7 @@ const procurando = ref(false)
 const resultados = ref([])
 const item = ref({ aberto: false })
 const desconto = ref({ aberto: false, em: 'percentual', valor: '' })
-const autorizacao = ref({ aberto: false, mensagem: '', login: '', senha: '' })
-const recebimento = ref({ aberto: false, sessao_caixa_id: null, valor_recebido: '', entrada: '', forma_entrada_id: null, primeiro_vencimento: '', enviando: false })
-const caixasAbertos = ref([])
+const { autorizacao, responder: responderAutorizacao, comAutorizacao } = usarAutorizacao()
 
 const podeVender = computed(() => sessao.pode('vendas.vender'))
 const podeReceber = computed(() => sessao.pode('caixa.operar'))
@@ -424,16 +356,6 @@ const parcelas = computed(() =>
   })),
 )
 const percentual = computed(() => (Number(venda.value?.subtotal) ? (Number(venda.value.desconto) * 100) / Number(venda.value.subtotal) : 0))
-const crediario = computed(() => forma.value?.tipo === 'crediario')
-const formasDaEntrada = computed(() => formas.value.filter((f) => f.tipo !== 'crediario'))
-const entrada = computed(() => (crediario.value ? Number(recebimento.value.entrada || 0) : 0))
-const aPrazo = computed(() => Number(venda.value?.total || 0) - entrada.value)
-// a forma em que o cliente paga agora: no crediário, a da entrada
-const formaNaMao = computed(() => {
-  if (!crediario.value) return forma.value
-  return entrada.value > 0 ? (formas.value.find((f) => f.id === recebimento.value.forma_entrada_id) ?? null) : null
-})
-const troco = computed(() => Number(recebimento.value.valor_recebido || 0) - (crediario.value ? entrada.value : Number(venda.value?.total || 0)))
 const passaDoLimite = computed(() => !!venda.value?.credito && Number(venda.value.credito.disponivel) < Number(venda.value.total))
 
 const colunas = [
@@ -479,36 +401,17 @@ function mostrar(dados) {
   if (dados.cliente && !clientes.value.some((c) => c.id === dados.cliente.id)) clientes.value = [dados.cliente, ...clientes.value]
 }
 
-// pedido de autorização: a tela espera o login e a senha (ou null, se desistir)
-let aoAutorizar = null
-function pedirAutorizacao(mensagem) {
-  autorizacao.value = { aberto: true, mensagem, login: '', senha: '' }
-  return new Promise((resolver) => (aoAutorizar = resolver))
-}
-function responderAutorizacao(resposta) {
-  autorizacao.value.aberto = false
-  aoAutorizar?.(resposta)
-  aoAutorizar = null
-}
-
 /** Manda o pedido; se passar do limite, pede a autorização e manda de novo com ela. Devolve a venda, ou null. */
 async function enviar(pedido) {
-  let dados = null
-  for (;;) {
-    try {
-      const { data } = await pedido(dados)
-      mostrar(data)
-      return data
-    } catch (e) {
-      if (e.response?.status === 403 && e.response.headers?.['x-pede-autorizacao']) {
-        dados = await pedirAutorizacao(mensagemDeErro(e))
-        if (dados) continue
-      } else {
-        $q.notify({ type: 'negative', message: mensagemDeErro(e) })
-      }
-      if (venda.value) mostrar(venda.value) // desfaz o que mudou na tela
-      return null
-    }
+  try {
+    const data = await comAutorizacao(pedido)
+    if (data) mostrar(data)
+    else if (venda.value) mostrar(venda.value) // desistiu: desfaz o que mudou na tela
+    return data
+  } catch (e) {
+    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+    if (venda.value) mostrar(venda.value)
+    return null
   }
 }
 
@@ -692,66 +595,6 @@ function cancelar() {
     cancel: { flat: true, label: 'Voltar' },
     ok: { label: 'Cancelar venda', color: 'negative' },
   }).onOk((motivo) => enviar(() => api.post(`${url.value}/cancelar`, { motivo })))
-}
-
-async function abrirRecebimento() {
-  let lembrado = null
-  try {
-    lembrado = Number(localStorage.getItem(CAIXA_DA_MAQUINA)) || null
-  } catch {
-    // sem armazenamento local: escolhe o caixa toda vez
-  }
-  try {
-    const { data } = await api.get('/caixas')
-    caixasAbertos.value = data.filter((c) => c.sessao).map((c) => ({ id: c.sessao.id, caixa_id: c.id, nome: c.nome }))
-  } catch (e) {
-    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
-    return
-  }
-  const doLembrado = caixasAbertos.value.find((c) => c.caixa_id === lembrado)
-  const unico = caixasAbertos.value.length === 1 ? caixasAbertos.value[0] : null
-  recebimento.value = {
-    aberto: true,
-    sessao_caixa_id: (doLembrado ?? unico)?.id ?? null,
-    valor_recebido: '',
-    entrada: '',
-    forma_entrada_id: formasDaEntrada.value.find((f) => f.tipo === 'dinheiro')?.id ?? null,
-    primeiro_vencimento: daquiAUmMes(),
-    enviando: false,
-  }
-}
-
-/** Hoje mais um mês, no formato do campo de data (2026-12-02); se o dia não existe no mês, o último dia dele. */
-function daquiAUmMes(hoje = new Date()) {
-  const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0).getDate()
-  const data = new Date(hoje.getFullYear(), hoje.getMonth() + 1, Math.min(hoje.getDate(), ultimoDia))
-  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`
-}
-
-async function receber() {
-  const r = recebimento.value
-  const pedido = { sessao_caixa_id: r.sessao_caixa_id, valor_recebido: r.valor_recebido ? String(r.valor_recebido) : null }
-  if (crediario.value) {
-    Object.assign(pedido, {
-      entrada: String(entrada.value),
-      forma_entrada_id: entrada.value > 0 ? r.forma_entrada_id : null,
-      primeiro_vencimento: r.primeiro_vencimento || null,
-    })
-  }
-  r.enviando = true
-  // no crediário acima do limite do cliente, pede a autorização como no desconto
-  const data = await enviar((autorizacao) => api.post(`${url.value}/receber`, { ...pedido, autorizacao }))
-  r.enviando = false
-  if (!data) return
-  r.aberto = false
-  try {
-    localStorage.setItem(CAIXA_DA_MAQUINA, String(caixasAbertos.value.find((c) => c.id === r.sessao_caixa_id)?.caixa_id))
-  } catch {
-    // sem armazenamento local: tudo bem
-  }
-  $q.notify({ type: 'positive', message: data.troco && Number(data.troco) ? `Venda recebida. Troco ${formatarMoeda(data.troco)}` : 'Venda recebida' })
-  for (const aviso of data.avisos) $q.notify({ type: 'warning', message: aviso, timeout: 8000 })
-  if (data.carne) roteador.push({ name: 'carne', params: { id: data.id }, query: { imprimir: 1 } })
 }
 
 onMounted(async () => {

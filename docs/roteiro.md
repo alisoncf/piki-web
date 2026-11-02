@@ -137,6 +137,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 - [x] Venda (D26): vendedor monta, caixa recebe, desconto pela forma com limite do perfil e autorização, venda aberta vence em 10 dias (migração 0020) — 02/11/2026
 - [x] Crediário na venda (D26): limite do cliente somando todas as lojas, entrada, parcelas sem juros e carnê pela janela de impressão (migração 0021) — 02/11/2026
 - [x] Ajustes da venda (D26): o vendedor fecha e o caixa recebe a fechada, venda a consumidor com cadastro curto, entrega com taxa e endereço, produto em queima sem desconto (migração 0022) — 02/11/2026
+- [x] Recebimento no caixa (D26): o computador fica no caixa, troca da forma no caixa, pagamento em várias formas, data base do crediário, escolha NFC-e ou NF-e (migração 0023) — 02/11/2026
 - [ ] Trocas, cancelamento, entrega, cartão presente
 - [ ] Controle de vales por funcionário
 - [ ] Conciliação do cartão pelo extrato da financeira

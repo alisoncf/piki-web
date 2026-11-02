@@ -45,7 +45,7 @@ def credito(db: Session, cliente: Cliente) -> Credito:
                    bloqueado=cliente.bloqueado, suspenso=cliente.credito_suspenso)
 
 
-def _somar_meses(inicio: date, meses: int) -> date:
+def somar_meses(inicio: date, meses: int) -> date:
     mes = inicio.month - 1 + meses
     ano, mes = inicio.year + mes // 12, mes % 12 + 1
     return date(ano, mes, min(inicio.day, calendar.monthrange(ano, mes)[1]))
@@ -54,7 +54,7 @@ def _somar_meses(inicio: date, meses: int) -> date:
 def vencimentos(primeiro: date, parcelas: int, intervalo: int) -> list[date]:
     """Intervalo de 30 dias (ou múltiplo) vence no mesmo dia de cada mês, como no VB6; outro, a cada tantos dias."""
     if intervalo % 30 == 0:
-        return [_somar_meses(primeiro, i * intervalo // 30) for i in range(parcelas)]
+        return [somar_meses(primeiro, i * intervalo // 30) for i in range(parcelas)]
     return [primeiro + timedelta(days=i * intervalo) for i in range(parcelas)]
 
 

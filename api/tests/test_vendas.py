@@ -93,7 +93,9 @@ def test_monta_a_venda_e_o_caixa_recebe(banco, cliente, cenario, admin, loja):
     assert cliente.get("/vendas", headers=davi, params={"situacao": "fechada", "busca": "jos"}).json()["total"] == 1
 
     # o caixa recebe: entra no caixa e baixa o estoque
-    r = cliente.post(f"{url}/receber", headers=davi, json={"sessao_caixa_id": loja["sessao"], "valor_recebido": "320"})
+    no_dinheiro = {"sessao_caixa_id": loja["sessao"], "valor_recebido": "320",
+                   "pagamentos": [{"forma_pagamento_id": loja["formas"]["dinheiro"], "valor": "319.25"}]}
+    r = cliente.post(f"{url}/receber", headers=davi, json=no_dinheiro)
     assert r.status_code == 200, r.text
     venda = r.json()
     assert (venda["situacao"], venda["troco"], venda["recebida_por"]["nome"]) == ("recebida", "0.75", "Davi Sem Acesso")
@@ -245,5 +247,33 @@ def test_consumidor_sem_cadastro_e_entrega(banco, cliente, loja):
     venda = cliente.put(url, headers=davi, json={"forma_pagamento_id": dinheiro, "consumidor": maria}).json()
     assert (venda["entrega"], venda["total"]) == (None, "95.00")
     assert cliente.post(f"{url}/fechar", headers=davi).json()["situacao"] == "fechada"
-    r = cliente.post(f"{url}/receber", headers=davi, json={"sessao_caixa_id": loja["sessao"]})
+    r = cliente.post(f"{url}/receber", headers=davi, json={
+        "sessao_caixa_id": loja["sessao"], "pagamentos": [{"forma_pagamento_id": dinheiro, "valor": "95.00"}]})
     assert r.status_code == 200, r.text
+
+
+def test_no_caixa_muda_a_forma_e_paga_em_varias(cliente, loja):
+    davi, f = loja["davi"], loja["formas"]
+    url = f"/vendas/{cliente.post('/vendas', headers=davi).json()['id']}"
+    cliente.post(f"{url}/itens", headers=davi, json={"produto_id": loja["produtos"]["lencol"]})
+    cliente.put(url, headers=davi, json={"forma_pagamento_id": f["dinheiro"], "consumidor": {"nome": "José"}})
+    assert cliente.post(f"{url}/fechar", headers=davi).json()["total"] == "95.00"
+
+    # no caixa, o cliente prefere o cartão: o desconto da forma é outro (0%), e o da venda cai
+    venda = cliente.post(f"{url}/forma", headers=davi, json={"forma_pagamento_id": f["cartao_credito"]}).json()
+    assert (venda["situacao"], venda["forma_pagamento"]["nome"], venda["total"]) == ("fechada", "Cartão de crédito", "100.00")
+    # um pouco no dinheiro, um pouco no cartão
+    pedido = {"sessao_caixa_id": loja["sessao"], "valor_recebido": "50", "pagamentos": [
+        {"forma_pagamento_id": f["dinheiro"], "valor": "40.00"}, {"forma_pagamento_id": f["cartao_credito"], "valor": "50.00"}]}
+    r = cliente.post(f"{url}/receber", headers=davi, json=pedido)
+    assert r.status_code == 422 and r.json()["detail"] == "Falta lançar R$ 10,00"
+    pedido["pagamentos"][1] |= {"valor": "60.00", "parcelas": 5}
+    r = cliente.post(f"{url}/receber", headers=davi, json=pedido)
+    assert r.status_code == 403 and "acima de 3x" in r.json()["detail"]
+    pedido["pagamentos"][1]["parcelas"] = 3
+    r = cliente.post(f"{url}/receber", headers=davi, json=pedido | {"modelo_nota": "55"})
+    assert r.status_code == 422 and "NF-e (modelo 55)" in r.json()["detail"]
+    venda = cliente.post(f"{url}/receber", headers=davi, json=pedido).json()
+    assert (venda["situacao"], venda["troco"], venda["modelo_nota"]) == ("recebida", "10.00", "65")
+    assert [(p["forma_pagamento"]["nome"], p["valor"], p["parcelas"]) for p in venda["pagamentos"]] == [
+        ("Dinheiro", "40.00", 1), ("Cartão de crédito", "60.00", 3)]

@@ -207,6 +207,12 @@ export const rotas = [
         meta: { permissao: ['vendas.ver', 'vendas.vender', 'caixa.operar'] },
       },
       {
+        path: 'vendas/:id(\\d+)/receber',
+        name: 'receber-venda',
+        component: () => import('@/paginas/vendas/RecebimentoPagina.vue'),
+        meta: { permissao: 'caixa.operar' },
+      },
+      {
         path: 'caixa',
         name: 'caixa',
         component: () => import('@/paginas/caixa/CaixaPagina.vue'),

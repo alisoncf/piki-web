@@ -8,6 +8,7 @@ import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import CaixaPagina from '@/paginas/caixa/CaixaPagina.vue'
 import SessaoCaixaPagina from '@/paginas/caixa/SessaoCaixaPagina.vue'
 import { api } from '@/servicos/api'
+import { useCaixaDaMaquinaStore } from '@/stores/caixaDaMaquina'
 import { useSessaoStore } from '@/stores/sessao'
 
 // dados fictícios
@@ -52,6 +53,7 @@ beforeEach(() => {
   setActivePinia(createPinia())
   vi.restoreAllMocks()
   document.body.innerHTML = ''
+  localStorage.clear()
 })
 
 describe('caixa', () => {
@@ -82,6 +84,21 @@ describe('caixa', () => {
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/caixas/6/abrir', { fundo: '150' })
     expect(router.currentRoute.value.params.id).toBe('12')
+    // quem abre deixa este computador no caixa
+    expect(JSON.parse(localStorage.getItem('piki.caixa'))).toEqual({ empresa_id: 1, id: 6, nome: 'Cx 03' })
+  })
+
+  it('entrar num caixa aberto deixa o computador nele', async () => {
+    entrar()
+    vi.spyOn(api, 'get').mockResolvedValue({ data: [{ id: 5, nome: 'Cx 02', ativo: true, sessao: SESSAO }] })
+    const { wrapper, router } = await montar(CaixaPagina, '/caixa')
+    await wrapper.findAll('button').find((b) => b.text().includes('Entrar')).trigger('click')
+    await flushPromises()
+    expect(useCaixaDaMaquinaStore().caixa).toEqual({ empresa_id: 1, id: 5, nome: 'Cx 02' })
+    expect(router.currentRoute.value.params.id).toBe('11')
+    // noutra empresa, este computador não está em caixa nenhum
+    useSessaoStore().empresa = { ...MATRIZ, id: 2 }
+    expect(useCaixaDaMaquinaStore().caixa).toBeNull()
   })
 
   it('conferência cega: o operador não vê o saldo e conta dinheiro e as formas lançadas', async () => {

@@ -168,6 +168,7 @@ import { useRoute } from 'vue-router'
 import SelecaoBusca from '@/componentes/SelecaoBusca.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
 import { formatarDataHora, formatarMoeda } from '@/servicos/formatos'
+import { useCaixaDaMaquinaStore } from '@/stores/caixaDaMaquina'
 import { useSessaoStore } from '@/stores/sessao'
 
 const MOTIVOS = {
@@ -181,6 +182,7 @@ const MOTIVOS = {
 const $q = useQuasar()
 const rota = useRoute()
 const sessao = useSessaoStore()
+const caixaDaMaquina = useCaixaDaMaquinaStore()
 
 const s = ref(null)
 const carregando = ref(true)
@@ -297,6 +299,7 @@ async function fechar() {
     })
     s.value = data
     fechando.value = false
+    if (caixaDaMaquina.caixa?.id === data.caixa.id) caixaDaMaquina.sair()
     const diferenca = data.conferencia.some((c) => Number(c.diferenca) !== 0)
     $q.notify({ type: diferenca ? 'warning' : 'positive', message: diferenca ? 'Caixa fechado com diferença' : 'Caixa fechado, sem diferença', timeout: 3000 })
   } catch (e) {

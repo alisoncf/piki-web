@@ -29,11 +29,12 @@ from app.dominios.produtos.modelos import Produto
 from app.dominios.receber import servico as contas
 from app.dominios.receber.modelos import ContaReceber
 from app.dominios.vendas.esquemas import (
-    Autorizacao, ConsumidorDados, EntregaDados, ItemAlteracao, ItemNovo, PedidoDesconto, PedidoRecebimento, VendaDados,
+    Autorizacao, ConsumidorDados, EntregaDados, ItemAlteracao, ItemNovo, PedidoDesconto, PedidoForma, PedidoRecebimento,
+    VendaDados,
 )
 from app.dominios.vendas.modelos import (
     ABERTA, CANCELADA, DIAS_PARA_VENCER, FECHADA, RECEBIDA, SITUACOES, VENCIDA, Consumidor, EntregaVenda, ItemVenda,
-    Venda,
+    PagamentoVenda, Venda,
 )
 
 ZERO = Decimal("0.00")
@@ -236,14 +237,20 @@ def _conferir_parcelas(db: Session, venda: Venda, permissoes: set[str], usuario:
         raise DadoInvalido(f"{forma.nome} vai até {forma.parcelas}x")
     if venda.parcelas <= forma.parcelas_sem_autorizacao or venda.parcelas_autorizadas_por is not None:
         return
+    venda.parcelas_autorizadas_por = _quem_autoriza_parcelas(db, venda, forma, permissoes, usuario, autorizador)
+
+
+def _quem_autoriza_parcelas(db: Session, venda: Venda, forma: FormaPagamento, permissoes: set[str], usuario: Usuario,
+                            autorizador: Usuario | None) -> Usuario:
+    """Parcelas acima do limite sem autorização da forma: quem está vendendo pode, se tiver vendas.autorizar;
+    senão, pede o login e a senha de quem tem."""
     if PERMISSAO_PARCELAS in permissoes:
-        venda.parcelas_autorizadas_por = usuario
-        return
+        return usuario
     if autorizador is None:
         raise PedeAutorizacao(f"{forma.nome} acima de {forma.parcelas_sem_autorizacao}x pede a autorização da gerência")
     if PERMISSAO_PARCELAS not in acesso.permissoes_na_empresa(db, autorizador, venda.empresa_id):
         raise PedeAutorizacao(f"{autorizador.nome} não pode autorizar parcelas acima do limite")
-    venda.parcelas_autorizadas_por = autorizador
+    return autorizador
 
 
 def _aplicar_consumidor(db: Session, venda: Venda, dados: ConsumidorDados | None) -> None:
@@ -470,25 +477,62 @@ def _conferir_limite(db: Session, venda: Venda, a_prazo: Decimal, permissoes: se
     venda.limite_autorizado_por = autorizador
 
 
-def _forma_da_entrada(db: Session, venda: Venda, pedido: PedidoRecebimento) -> FormaPagamento | None:
-    if pedido.entrada <= 0:
-        return None
-    if pedido.entrada >= venda.total:
-        raise DadoInvalido("A entrada cobre a venda toda; troque a forma de pagamento")
-    if pedido.forma_entrada_id is None:
-        raise DadoInvalido("Escolha a forma de pagamento da entrada")
-    forma = db.get(FormaPagamento, pedido.forma_entrada_id)
-    if forma is None or not forma.ativo or forma.tipo == "crediario":
-        raise DadoInvalido("Forma de pagamento da entrada não encontrada")
+def _forma_ativa(db: Session, forma_id: int) -> FormaPagamento:
+    forma = db.get(FormaPagamento, forma_id)
+    if forma is None:
+        raise NaoEncontrado("Forma de pagamento não encontrada")
+    if not forma.ativo:
+        raise DadoInvalido(f"A forma {forma.nome} está desativada; escolha outra")
     return forma
+
+
+def trocar_forma(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str], venda_id: int,
+                 pedido: PedidoForma) -> Venda:
+    """No caixa, o cliente muda a forma de pagamento da venda fechada (era crédito, vai no débito...).
+
+    Se o desconto da forma nova é outro, ele vale para todos os itens e o que tinha sido dado cai, como no
+    VB6; se é o mesmo, o desconto da venda fica como estava.
+    """
+    autorizador = _autorizador(db, pedido.autorizacao)
+    venda = _na_situacao(db, empresa_id, venda_id, FECHADA)
+    forma = _forma_ativa(db, pedido.forma_pagamento_id)
+    if forma.tipo == "crediario" and venda.cliente is None:
+        raise DadoInvalido("O crediário pede o cliente cadastrado; reabra a venda para o vendedor escolher o cliente")
+    antiga = venda.forma_pagamento
+    venda.forma_pagamento = forma
+    if antiga is None or antiga.desconto != forma.desconto:
+        venda.percentual_desconto = forma.desconto
+        venda.desconto_autorizado_por = None
+        _aplicar_percentual(venda)
+    if antiga is not forma or venda.parcelas != pedido.parcelas:
+        venda.parcelas_autorizadas_por = None
+    venda.parcelas = pedido.parcelas
+    _conferir_parcelas(db, venda, permissoes, usuario, autorizador)
+    return _salvar(db, venda)
+
+
+def _pagamentos(db: Session, venda: Venda, pedido: PedidoRecebimento, permissoes: set[str], usuario: Usuario,
+                autorizador: Usuario | None) -> list[PagamentoVenda]:
+    pagamentos = []
+    for ordem, dados in enumerate(pedido.pagamentos, start=1):
+        forma = _forma_ativa(db, dados.forma_pagamento_id)
+        if forma.tipo == "crediario":
+            raise DadoInvalido("O crediário não entra como pagamento à vista; escolha o crediário como forma da venda")
+        if dados.parcelas > forma.parcelas:
+            raise DadoInvalido(f"{forma.nome} vai até {forma.parcelas}x")
+        if dados.parcelas > forma.parcelas_sem_autorizacao and venda.parcelas_autorizadas_por is None:
+            venda.parcelas_autorizadas_por = _quem_autoriza_parcelas(db, venda, forma, permissoes, usuario, autorizador)
+        pagamentos.append(PagamentoVenda(ordem=ordem, forma_pagamento=forma, valor=dados.valor,
+                                         parcelas=dados.parcelas))
+    return pagamentos
 
 
 def receber(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str], venda_id: int,
             pedido: PedidoRecebimento) -> tuple[Venda, list[str]]:
     """O caixa recebe a venda fechada: lança no caixa e baixa o estoque. Devolve a venda e os avisos de estoque negativo.
 
-    No crediário, a entrada (se houver) entra no caixa na forma em que foi paga, e o resto vira o carnê,
-    em parcelas iguais e sem juros.
+    O cliente paga em uma ou mais formas (um pouco no PIX, um pouco no cartão). No crediário, o que ele paga
+    agora é a entrada, e o resto vira o carnê, em parcelas iguais e sem juros, contadas da data base.
     """
     autorizador = _autorizador(db, pedido.autorizacao)
     venda = _na_situacao(db, empresa_id, venda_id, FECHADA)
@@ -503,41 +547,47 @@ def receber(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str]
         raise NaoEncontrado(str(e))
     if sessao.situacao != ABERTO:
         raise DadoInvalido(f"O caixa {sessao.caixa.nome} está fechado")
+    if pedido.modelo_nota == "55" and (venda.cliente is None or not venda.cliente.cpf_cnpj):
+        raise DadoInvalido("A NF-e (modelo 55) pede o cliente cadastrado, com CPF ou CNPJ")
 
-    # o que entra no caixa agora: (forma, valor)
-    lancamentos = [(forma, venda.total)]
-    venda.entrada = None
-    venda.forma_entrada = None
+    pagamentos = _pagamentos(db, venda, pedido, permissoes, usuario, autorizador)
+    pago = sum((p.valor for p in pagamentos), ZERO)
     venda.limite_autorizado_por = None
-    forma_na_mao = forma
+    venda.data_base = None
+    lancamentos = []
     if forma.tipo == "crediario":
         if venda.cliente is None:
             raise DadoInvalido("O crediário pede o cliente cadastrado")
-        forma_entrada = _forma_da_entrada(db, venda, pedido)
-        entrada = pedido.entrada if forma_entrada else ZERO
-        a_prazo = venda.total - entrada
-        primeiro = pedido.primeiro_vencimento or contas.vencimentos(date.today(), 2, forma.intervalo)[1]
-        if primeiro < date.today():
-            raise DadoInvalido("O primeiro vencimento não pode ser antes de hoje")
+        if pago >= venda.total:
+            raise DadoInvalido("A entrada cobre a venda toda; troque a forma da venda")
+        a_prazo = venda.total - pago
+        base = pedido.data_base or date.today()
+        if base < contas.somar_meses(date.today(), -1):
+            raise DadoInvalido("A data base não pode ser de mais de um mês atrás")
         _conferir_limite(db, venda, a_prazo, permissoes, usuario, autorizador)
-        venda.entrada = entrada
-        venda.forma_entrada = forma_entrada
-        forma_na_mao = forma_entrada
-        lancamentos = [(forma, a_prazo)] + ([(forma_entrada, entrada)] if forma_entrada else [])
+        venda.data_base = base
+        primeiro = contas.vencimentos(base, 2, forma.intervalo)[1]
         contas.lancar_carne(db, empresa_id, venda.cliente_id, venda.id, a_prazo, venda.parcelas, primeiro,
                              forma.intervalo, f"Venda {venda.numero} {venda.cliente.nome}", usuario.id)
+        lancamentos.append((forma, a_prazo))
+    elif pago < venda.total:
+        raise DadoInvalido(f"Falta lançar {_moeda(venda.total - pago)}")
+    elif pago > venda.total:
+        raise DadoInvalido(f"O lançado passa do total em {_moeda(pago - venda.total)}; "
+                           "o troco sai do valor que o cliente deu no dinheiro")
 
+    no_dinheiro = sum((p.valor for p in pagamentos if p.forma_pagamento.tipo == "dinheiro"), ZERO)
     venda.valor_recebido = None
-    if forma_na_mao is not None and forma_na_mao.tipo == "dinheiro":
-        venda.valor_recebido = pedido.valor_recebido or venda.pago_na_hora
-        if venda.valor_recebido < venda.pago_na_hora:
-            raise DadoInvalido("O valor recebido é menor que o total da venda" if forma_na_mao is forma
-                               else "O valor recebido é menor que a entrada")
-    for forma_lancada, valor in lancamentos:
-        if valor > 0:
-            db.add(LancamentoCaixa(sessao_id=sessao.id, tipo="entrada", motivo="venda",
-                                   forma_pagamento_id=forma_lancada.id, valor=valor, documento=documento(venda),
-                                   usuario_id=usuario.id))
+    if no_dinheiro:
+        venda.valor_recebido = pedido.valor_recebido or no_dinheiro
+        if venda.valor_recebido < no_dinheiro:
+            raise DadoInvalido(f"O valor que o cliente deu é menor que os {_moeda(no_dinheiro)} no dinheiro")
+    venda.pagamentos = pagamentos
+    venda.modelo_nota = pedido.modelo_nota
+    for forma_lancada, valor in [(p.forma_pagamento, p.valor) for p in pagamentos] + lancamentos:
+        db.add(LancamentoCaixa(sessao_id=sessao.id, tipo="entrada", motivo="venda",
+                               forma_pagamento_id=forma_lancada.id, valor=valor, documento=documento(venda),
+                               usuario_id=usuario.id))
     avisos = []
     for item in venda.itens:
         try:

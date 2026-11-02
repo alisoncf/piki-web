@@ -8,7 +8,7 @@ from app.dominios.empresas.modelos import Empresa
 from app.dominios.vendas.esquemas import (
     BuscaPorCpf, ClienteResumido, Consumidor,
     Carne, ClienteDoCarne, Credito, ImpressaoCarne, Item, ItemAlteracao, ItemNovo, LojaDoCarne, PaginaVendas,
-    PedidoCancelamento, PedidoDesconto, PedidoRecebimento, Venda, VendaDados, VendaResumo,
+    PedidoCancelamento, PedidoDesconto, PedidoForma, PedidoRecebimento, Venda, VendaDados, VendaResumo,
 )
 from app.dominios.vendas.modelos import ABERTA, FECHADA, SITUACOES
 from app.dominios.vendas.modelos import Venda as ModeloVenda
@@ -40,7 +40,7 @@ def _venda(ctx: Contexto, venda: ModeloVenda, avisos: list[str] | None = None) -
     resposta.avisos = avisos or []
     if (credito := servico.credito(ctx.db, venda)) is not None:
         resposta.credito = Credito.model_validate(credito)
-    if venda.entrada is not None and (carne := servico.carne(ctx.db, venda)) is not None:
+    if venda.data_base is not None and (carne := servico.carne(ctx.db, venda)) is not None:
         resposta.carne = Carne.model_validate(carne)
     if venda.situacao in (ABERTA, FECHADA):
         saldos = servico.disponiveis(ctx.db, venda)
@@ -141,6 +141,16 @@ def reabrir(venda_id: int, ctx: Reabrir) -> Venda:
         raise _http(ctx, e)
 
 
+@router.post("/vendas/{venda_id}/forma", response_model=Venda, responses={403: {"description": "Pede autorização"}})
+def trocar_forma(venda_id: int, pedido: PedidoForma, ctx: Receber) -> Venda:
+    """No caixa, o cliente muda a forma de pagamento (ou as parcelas) da venda fechada.
+    Se o desconto da forma nova é outro, ele substitui o que a venda tinha."""
+    try:
+        return _venda(ctx, servico.trocar_forma(ctx.db, ctx.empresa_id, ctx.usuario, ctx.permissoes, venda_id, pedido))
+    except servico.ErroVenda as e:
+        raise _http(ctx, e)
+
+
 @router.get("/consumidores/{cpf}", response_model=BuscaPorCpf)
 def buscar_cpf(cpf: str, ctx: Vender) -> BuscaPorCpf:
     """Quem tem este CPF: cliente cadastrado ou consumidor que já comprou (para preencher a venda)."""
@@ -164,7 +174,8 @@ def cancelar(venda_id: int, pedido: PedidoCancelamento, ctx: Vender) -> Venda:
 def receber(venda_id: int, pedido: PedidoRecebimento, ctx: Receber) -> Venda:
     """O caixa recebe: entra no caixa e baixa o estoque. `avisos` traz os produtos que ficaram negativos.
 
-    No crediário, o que não foi pago na entrada vira o carnê. Acima do limite disponível do cliente:
+    O cliente pode pagar em várias formas (`pagamentos`); o troco é do dinheiro. No crediário, os
+    pagamentos são a entrada e o resto vira o carnê, contado da `data_base`. Acima do limite disponível do cliente:
     403 com o cabeçalho X-Pede-Autorizacao, como no desconto.
     """
     try:

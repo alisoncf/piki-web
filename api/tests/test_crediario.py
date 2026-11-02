@@ -49,19 +49,21 @@ def test_crediario_com_entrada_dentro_do_limite(cliente, loja, admin, freguesa):
     assert r.json()["detail"] == ("O crediário de R$ 400,00 passa do limite disponível do cliente (R$ 300,00). "
                                   "Peça a autorização da gerência.")
 
-    # com a entrada no dinheiro, o resto cabe
-    receber |= {"entrada": "100.01", "valor_recebido": "150"}
-    assert cliente.post(f"{url}/receber", headers=davi, json=receber).status_code == 422  # falta a forma da entrada
-    receber["forma_entrada_id"] = loja["formas"]["crediario"]
-    assert cliente.post(f"{url}/receber", headers=davi, json=receber).status_code == 422  # a entrada não é no crediário
-    receber["forma_entrada_id"] = loja["formas"]["dinheiro"]
-    r = cliente.post(f"{url}/receber", headers=davi, json=receber)
+    # com a entrada à vista (um pouco no dinheiro, um pouco no cartão), o resto cabe
+    f = loja["formas"]
+    no_crediario = [{"forma_pagamento_id": f["crediario"], "valor": "100.01"}]
+    r = cliente.post(f"{url}/receber", headers=davi, json=receber | {"pagamentos": no_crediario})
+    assert r.status_code == 422 and "não entra como pagamento à vista" in r.json()["detail"]
+    entrada = [{"forma_pagamento_id": f["dinheiro"], "valor": "50.01"}, {"forma_pagamento_id": f["cartao_credito"], "valor": "50.00"}]
+    r = cliente.post(f"{url}/receber", headers=davi, json=receber | {"pagamentos": entrada, "valor_recebido": "100"})
     assert r.status_code == 200, r.text
     venda = r.json()
-    assert (venda["situacao"], venda["entrada"], venda["forma_entrada"]["nome"], venda["troco"]) == (
-        "recebida", "100.01", "Dinheiro", "49.99")
+    assert (venda["situacao"], venda["a_prazo"], venda["troco"], venda["data_base"]) == (
+        "recebida", "299.99", "49.99", date.today().isoformat())
+    assert [(p["forma_pagamento"]["nome"], p["valor"]) for p in venda["pagamentos"]] == [
+        ("Dinheiro", "50.01"), ("Cartão de crédito", "50.00")]
     assert venda["limite_autorizado_por"] is None and venda["credito"] is None
-    vencimentos = [contas._somar_meses(date.today(), i).isoformat() for i in (1, 2, 3)]
+    vencimentos = [contas.somar_meses(date.today(), i).isoformat() for i in (1, 2, 3)]
     assert [(p["numero"], p["vencimento"], p["valor"]) for p in venda["carne"]["parcelas"]] == [
         (1, vencimentos[0], "99.99"), (2, vencimentos[1], "99.99"),
         (3, vencimentos[2], "100.01"),  # os centavos que sobram vão na última
@@ -70,7 +72,7 @@ def test_crediario_com_entrada_dentro_do_limite(cliente, loja, admin, freguesa):
     # no caixa: o crediário e a entrada, cada um na sua forma
     sessao = cliente.get(f"/caixas/sessoes/{loja['sessao']}", headers=admin).json()
     assert sorted((x["forma_pagamento"]["nome"], x["valor"]) for x in sessao["lancamentos"]) == [
-        ("Crediário", "299.99"), ("Dinheiro", "100.01")]
+        ("Cartão de crédito", "50.00"), ("Crediário", "299.99"), ("Dinheiro", "50.01")]
 
     carne = cliente.get(f"{url}/carne", headers=davi).json()
     assert carne["cliente"] == {"id": freguesa["id"], "nome": "Freguesa Ficticia", "cpf_cnpj": "00000000191",
@@ -85,20 +87,21 @@ def test_crediario_com_entrada_dentro_do_limite(cliente, loja, admin, freguesa):
 def test_crediario_acima_do_limite_com_autorizacao(cliente, loja, freguesa):  # noqa: F811
     davi = loja["davi"]
     url, _ = _venda_no_crediario(cliente, loja, freguesa["id"], 4, parcelas=2)
-    pedido = {"sessao_caixa_id": loja["sessao"], "primeiro_vencimento": (date.today() - timedelta(days=1)).isoformat()}
+    pedido = {"sessao_caixa_id": loja["sessao"], "data_base": (date.today() - timedelta(days=40)).isoformat()}
     r = cliente.post(f"{url}/receber", headers=davi, json=pedido)
-    assert r.status_code == 422 and "antes de hoje" in r.json()["detail"]
+    assert r.status_code == 422 and "mais de um mês atrás" in r.json()["detail"]
 
-    primeiro = date.today() + timedelta(days=10)
-    pedido["primeiro_vencimento"] = primeiro.isoformat()
+    # a data base pode ser outra que não hoje; a 1ª parcela vence um mês depois dela
+    base = date.today() - timedelta(days=10)
+    pedido["data_base"] = base.isoformat()
     r = cliente.post(f"{url}/receber", headers=davi, json=pedido | {"autorizacao": {"login": "ana", "senha": "senha-ana"}})
     assert r.status_code == 403 and "Ana Lima não pode" in r.json()["detail"]
     r = cliente.post(f"{url}/receber", headers=davi, json=pedido | {"autorizacao": {"login": "caio", "senha": "senha-caio"}})
     assert r.status_code == 200, r.text
     venda = r.json()
-    assert (venda["limite_autorizado_por"]["nome"], venda["entrada"], venda["troco"]) == ("Caio Admin", "0.00", None)
+    assert (venda["limite_autorizado_por"]["nome"], venda["pagamentos"], venda["troco"]) == ("Caio Admin", [], None)
     assert [p["vencimento"] for p in venda["carne"]["parcelas"]] == [
-        primeiro.isoformat(), contas._somar_meses(primeiro, 1).isoformat()]
+        contas.somar_meses(base, 1).isoformat(), contas.somar_meses(base, 2).isoformat()]
 
 
 def test_cliente_bloqueado_nao_compra_no_crediario(cliente, loja, freguesa):  # noqa: F811

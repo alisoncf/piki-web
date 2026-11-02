@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -121,15 +122,27 @@ class PedidoDesconto(ComAutorizacao):
         return self
 
 
+class PedidoForma(ComAutorizacao):
+    """No caixa, o cliente muda a forma de pagamento (ou as parcelas do crediário) da venda fechada."""
+
+    forma_pagamento_id: int
+    parcelas: int = Field(default=1, ge=1, le=24)
+
+
+class PagamentoDados(BaseModel):
+    forma_pagamento_id: int
+    valor: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    parcelas: int = Field(default=1, ge=1, le=24, description="No cartão de crédito")
+
+
 class PedidoRecebimento(ComAutorizacao):
     sessao_caixa_id: int
+    pagamentos: list[PagamentoDados] = Field(
+        default=[], description="O que o cliente paga agora, em uma ou mais formas; no crediário, a entrada (pode ser nada)")
     valor_recebido: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2,
                                            description="No dinheiro, o que o cliente deu (para o troco)")
-    # só no crediário
-    entrada: Decimal = Field(default=Decimal(0), ge=0, max_digits=14, decimal_places=2,
-                             description="Crediário: o que o cliente paga na hora; o resto vira o carnê")
-    forma_entrada_id: int | None = Field(default=None, description="Crediário: a forma em que a entrada foi paga")
-    primeiro_vencimento: date | None = Field(default=None, description="Crediário: sem ele, um mês depois de hoje")
+    data_base: date | None = Field(default=None, description="Crediário: de onde contam os vencimentos; sem ela, hoje")
+    modelo_nota: Literal["65", "55"] = Field(default="65", description="65 NFC-e, 55 NF-e")
 
 
 class PedidoCancelamento(BaseModel):
@@ -273,6 +286,14 @@ class Carne(BaseModel):
     parcelas: list[Parcela]
 
 
+class Pagamento(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    forma_pagamento: FormaResumida
+    valor: Decimal
+    parcelas: int
+
+
 class VendaResumo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -306,8 +327,10 @@ class Venda(VendaResumo):
     recebida_por: Pessoa | None
     valor_recebido: Decimal | None
     troco: Decimal | None
-    entrada: Decimal | None
-    forma_entrada: FormaResumida | None
+    pagamentos: list[Pagamento]
+    a_prazo: Decimal
+    data_base: date | None
+    modelo_nota: str
     limite_autorizado_por: Pessoa | None
     carne: Carne | None = Field(default=None, description="Crediário recebido: as parcelas")
     credito: Credito | None = Field(default=None, description="Venda aberta no crediário: o crédito do cliente")

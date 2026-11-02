@@ -11,6 +11,7 @@
         <section class="cartao q-pa-md full-height column">
           <div class="row items-center q-mb-sm">
             <div class="text-h6 col">{{ c.nome }}</div>
+            <q-badge v-if="caixaDaMaquina.caixa?.id === c.id" color="primary" class="q-mr-xs">Este computador</q-badge>
             <q-badge :color="c.sessao ? 'positive' : 'grey'">{{ c.sessao ? 'Aberto' : 'Fechado' }}</q-badge>
           </div>
           <div class="text-caption text-suave col">
@@ -18,15 +19,9 @@
             <template v-else>Fechado</template>
           </div>
           <div class="row q-gutter-sm q-mt-md">
-            <q-btn
-              v-if="c.sessao"
-              unelevated
-              no-caps
-              color="primary"
-              icon="point_of_sale"
-              label="Entrar"
-              :to="{ name: 'sessao-caixa', params: { id: c.sessao.id } }"
-            />
+            <q-btn v-if="c.sessao" unelevated no-caps color="primary" icon="point_of_sale" label="Entrar" @click="entrar(c, c.sessao.id)">
+              <q-tooltip>Este computador passa a receber as vendas no {{ c.nome }}</q-tooltip>
+            </q-btn>
             <q-btn v-else-if="sessao.pode('caixa.operar')" unelevated no-caps color="primary" icon="lock_open" label="Abrir" @click="pedirAbertura(c)" />
             <q-btn v-if="sessao.pode('caixa.conferir')" flat no-caps color="primary" icon="history" label="Fechamentos" @click="verFechamentos(c)" />
           </div>
@@ -78,6 +73,7 @@ import { useRouter } from 'vue-router'
 
 import { api, mensagemDeErro } from '@/servicos/api'
 import { formatarDataHora } from '@/servicos/formatos'
+import { useCaixaDaMaquinaStore } from '@/stores/caixaDaMaquina'
 import { useSessaoStore } from '@/stores/sessao'
 
 const $q = useQuasar()
@@ -111,6 +107,13 @@ onMounted(async () => {
   }
 })
 
+const caixaDaMaquina = useCaixaDaMaquinaStore()
+
+function entrar(caixa, sessaoId) {
+  caixaDaMaquina.entrar(caixa)
+  roteador.push({ name: 'sessao-caixa', params: { id: sessaoId } })
+}
+
 function pedirAbertura(caixa) {
   escolhido.value = caixa
   fundo.value = ''
@@ -122,7 +125,7 @@ async function abrir() {
   try {
     const { data } = await api.post(`/caixas/${escolhido.value.id}/abrir`, { fundo: fundo.value === '' ? '0' : String(fundo.value) })
     abrindo.value = false
-    await roteador.push({ name: 'sessao-caixa', params: { id: data.id } })
+    entrar(escolhido.value, data.id)
   } catch (e) {
     $q.notify({ type: 'negative', message: mensagemDeErro(e) })
   } finally {

@@ -28,7 +28,7 @@
       loading-label="Carregando..."
       class="tabela-clicavel"
       @request="aoPaginar"
-      @row-click="(_, v) => $router.push({ name: 'venda', params: { id: v.id } })"
+      @row-click="(_, v) => $router.push({ name: v.situacao === 'fechada' && sessao.pode('caixa.operar') ? 'receber-venda' : 'venda', params: { id: v.id } })"
     >
       <template #top>
         <div class="row items-center q-gutter-md full-width">
