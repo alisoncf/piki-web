@@ -33,7 +33,9 @@ letra O ("D0S SANTOS") e o número da casa no fim ("MARIA N.470").
 
 Quem manda nos dados é o registro com a data de alteração mais recente
 (dataalt_cli, ou data_cli se estiver vazia). Os outros só preenchem os campos
-vazios. Telefones, referências e anotações de todas as lojas são somados.
+vazios. Cadastro repetido com nome sem sentido (o "+" que marcava o cadastro
+velho) nunca manda, e o mapa não guarda o código dele: as vendas e parcelas
+desse código acham o cliente pelo CPF. Telefones, referências e anotações de todas as lojas são somados.
 A data de cadastro e a loja do cadastro são as do registro mais antigo.
 
 As colunas da tab_clientes não são iguais em todas as filiais
@@ -543,7 +545,11 @@ def _importar_lote(db: Session, empresa: Empresa, lote: list[dict], extras: _Ext
                 r.atualizados += 1
             else:
                 r.ligados_por_documento += 1
-            completo = cliente.data_alteracao is None or (data_linha is not None and data_linha >= cliente.data_alteracao)
+            # um cadastro com nome sem sentido ("+") nunca manda, mesmo sendo o mais recente; e, se já tinha
+            # mandado (importado antes da D21), o cadastro bom com o mesmo CPF toma o lugar dele
+            completo = not nome_sem_sentido(dados["nome"]) and (
+                nome_sem_sentido(cliente.nome) or cliente.data_alteracao is None
+                or (data_linha is not None and data_linha >= cliente.data_alteracao))
             _aplicar(cliente, dados, completo)
             if completo and data_linha:
                 cliente.data_alteracao = data_linha

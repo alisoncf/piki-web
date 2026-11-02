@@ -322,3 +322,29 @@ def test_descartados_saem_do_banco_novo(banco, empresas, tmp_path):
         assert mapa.buscar(db, "tab_clientes", empresas["01"], "5") is None
         assert mapa.buscar(db, "tab_clientesanot", empresas["01"], "20") is None
 
+
+def test_cadastro_repetido_com_nome_sem_sentido_nao_manda(banco, empresas, tmp_path):
+    """Mesmo CPF duas vezes na loja: o "+" (mais recente) sai e o cadastro bom fica com os dados (D21)."""
+    with banco() as db:  # importado antes da regra: o "+" mandou nos dados
+        velho = Cliente(nome="+", cpf_cnpj=CPF_A, data_cadastro=date(2008, 4, 30), data_alteracao=date(2011, 6, 22))
+        db.add(velho)
+        db.flush()
+        mapa.gravar(db, "tab_clientes", empresas["01"], "1", velho.id)
+        mapa.gravar(db, "tab_clientes", empresas["01"], "2", velho.id)
+        db.commit()
+    linhas = [
+        {**_ANA, "cod_cli": 1, "nome_cli": "+", "data_cli": "2008-04-30", "dataalt_cli": "2011-06-22"},
+        {**_ANA, "cod_cli": 2, "nome_cli": "ANA NOVA", "data_cli": "2011-02-17", "dataalt_cli": None},
+        {**_ANA, "cod_cli": 3, "nome_cli": "TESTE", "cpf_cli": CPF_B, "data_cli": "2010-01-01", "dataalt_cli": "2024-01-01"},
+        {**_ANA, "cod_cli": 4, "nome_cli": "CARLA BOA", "cpf_cli": CPF_B, "data_cli": "2010-01-01", "dataalt_cli": "2012-01-01"},
+    ]
+    eng = _banco_vb6(tmp_path / "f01.db", linhas, dividas=[(3, 10.0)])  # o TESTE deve: fica, mas não manda
+    r = _importar(eng, banco, "01")
+    eng.dispose()
+    assert (r.descartados, r.excluidos, r.mantidos_por_divida) == (1, 0, 1)
+    with banco() as db:
+        assert sorted((c.nome, c.cpf_cnpj) for c in db.scalars(select(Cliente))) == [
+            ("ANA NOVA", CPF_A), ("CARLA BOA", CPF_B)]
+        assert mapa.buscar(db, "tab_clientes", empresas["01"], "1") is None
+        assert mapa.buscar(db, "tab_clientes", empresas["01"], "2") == velho.id
+

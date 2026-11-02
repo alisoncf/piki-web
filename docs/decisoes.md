@@ -149,7 +149,8 @@ Decisão do Alison.
 - A exceção é quem tem parcela de crediário em aberto na loja (`tab_itdoc.reman_itd` > 0): fica, para não perder a dívida, e a ficha avisa que o CPF precisa ser corrigido.
 - Os que já tinham sido importados foram excluídos. Fica o cliente que veio também de outra loja ou que já tem documentos enviados no sistema novo.
 - Erros de digitação no nome são corrigidos na importação: zero no lugar da letra O ("D0S SANTOS") e pedaços de endereço no fim ("N.470", "Q 3 L 2").
-- Continua mandando o cadastro alterado por último, de qualquer loja (D15).
+- Continua mandando o cadastro alterado por último, de qualquer loja (D15). A exceção é o cadastro repetido com nome sem sentido (o "+" que marcava o cadastro velho de quem foi recadastrado com o mesmo CPF): ele nunca manda, mesmo sendo o alterado por último, e fica só o cadastro bom (02/11/2026).
+- Na importação de vendas, parcelas e documentos, o cliente é procurado pelo CPF do cadastro do VB6 quando o código dele não estiver no mapa (caso dos cadastros descartados que tinham o mesmo CPF de outro).
 - Resultado em 01/11/2026, com o `requinte` atualizado: de 80.657 clientes ficaram 56.000. Saíram 921 da matriz, 1.125 da Jundiaí e 23.272 da La Viva (quase nenhum cliente de lá tem CPF). Ficaram 184 sem CPF válido, todos da matriz, por terem parcela em aberto.
 
 ## Substituídas
