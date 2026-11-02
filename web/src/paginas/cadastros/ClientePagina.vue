@@ -13,11 +13,12 @@
       <template v-if="info.data_alteracao"> · alterado em {{ formatarDataHora(info.data_alteracao) }}</template>
     </div>
 
+    <indice-ficha v-if="!carregando" :key="secoes.length" :secoes="secoes" />
     <div v-if="carregando" class="row justify-center q-pa-xl"><q-spinner color="primary" size="40px" /></div>
 
     <q-form v-else ref="formulario" class="formulario" @submit.prevent="salvar">
       <fieldset :disabled="!podeEditar" class="sem-borda">
-        <section class="cartao q-pa-md q-mb-md">
+        <section id="secao-identificacao" class="cartao q-pa-md q-mb-md">
           <div class="formulario__secao">Identificação</div>
           <div class="row q-col-gutter-md">
             <q-btn-toggle
@@ -74,7 +75,7 @@
           </div>
         </section>
 
-        <section class="cartao q-pa-md q-mb-md">
+        <section id="secao-telefones" class="cartao q-pa-md q-mb-md">
           <div class="formulario__secao">Telefones</div>
           <div v-for="(tel, i) in form.telefones" :key="i" class="row q-col-gutter-md items-start q-mb-sm">
             <q-input
@@ -94,7 +95,7 @@
           <q-btn flat no-caps color="primary" icon="add" label="Adicionar telefone" @click="form.telefones.push({ numero: '', tipo: '3' })" />
         </section>
 
-        <section class="cartao q-pa-md q-mb-md">
+        <section id="secao-endereco" class="cartao q-pa-md q-mb-md">
           <div class="formulario__secao">Endereço</div>
           <div class="row q-col-gutter-md">
             <campo-cep v-model="form.cep" label="CEP" :buscando="buscandoCep" class="col-12 col-sm-4 col-md-2" @buscar="buscarCep" />
@@ -113,7 +114,7 @@
           </div>
         </section>
 
-        <section class="cartao q-pa-md q-mb-md">
+        <section id="secao-trabalho" class="cartao q-pa-md q-mb-md">
           <div class="formulario__secao">Trabalho</div>
           <div class="row q-col-gutter-md">
             <selecao-busca v-model="form.orgao_id" :opcoes="orgaos" label="Órgão / empresa" class="col-12 col-md-6" />
@@ -157,7 +158,7 @@
           </div>
         </section>
 
-        <section class="cartao q-pa-md q-mb-md">
+        <section id="secao-credito" class="cartao q-pa-md q-mb-md">
           <div class="formulario__secao">Crédito e cobrança</div>
           <div class="row q-col-gutter-md items-start">
             <q-input
@@ -188,7 +189,7 @@
           </div>
         </section>
 
-        <section class="cartao q-pa-md q-mb-md">
+        <section id="secao-referencias" class="cartao q-pa-md q-mb-md">
           <div class="formulario__secao">Referências</div>
           <div v-for="(ref_, i) in form.referencias" :key="i" class="row q-col-gutter-md items-start q-mb-sm">
             <q-input
@@ -226,7 +227,7 @@
           />
         </section>
 
-        <section class="cartao q-pa-md q-mb-md">
+        <section id="secao-observacoes" class="cartao q-pa-md q-mb-md">
           <div class="formulario__secao">Observações</div>
           <q-input v-model="form.observacao" outlined type="textarea" autogrow maxlength="4000" />
         </section>
@@ -237,7 +238,7 @@
         <q-btn type="submit" color="primary" unelevated no-caps icon="check" label="Salvar" :loading="salvando" />
       </div>
 
-      <section v-if="!novo" class="cartao q-pa-md q-mb-md">
+      <section v-if="!novo" id="secao-anotacoes" class="cartao q-pa-md q-mb-md">
         <div class="formulario__secao">Anotações</div>
         <div v-if="podeEditar" class="row q-col-gutter-md items-start q-mb-md">
           <q-input v-model="anotacao" outlined autogrow label="Nova anotação" maxlength="4000" class="col" />
@@ -260,7 +261,8 @@
     </q-form>
 
     <documentos-cliente
-      v-if="!novo && !carregando && sessao.pode('clientes.documentos')"
+      v-if="mostraDocumentos"
+      id="secao-documentos"
       :key="rota.params.id"
       :cliente-id="Number(rota.params.id)"
       :pode-remover="podeEditar"
@@ -275,6 +277,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import CampoCep from '@/componentes/CampoCep.vue'
 import DocumentosCliente from '@/componentes/DocumentosCliente.vue'
+import IndiceFicha from '@/componentes/IndiceFicha.vue'
 import SelecaoBusca from '@/componentes/SelecaoBusca.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
 import { usarCep } from '@/servicos/cep'
@@ -290,6 +293,14 @@ const sessao = useSessaoStore()
 
 const novo = computed(() => !rota.params.id)
 const podeEditar = computed(() => sessao.pode('clientes.editar'))
+const mostraDocumentos = computed(() => !novo.value && !carregando.value && sessao.pode('clientes.documentos'))
+// a ficha é uma página só (sem abas); o índice leva a cada parte
+const secoes = computed(() => [
+  ['identificacao', 'Identificação'], ['telefones', 'Telefones'], ['endereco', 'Endereço'], ['trabalho', 'Trabalho'],
+  ['credito', 'Crédito e cobrança'], ['referencias', 'Referências'], ['observacoes', 'Observações'],
+  ...(novo.value ? [] : [['anotacoes', 'Anotações']]),
+  ...(mostraDocumentos.value ? [['documentos', 'Documentos']] : []),
+].map(([id, titulo]) => ({ id: `secao-${id}`, titulo })))
 
 const carregando = ref(true)
 const salvando = ref(false)

@@ -82,6 +82,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [x] Documentos digitais do cliente para o crediário (D20): envio de arquivo ou foto, permissão própria pela LGPD, arquivos numa pasta do servidor ou no MinIO; migração 0013 — 01/11/2026
 - [x] Clientes atualizados pelo `requinte`; sem CPF/CNPJ válido ou com nome sem sentido ficam de fora, menos quem tem dívida em aberto (D21) — 01/11/2026
 - [x] Cadastro repetido com nome sem sentido não manda nos dados do cliente com o mesmo CPF (D21) — 02/11/2026
+- [x] Ficha do cliente em página única com índice fixo das partes; menu lateral fixo ao rolar — 02/11/2026
 - [ ] Nomes do VB6 hoje em maiúsculas (setores, clientes...) passarem para maiúsculas só nas iniciais; os cadastros novos já são gravados assim
 - [ ] Bancos, formas de pagamento, plano de contas
 
