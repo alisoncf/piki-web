@@ -77,6 +77,9 @@
           <template v-else>{{ formatarMoeda(props.row.preco_venda) }}</template>
         </q-td>
       </template>
+      <template #body-cell-estoque="props">
+        <q-td :props="props" :class="{ 'text-negative': Number(props.row.estoque) < 0 }">{{ formatarQuantidade(props.row.estoque) }}</q-td>
+      </template>
       <template #body-cell-situacao="props">
         <q-td :props="props">
           <q-badge :color="props.row.ativo ? 'positive' : 'grey'">{{ props.row.ativo ? 'Ativo' : 'Inativo' }}</q-badge>
@@ -91,7 +94,7 @@ import { useQuasar } from 'quasar'
 import { onMounted, ref, watch } from 'vue'
 
 import { api, mensagemDeErro } from '@/servicos/api'
-import { formatarCodigoProduto, formatarMoeda } from '@/servicos/formatos'
+import { formatarCodigoProduto, formatarMoeda, formatarQuantidade } from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
 
 const $q = useQuasar()
@@ -111,6 +114,7 @@ const colunas = [
   { name: 'fornecedor', label: 'Fornecedor', field: 'fornecedor', align: 'left' },
   { name: 'unidade', label: 'Un.', field: 'unidade', align: 'center' },
   { name: 'preco', label: 'Preço', field: 'preco_venda', align: 'right' },
+  ...(sessao.pode('estoque.ver') ? [{ name: 'estoque', label: 'Estoque', field: 'estoque', align: 'right' }] : []),
   { name: 'situacao', label: 'Situação', field: 'ativo', align: 'left' },
 ]
 

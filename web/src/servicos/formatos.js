@@ -111,3 +111,9 @@ export const ORIGENS = [
   { value: 7, label: '7 - Estrangeira, mercado interno, sem similar nacional' },
   { value: 8, label: '8 - Nacional, com mais de 70% de conteúdo importado' },
 ]
+
+/** Quantidade da API ("12.000", "-2.500") para exibir: 12, -2,5. */
+export function formatarQuantidade(valor) {
+  if (valor === null || valor === undefined || valor === '') return ''
+  return Number(valor).toLocaleString('pt-BR', { maximumFractionDigits: 3 })
+}

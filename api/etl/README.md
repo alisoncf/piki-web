@@ -27,6 +27,7 @@ python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
 python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
 python -m etl fornecedores --origem "mysql+pymysql://..." --empresa 01 --avisos fornecedores-01.txt
 python -m etl usuarios --origem "mysql+pymysql://..." --empresa 01
+python -m etl estoque --origem "mysql+pymysql://..." --empresa 01 --avisos estoque-01.txt
 python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun" --avisos produtos.txt
 ```
 
@@ -106,6 +107,17 @@ Decisão D24. Lê `tab_secoes`, `tab_subsec`, `tab_produtos` e `tab_codbarras` s
 - Na reimportação, os dados voltam a ser os do VB6; códigos de barras e fornecedores acrescentados no sistema novo ficam.
 - Princípio ativo, controle, fabricante, gênero, combustível e balança (restos de farmácia) não são importados. O estoque fica para o ETL do estoque.
 
+### Estoque
+
+Decisão D24. Lê a `tab_produtos` e a `tab_consignacoes` de cada loja. Rode antes o ETL de produtos.
+
+- O produto é achado pelo código. Código que a matriz não tem, ou que na loja é outro produto (nome bem diferente do da matriz), fica de fora, com aviso.
+- Quantidade: `ef_pro` (o fiscal, que passa a ser o real). Ele inclui o que está com os representantes, porque no VB6 a consignação mexe só no `er_pro`.
+- Reservado: soma do `reman_con` da `tab_consignacoes` (o que falta acertar), a mesma conta que o VB6 usa para refazer o `r_pro`.
+- Localização (`endereco_pro`, sem os "UN" e "0" que sobraram de outro campo), CST/CSOSN (`cst_icms`) e CFOP (`cfop_pro`).
+- Cada diferença de saldo vira um movimento "Saldo do VB6"; na reimportação entra só a diferença. Produto sem saldo, reservado e localização não ganha linha.
+- É o saldo de partida: depois ele vai ser refeito a partir do inventário de 31/12/2025, com as notas desde então.
+
 ## Situação
 
 | Parte | Status |
@@ -119,4 +131,5 @@ Decisão D24. Lê `tab_secoes`, `tab_subsec`, `tab_produtos` e `tab_codbarras` s
 | Importação de fornecedores (`fornecedores.py`) | pronta, com testes |
 | Importação de usuários (`usuarios.py`) | pronta, com testes |
 | Importação de produtos, seções e subseções (`produtos.py`) | pronta, com testes |
+| Importação do estoque de cada loja (`estoque.py`) | pronta, com testes |
 | Demais domínios | acompanham as ondas do roteiro |

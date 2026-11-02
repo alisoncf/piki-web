@@ -1,7 +1,9 @@
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 
+from app.dominios.estoque import repositorio as estoque
 from app.dominios.produtos import repositorio as repo
 from app.dominios.produtos import servico
 from app.dominios.produtos.esquemas import (
@@ -43,7 +45,12 @@ def listar_produtos(
     """Produtos (cadastro único de todas as lojas), uma página por vez."""
     itens, total = repo.listar_produtos(ctx.db, busca, secao_id, subsecao_id, marca_id, fornecedor_id, ativo,
                                         limite, deslocamento)
-    return PaginaProdutos(itens=[ProdutoResumo.model_validate(p) for p in itens], total=total)
+    resumos = [ProdutoResumo.model_validate(p) for p in itens]
+    if "estoque.ver" in ctx.permissoes:
+        saldos = estoque.quantidades(ctx.db, ctx.empresa_id, [p.id for p in itens])
+        for resumo in resumos:
+            resumo.estoque = saldos.get(resumo.id, Decimal("0.000"))
+    return PaginaProdutos(itens=resumos, total=total)
 
 
 @router.get("/produtos/{produto_id}", response_model=Produto)

@@ -171,6 +171,12 @@
         <q-btn type="submit" color="primary" unelevated no-caps icon="check" label="Salvar" :loading="salvando" />
       </div>
     </q-form>
+
+    <!-- fora do formulário do produto: o estoque é da loja e tem o seu próprio salvar -->
+    <section v-if="!carregando && verEstoque" id="secao-estoque" class="cartao q-pa-md q-mb-md formulario">
+      <div class="formulario__secao">Estoque em {{ sessao.empresa?.nome }}</div>
+      <estoque-produto :produto-id="Number(rota.params.id)" :unidade="form.unidade" :fracionado="form.fracionado" />
+    </section>
   </q-page>
 </template>
 
@@ -179,6 +185,7 @@ import { useQuasar } from 'quasar'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import EstoqueProduto from '@/componentes/EstoqueProduto.vue'
 import FotosProduto from '@/componentes/FotosProduto.vue'
 import IndiceFicha from '@/componentes/IndiceFicha.vue'
 import SelecaoBusca from '@/componentes/SelecaoBusca.vue'
@@ -196,6 +203,7 @@ const sessao = useSessaoStore()
 const novo = computed(() => !rota.params.id)
 const podeEditar = computed(() => sessao.pode('produtos.editar'))
 const podePrecos = computed(() => podeEditar.value && sessao.pode('produtos.precos'))
+const verEstoque = computed(() => !novo.value && sessao.pode('estoque.ver'))
 const carregando = ref(true)
 const salvando = ref(false)
 const codigo = ref(null)
@@ -214,7 +222,7 @@ const marcaAtual = ref(null)
 const secoes = computed(() => [
   ['identificacao', 'Identificação'], ['preco', 'Preço e custo'], ['barras', 'Códigos de barras'],
   ['fornecedores', 'Fornecedores'], ['fiscal', 'Fiscal'], ...(novo.value ? [] : [['fotos', 'Fotos']]),
-  ['observacoes', 'Observações'],
+  ['observacoes', 'Observações'], ...(verEstoque.value ? [['estoque', 'Estoque']] : []),
 ].map(([id, titulo]) => ({ id: `secao-${id}`, titulo })))
 
 function vazio() {

@@ -107,7 +107,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 ## Onda 4 · Estoque e compras
 
 - [x] Cadastro de produtos (D24): API (migração 0016), lista paginada pela API, ficha com códigos de barras, fornecedores e fotos, seções e marcas — 02/11/2026
-- [ ] Estoque por loja (D24): quantidade, reservado, localização e impostos da empresa, com os movimentos registrados
+- [x] Estoque por loja (D24): quantidade, reservado, localização e impostos da empresa, ajuste com motivo e histórico de movimentos, na ficha do produto (migração 0017); ETL do saldo do VB6 rodado nas três cópias — 02/11/2026
 - [ ] Saldo inicial do estoque: inventário de 31/12/2025 + notas de saída e entradas desde então
 - [ ] Entrada de notas e compras
 - [ ] Inventário e contagens

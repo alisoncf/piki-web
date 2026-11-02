@@ -199,7 +199,9 @@ Decisão do Alison. Substitui o trecho da D9 que punha preço e custo por empres
 - **Transferência entre lojas** não existe: tem que ser por nota, como uma remessa (fica para o fiscal).
 - **Saldo inicial:** o estoque de cada loja vai ser montado a partir do último inventário (31/12/2025), com as notas de saída e as entradas desde então. Fica para o passo do estoque.
 - **Importação:** só do banco da matriz. Inativo o produto sem venda, compra, cadastro ou alteração no último ano (em qualquer loja). Restos de farmácia do VB6 (princípio ativo, controle, fabricante, gênero, combustível, balança) e o preço de atacado não vêm.
-- Resultado em 02/11/2026: 13.474 produtos (6.689 ativos), 11 seções, 67 subseções, 1.703 códigos de barras de fábrica, 11.609 com fornecedor. 1.379 produtos ficaram sem fornecedor porque o fornecedor do VB6 não tem CNPJ válido (Karsten, Coteminas, Buchara...).
+- Resultado em 02/11/2026: 13.474 produtos (6.689 ativos), 11 seções, 67 subseções, 1.703 códigos de barras de fábrica, 11.609 com fornecedor. 1.379 produtos ficaram sem fornecedor porque o fornecedor do VB6 não tem CNPJ válido (Karsten, Coteminas, Buchara...); o Alison vai corrigir os CNPJs no VB6 para reimportar.
+- **Estoque na ficha do produto** (02/11/2026): a ficha mostra o estoque da loja ativa (em estoque, com representantes e disponível), a localização e os impostos da loja, o ajuste de quantidade (com motivo) e o histórico. Quantidade é tudo o que é da loja, inclusive o que está com os representantes; o reservado é a parte que está com eles. As permissões são `estoque.ver`, `estoque.editar` (localização e impostos) e `estoque.ajustar`.
+- **Saldo importado:** o fiscal do VB6 (`ef_pro`) e, como reservado, o que falta acertar das consignações (a mesma conta que o VB6 usa para refazer o `r_pro`). Resultado em 02/11/2026: matriz com 7.648 produtos com saldo (2.337 negativos), Jundiaí com 3 (o estoque dela está zerado na cópia) e La Viva com 3.685 (1.337 negativos; 120 códigos que lá são outro produto ficaram de fora). As cópias da Jundiaí e da La Viva estão antigas e serão importadas de novo.
 
 ## Substituídas
 

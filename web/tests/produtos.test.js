@@ -143,3 +143,44 @@ describe('produtos', () => {
     expect(router.currentRoute.value.params.id).toBe('10')
   })
 })
+
+describe('estoque na ficha do produto', () => {
+  const ESTOQUE = {
+    produto_id: 9, quantidade: '-2.000', reservado: '3.000', disponivel: '-5.000',
+    localizacao: 'Prateleira 2', cst_csosn: '102', cfop: '5102', aliquota_icms: null,
+  }
+  const MOVIMENTO = {
+    id: 1, data_hora: '2026-11-02T10:00:00', tipo: 'importacao', descricao: 'Saldo do VB6', quantidade: '-2.000',
+    reservado: '3.000', saldo: '-2.000', saldo_reservado: '3.000', documento: null, observacao: 'Importado do VB6', usuario: null,
+  }
+
+  it('mostra saldo, reservado e histórico da loja ativa e ajusta a quantidade', async () => {
+    entrar(['produtos.ver', 'estoque.ver', 'estoque.ajustar'])
+    respostas({ '/produtos/9/estoque': ESTOQUE, '/produtos/9/estoque/movimentos': { itens: [MOVIMENTO], total: 1 } })
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...ESTOQUE, quantidade: '10.000', disponivel: '7.000' } })
+    const { wrapper } = await montar(ProdutoPagina, '/cadastros/produtos/9')
+    const texto = wrapper.text()
+    expect(texto).toContain('Estoque em MATRIZ')
+    expect(texto).toContain('Com representantes')
+    expect(texto).toContain('Estoque negativo')
+    expect(texto).toContain('Saldo do VB6')
+    expect(campo(wrapper, 'Localização na loja').props('readonly')).toBe(true) // sem estoque.editar
+
+    await wrapper.findAll('button').find((b) => b.text().includes('Ajustar quantidade')).trigger('click')
+    await flushPromises()
+    const dialogo = wrapper.findAllComponents(QInput)
+    await dialogo.find((c) => c.props('label') === 'Quantidade certa *').vm.$emit('update:modelValue', '10')
+    await dialogo.find((c) => c.props('label') === 'Motivo *').vm.$emit('update:modelValue', 'Contagem')
+    expect(dialogo.find((c) => c.props('label') === 'Quantidade certa *').props('hint')).toContain('diferença +12')
+    document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/produtos/9/estoque/ajuste', { quantidade: '10', motivo: 'Contagem' })
+  })
+
+  it('sem estoque.ver, a ficha não mostra o estoque', async () => {
+    entrar(['produtos.ver'])
+    respostas()
+    const { wrapper } = await montar(ProdutoPagina, '/cadastros/produtos/9')
+    expect(wrapper.text()).not.toContain('Estoque em')
+  })
+})

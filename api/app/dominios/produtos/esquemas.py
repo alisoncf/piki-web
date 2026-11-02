@@ -156,6 +156,7 @@ class ProdutoResumo(BaseModel):
     ativo: bool
     fornecedor: str | None = Field(description="Nome (fantasia, se houver) do primeiro fornecedor")
     foto_id: int | None = Field(description="A foto principal")
+    estoque: Decimal | None = Field(default=None, description="Saldo na loja ativa (só para quem tem estoque.ver)")
 
 
 class PaginaProdutos(BaseModel):
