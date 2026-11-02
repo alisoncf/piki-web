@@ -22,6 +22,8 @@ PERMISSOES: dict[str, str] = {
     "estoque.ver": "Consultar o estoque da loja e o histórico de movimentos",
     "estoque.editar": "Alterar a localização e os impostos do produto na loja",
     "estoque.ajustar": "Ajustar a quantidade em estoque da loja",
+    "entradas.ver": "Consultar as notas de entrada da loja",
+    "entradas.lancar": "Carregar o XML, ligar os itens aos produtos e confirmar a entrada das notas",
 }
 
 # nome de cada área (a parte antes do ponto), para agrupar as permissões na tela de perfis
@@ -32,4 +34,5 @@ AREAS: dict[str, str] = {
     "fornecedores": "Fornecedores",
     "produtos": "Produtos",
     "estoque": "Estoque",
+    "entradas": "Entrada de notas",
 }

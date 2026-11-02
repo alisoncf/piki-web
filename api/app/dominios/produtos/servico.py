@@ -88,7 +88,7 @@ def _aplicar(produto: Produto, dados: ProdutoDados, pode_precos: bool) -> None:
     novos = []
     for f in dados.fornecedores:
         registro = fornecedores.get(f.fornecedor_id) or ProdutoFornecedor(fornecedor_id=f.fornecedor_id)
-        registro.codigo = f.codigo
+        registro.codigo, registro.embalagem = f.codigo, f.embalagem
         novos.append(registro)
     produto.fornecedores = novos
 

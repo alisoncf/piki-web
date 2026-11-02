@@ -113,7 +113,7 @@ describe('produtos', () => {
       codigos_barras: ['7891234567895', '7890000000001'],
       preco_queima: '89.90',
       cest: null,
-      fornecedores: [{ fornecedor_id: 4, codigo: 'TR-04' }],
+      fornecedores: [{ fornecedor_id: 4, codigo: 'TR-04', embalagem: 1 }],
     }))
   })
 
@@ -182,5 +182,38 @@ describe('estoque na ficha do produto', () => {
     respostas()
     const { wrapper } = await montar(ProdutoPagina, '/cadastros/produtos/9')
     expect(wrapper.text()).not.toContain('Estoque em')
+  })
+})
+
+describe('cadastro pelo atalho da entrada de notas', () => {
+  it('vem preenchido com os dados do item e volta para a nota ao salvar', async () => {
+    entrar()
+    respostas()
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...JOGO, id: 10 } })
+    const caminho = '/cadastros/produtos/novo?nome=TAPETE%20FICTICIO&ncm=57050000&ean=7890000000017&fornecedor=4&codigo_fornecedor=TA-99&volta=%2Fcompras%2Fentradas%2F7'
+    const vazio = { render: () => h('div') }
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/cadastros/produtos/novo', name: 'produto-novo', component: ProdutoPagina },
+        { path: '/cadastros/produtos/:id', name: 'produto', component: ProdutoPagina },
+        { path: '/cadastros/produtos', name: 'produtos', component: vazio },
+        { path: '/compras/entradas/:id', name: 'entrada', component: vazio },
+      ],
+    })
+    await router.push(caminho)
+    const casca = { render: () => h(QLayout, () => h(QPageContainer, () => h(RouterView))) }
+    const wrapper = mount(casca, { global: { plugins: [[Quasar, { plugins: { Notify, Dialog } }], router] }, attachTo: document.body })
+    await flushPromises()
+    expect(campo(wrapper, 'Nome *').props('modelValue')).toBe('TAPETE FICTICIO')
+    expect(wrapper.text()).toContain('7890000000017')
+    await wrapper.findAllComponents(SelecaoBusca)[0].vm.$emit('update:modelValue', 5)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/produtos', expect.objectContaining({
+      nome: 'TAPETE FICTICIO', ncm: '57050000', codigos_barras: ['7890000000017'],
+      fornecedores: [{ fornecedor_id: 4, codigo: 'TA-99', embalagem: 1 }],
+    }))
+    expect(router.currentRoute.value.fullPath).toBe('/compras/entradas/7')
   })
 })

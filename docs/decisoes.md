@@ -203,6 +203,20 @@ Decisão do Alison. Substitui o trecho da D9 que punha preço e custo por empres
 - **Estoque na ficha do produto** (02/11/2026): a ficha mostra o estoque da loja ativa (em estoque, com representantes e disponível), a localização e os impostos da loja, o ajuste de quantidade (com motivo) e o histórico. Quantidade é tudo o que é da loja, inclusive o que está com os representantes; o reservado é a parte que está com eles. As permissões são `estoque.ver`, `estoque.editar` (localização e impostos) e `estoque.ajustar`.
 - **Saldo importado:** o fiscal do VB6 (`ef_pro`) e, como reservado, o que falta acertar das consignações (a mesma conta que o VB6 usa para refazer o `r_pro`). Resultado em 02/11/2026: matriz com 7.648 produtos com saldo (2.337 negativos), Jundiaí com 3 (o estoque dela está zerado na cópia) e La Viva com 3.685 (1.337 negativos; 120 códigos que lá são outro produto ficaram de fora). As cópias da Jundiaí e da La Viva estão antigas e serão importadas de novo.
 
+### D25. Entrada de notas pelo XML (02/11/2026)
+
+Decisão do Alison: a entrada é pelo XML da NF-e, e a nota tem que ser da empresa. Os demais pontos foram propostos e ficam valendo até os XMLs reais mostrarem outra coisa.
+
+- **Carregar:** o XML (NF-e modelo 55) só entra na empresa do destinatário, e uma nota (pela chave) só entra uma vez; a repetida abre a que já existe. O XML fica guardado no armazenamento de arquivos.
+- **Fornecedor:** achado pelo CNPJ do emitente; se não existe, é cadastrado com os dados do XML (a tela avisa).
+- **Itens:** cada item é ligado sozinho a um produto, pelo código do produto no fornecedor ou pelo código de barras. Enquanto a nota está aberta, isso é refeito toda vez que ela é aberta, então o produto cadastrado antes da entrada (como a pessoa do estoque costuma fazer) aparece ligado. O item sem produto tem um atalho que abre a ficha de produto nova já preenchida (nome, NCM, CEST, EAN, fornecedor e código) e volta para a nota ao salvar; ou pode ser ligado a um produto existente.
+- **Embalagem:** quantas unidades do produto vêm em cada unidade da nota (caixa com 12). Fica na ligação do produto com o fornecedor e é lembrada na próxima nota.
+- **Custo:** produtos − desconto + frete, seguro, outras despesas, IPI e ST do item, dividido pelas unidades. Ao confirmar, passa a ser o custo do produto (o custo da última nota, como no VB6).
+- **Preço:** a tela mostra o preço pela margem do produto; o preço novo é opcional, item por item, e pede `produtos.precos`.
+- **Confirmar:** de uma vez, só com todos os itens ligados. Cada item vira um movimento "Entrada" no estoque da loja, com o número da nota; a ligação (código e embalagem do fornecedor) e o código de barras da nota ficam na ficha do produto. A nota aberta pode ser descartada.
+- Permissões: `entradas.ver` e `entradas.lancar`.
+- Ficam para depois: buscar as notas direto na SEFAZ (com o certificado), devolução ao fornecedor e o SPED.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.

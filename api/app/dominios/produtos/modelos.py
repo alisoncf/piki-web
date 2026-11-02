@@ -131,6 +131,8 @@ class ProdutoFornecedor(Base):
     produto_id: Mapped[int] = mapped_column(ForeignKey("produto.id", ondelete="CASCADE"), index=True)
     fornecedor_id: Mapped[int] = mapped_column(ForeignKey("fornecedor.id"), index=True)
     codigo: Mapped[str | None] = mapped_column(String(60))
+    # quantas unidades do produto vêm em cada unidade da nota do fornecedor (caixa com 12: 12)
+    embalagem: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     produto: Mapped[Produto] = relationship(back_populates="fornecedores")
     fornecedor: Mapped[Fornecedor] = relationship(lazy="joined")

@@ -137,12 +137,15 @@
               :rules="[(v) => !!v || 'Escolha o fornecedor']"
               class="col-12 col-sm-7"
             />
-            <q-input v-model="f.codigo" outlined label="Código no fornecedor" maxlength="60" class="col-10 col-sm-4" />
+            <q-input v-model="f.codigo" outlined label="Código no fornecedor" maxlength="60" class="col-7 col-sm-3" />
+            <q-input v-model.number="f.embalagem" outlined type="number" min="1" label="Unid. por embalagem" class="col-3 col-sm-1">
+              <q-tooltip>Quantas unidades vêm em cada unidade da nota do fornecedor (caixa com 12: 12)</q-tooltip>
+            </q-input>
             <div class="col-2 col-sm-1">
               <q-btn flat round icon="delete_outline" color="grey-7" aria-label="Remover fornecedor" @click="form.fornecedores.splice(i, 1)" />
             </div>
           </div>
-          <q-btn flat no-caps color="primary" icon="add" label="Adicionar fornecedor" @click="form.fornecedores.push({ fornecedor_id: null, codigo: '' })" />
+          <q-btn flat no-caps color="primary" icon="add" label="Adicionar fornecedor" @click="form.fornecedores.push({ fornecedor_id: null, codigo: '', embalagem: 1 })" />
         </section>
 
         <section id="secao-fiscal" class="cartao q-pa-md q-mb-md">
@@ -286,7 +289,20 @@ function preencher(produto) {
   form.value = {
     ...vazio(), ...dados,
     ncm: dados.ncm ?? '', cest: dados.cest ?? '', observacao: dados.observacao ?? '',
-    fornecedores: forns.map((f) => ({ fornecedor_id: f.fornecedor_id, codigo: f.codigo ?? '' })),
+    fornecedores: forns.map((f) => ({ fornecedor_id: f.fornecedor_id, codigo: f.codigo ?? '', embalagem: f.embalagem ?? 1 })),
+  }
+}
+
+// o atalho "Cadastrar produto" da entrada de notas manda os dados do item na rota
+function preencherDaNota() {
+  const q = rota.query
+  if (!q.nome) return
+  form.value.nome = String(q.nome).slice(0, 120)
+  form.value.ncm = q.ncm ? String(q.ncm) : ''
+  form.value.cest = q.cest ? String(q.cest) : ''
+  if (q.ean) form.value.codigos_barras = [String(q.ean)]
+  if (q.fornecedor) {
+    form.value.fornecedores = [{ fornecedor_id: Number(q.fornecedor), codigo: String(q.codigo_fornecedor ?? ''), embalagem: 1 }]
   }
 }
 
@@ -303,6 +319,7 @@ async function carregar() {
     marcas.value = m.data
     fornecedores.value = f?.data ?? []
     if (p) preencher(p.data)
+    else preencherDaNota()
   } catch (e) {
     $q.notify({ type: 'negative', message: mensagemDeErro(e) })
   } finally {
@@ -322,10 +339,15 @@ async function salvar() {
       preco_queima: f.preco_queima === '' ? null : f.preco_queima,
       ncm: f.ncm || null,
       cest: f.cest || null,
-      fornecedores: f.fornecedores.map((x) => ({ fornecedor_id: x.fornecedor_id, codigo: x.codigo || null })),
+      fornecedores: f.fornecedores.map((x) => ({ fornecedor_id: x.fornecedor_id, codigo: x.codigo || null, embalagem: Number(x.embalagem) || 1 })),
     }
     const resp = novo.value ? await api.post('/produtos', dados) : await api.put(`/produtos/${rota.params.id}`, dados)
     $q.notify({ type: 'positive', message: 'Produto salvo', timeout: 1500 })
+    // veio do atalho da entrada de notas: volta para a nota, que liga o item sozinha
+    if (novo.value && rota.query.volta) {
+      await roteador.push(String(rota.query.volta))
+      return
+    }
     if (novo.value) await roteador.replace({ name: 'produto', params: { id: resp.data.id } })
     // a página continua montada depois do replace: mostra o que a API gravou
     preencher(resp.data)

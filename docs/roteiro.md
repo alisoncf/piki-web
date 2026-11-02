@@ -109,7 +109,9 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 - [x] Cadastro de produtos (D24): API (migração 0016), lista paginada pela API, ficha com códigos de barras, fornecedores e fotos, seções e marcas — 02/11/2026
 - [x] Estoque por loja (D24): quantidade, reservado, localização e impostos da empresa, ajuste com motivo e histórico de movimentos, na ficha do produto (migração 0017); ETL do saldo do VB6 rodado nas três cópias — 02/11/2026
 - [ ] Saldo inicial do estoque: inventário de 31/12/2025 + notas de saída e entradas desde então
-- [ ] Entrada de notas e compras
+- [x] Entrada de notas pelo XML (D25): carga, ligação dos itens (com atalho para cadastrar o produto), embalagem, custo, preço e entrada no estoque (migração 0018) — 02/11/2026
+- [ ] Conferir a entrada com XMLs reais dos fornecedores
+- [ ] Buscar as notas de entrada na SEFAZ (distribuição de DF-e, com o certificado)
 - [ ] Inventário e contagens
 - [ ] Perdas, movimento interno, etiquetas
 

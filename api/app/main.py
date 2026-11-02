@@ -5,6 +5,7 @@ from app.dominios.cidades.rotas import router as cidades
 from app.dominios.clientes.rotas import router as clientes
 from app.dominios.empresas.rotas import router as empresas
 from app.dominios.enderecos.rotas import router as enderecos
+from app.dominios.entradas.rotas import router as entradas
 from app.dominios.estoque.rotas import router as estoque
 from app.dominios.fornecedores.rotas import router as fornecedores
 from app.dominios.funcionarios.rotas import router as funcionarios
@@ -27,3 +28,4 @@ app.include_router(enderecos)
 app.include_router(fornecedores)
 app.include_router(produtos)
 app.include_router(estoque)
+app.include_router(entradas)

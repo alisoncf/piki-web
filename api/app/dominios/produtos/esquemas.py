@@ -66,6 +66,7 @@ class FornecedorDoProduto(BaseModel):
 
     fornecedor_id: int
     codigo: str | None = Field(default=None, max_length=60, description="O código do produto para o fornecedor")
+    embalagem: int = Field(default=1, ge=1, le=10000, description="Unidades em cada unidade da nota do fornecedor")
 
     @field_validator("codigo", mode="before")
     @classmethod

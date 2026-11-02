@@ -41,6 +41,13 @@ export const MENU = [
     ],
   },
   {
+    titulo: 'Compras',
+    icone: 'shopping_cart',
+    filhos: [
+      { titulo: 'Entrada de notas', icone: 'receipt_long', rota: '/compras/entradas', permissao: 'entradas.ver' },
+    ],
+  },
+  {
     titulo: 'Acesso',
     icone: 'admin_panel_settings',
     filhos: [

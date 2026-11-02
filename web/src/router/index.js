@@ -176,6 +176,18 @@ export const rotas = [
         meta: { permissao: 'produtos.ver' },
       },
       {
+        path: 'compras/entradas',
+        name: 'entradas',
+        component: () => import('@/paginas/compras/EntradasPagina.vue'),
+        meta: { permissao: 'entradas.ver' },
+      },
+      {
+        path: 'compras/entradas/:id(\\d+)',
+        name: 'entrada',
+        component: () => import('@/paginas/compras/EntradaPagina.vue'),
+        meta: { permissao: 'entradas.ver' },
+      },
+      {
         path: 'cadastros/cargos',
         name: 'cargos',
         component: () => import('@/paginas/cadastros/CargosPagina.vue'),
