@@ -67,6 +67,8 @@ class ParcelaReceber(Base):
     conta_id: Mapped[int] = mapped_column(ForeignKey("conta_receber.id", ondelete="CASCADE"), index=True)
     numero: Mapped[int] = mapped_column(Integer)  # 1, 2, 3...
     vencimento: Mapped[date] = mapped_column(Date, index=True)
+    # o vencimento com que a parcela nasceu (vencini_itd); o de cima muda quando é prorrogada
+    vencimento_inicial: Mapped[date | None] = mapped_column(Date)
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     aberto: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # o que falta pagar (reman_itd no VB6)
 

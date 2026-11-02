@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.dominios.caixa import servico as caixa
 from app.dominios.caixa.modelos import ABERTO, FormaPagamento, LancamentoCaixa
-from app.dominios.clientes.modelos import Cliente
+from app.dominios.clientes.modelos import Cliente, Setor
 from app.dominios.receber.esquemas import RecebimentoDados
 from app.dominios.receber.modelos import (
     ContaReceber, ItemRecebimento, PagamentoRecebimento, ParcelaReceber, RecebimentoCrediario,
@@ -94,7 +94,8 @@ def lancar_carne(db: Session, empresa_id: int, cliente_id: int, venda_id: int | 
                          historico=historico[:80], usuario_id=usuario_id)
     datas = vencimentos(primeiro_vencimento, parcelas, intervalo)
     for numero, (vencimento, parte) in enumerate(zip(datas, dividir(valor, parcelas)), start=1):
-        conta.parcelas.append(ParcelaReceber(numero=numero, vencimento=vencimento, valor=parte, aberto=parte))
+        conta.parcelas.append(ParcelaReceber(numero=numero, vencimento=vencimento, vencimento_inicial=vencimento,
+                                             valor=parte, aberto=parte))
     db.add(conta)
     return conta
 
@@ -222,3 +223,100 @@ def estornar(db: Session, empresa_id: int, usuario_id: int, recebimento_id: int)
     db.commit()
     db.expire_all()
     return recebimento
+
+
+# ------------------------------------------------------------ consultar (a tela de contas a receber)
+
+@dataclass
+class Filtros:
+    """Os filtros da tela de contas a receber (os da frmEditaMov do VB6 que já têm dados aqui)."""
+
+    situacao: str = "aberto"  # aberto, pagas (alguma coisa já paga) ou todas
+    empresa_id: int | None = None  # a loja que vendeu; sem ela, todas
+    cliente_id: int | None = None
+    busca: str | None = None  # nome ou CPF/CNPJ do cliente
+    documento: str | None = None  # começo do número do VB6 (ou o id da conta)
+    origem: str | None = None
+    historico: str | None = None
+    data: str = "vencimento"  # vencimento, inicial ou emissao
+    de: date | None = None
+    ate: date | None = None
+    valor: Decimal | None = None  # o que falta, exato
+    cidade_id: int | None = None
+    setor_id: int | None = None
+    orgao_id: int | None = None
+    grupo_id: int | None = None
+    bloqueio: str | None = None  # bloqueados ou liberados
+    credito_suspenso: bool | None = None
+
+
+ORDENS = {
+    "vencimento": (ParcelaReceber.vencimento, Cliente.nome, ParcelaReceber.numero),
+    "cliente": (Cliente.nome, ParcelaReceber.vencimento, ParcelaReceber.numero),
+    "documento": (ContaReceber.documento_legado, ContaReceber.id, ParcelaReceber.numero),
+    "valor": (ParcelaReceber.valor.desc(), ParcelaReceber.vencimento),
+}
+
+
+def _condicoes(f: Filtros) -> list:
+    c = []
+    if f.situacao == "aberto":
+        c.append(ParcelaReceber.aberto > 0)
+    elif f.situacao == "pagas":
+        c.append(ParcelaReceber.aberto < ParcelaReceber.valor)
+    if f.empresa_id:
+        c.append(ContaReceber.empresa_id == f.empresa_id)
+    if f.cliente_id:
+        c.append(ContaReceber.cliente_id == f.cliente_id)
+    if f.busca and f.busca.strip():
+        termo = f.busca.strip()
+        digitos = termo.replace(".", "").replace("-", "").replace("/", "")
+        if digitos.isdigit():
+            c.append(Cliente.cpf_cnpj.like(f"{digitos}%"))
+        else:
+            c.append(Cliente.nome.ilike(f"%{termo}%"))
+    if f.documento and f.documento.strip():
+        numero = f.documento.strip()
+        c.append(ContaReceber.documento_legado.like(f"{numero}%") if not numero.isdigit()
+                 else (ContaReceber.documento_legado.like(f"{numero}%")) | (ContaReceber.id == int(numero)))
+    if f.origem:
+        c.append(ContaReceber.origem == f.origem)
+    if f.historico and f.historico.strip():
+        c.append(ContaReceber.historico.ilike(f"%{f.historico.strip()}%"))
+    campo = {"inicial": ParcelaReceber.vencimento_inicial, "emissao": func.date(ContaReceber.criado_em)}.get(
+        f.data, ParcelaReceber.vencimento)
+    if f.de:
+        c.append(campo >= f.de)
+    if f.ate:
+        c.append(campo <= f.ate)
+    if f.valor is not None:
+        c.append(ParcelaReceber.aberto == f.valor)
+    if f.setor_id:
+        c.append(Cliente.setor_id == f.setor_id)
+    if f.cidade_id:
+        c.append(Cliente.setor_id.in_(select(Setor.id).where(Setor.cidade_id == f.cidade_id)))
+    if f.orgao_id:
+        c.append(Cliente.orgao_id == f.orgao_id)
+    if f.grupo_id:
+        c.append(Cliente.grupo_id == f.grupo_id)
+    if f.bloqueio == "bloqueados":
+        c.append(Cliente.bloqueado.is_(True))
+    elif f.bloqueio == "liberados":
+        c.append(Cliente.bloqueado.is_(False))
+    if f.credito_suspenso is not None:
+        c.append(Cliente.credito_suspenso.is_(f.credito_suspenso))
+    return c
+
+
+def consultar(db: Session, f: Filtros, ordem: str, limite: int,
+              deslocamento: int) -> tuple[list[ParcelaReceber], int, Decimal, Decimal]:
+    """As parcelas que passam nos filtros, de todas as lojas (D9), com o total e as somas da consulta toda."""
+    base = select(ParcelaReceber).join(ContaReceber).join(Cliente, Cliente.id == ContaReceber.cliente_id) \
+        .where(*_condicoes(f))
+    filtradas = base.with_only_columns(ParcelaReceber.valor, ParcelaReceber.aberto).subquery()
+    total, soma_valor, soma_aberto = db.execute(
+        select(func.count(), func.coalesce(func.sum(filtradas.c.valor), 0),
+               func.coalesce(func.sum(filtradas.c.aberto), 0))).one()
+    itens = db.scalars(base.order_by(*ORDENS.get(ordem, ORDENS["vencimento"]), ParcelaReceber.id)
+                       .limit(limite).offset(deslocamento))
+    return list(itens), total, Decimal(soma_valor).quantize(CENTAVO), Decimal(soma_aberto).quantize(CENTAVO)

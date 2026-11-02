@@ -96,3 +96,42 @@ class Recebimento(BaseModel):
     troco: Decimal | None
     estornado_em: datetime | None
     estornado_por: Pessoa | None
+
+
+class ClienteDaParcela(BaseModel):
+    id: int
+    nome: str
+    cpf_cnpj: str | None
+    bloqueado: bool
+    credito_suspenso: bool
+
+
+class LinhaParcela(BaseModel):
+    """Uma parcela na consulta das contas a receber."""
+
+    id: int
+    conta_id: int
+    documento: str
+    origem: str
+    loja: LojaResumida
+    cliente: ClienteDaParcela
+    setor: str | None
+    cidade: str | None
+    historico: str
+    emissao: date
+    numero: int
+    parcelas: int
+    vencimento: date
+    vencimento_inicial: date | None
+    valor: Decimal
+    aberto: Decimal
+    dias_atraso: int
+    juros: Decimal
+
+
+class PaginaParcelas(BaseModel):
+    itens: list[LinhaParcela]
+    total: int
+    soma_valor: Decimal
+    soma_aberto: Decimal
+    juros_ao_mes: Decimal

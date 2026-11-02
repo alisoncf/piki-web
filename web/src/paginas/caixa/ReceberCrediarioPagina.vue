@@ -25,7 +25,7 @@
         emit-value
         map-options
         @filter="buscarClientes"
-        @update:model-value="carregarParcelas"
+        @update:model-value="carregarParcelas()"
       >
         <template #no-option><q-item><q-item-section class="text-suave">Digite parte do nome ou o CPF</q-item-section></q-item></template>
       </q-select>
@@ -39,7 +39,22 @@
           <div class="text-caption text-suave">Juros sugeridos: {{ formatarPercentual(jurosAoMes) }} ao mês, por dia de atraso</div>
         </div>
         <div v-if="!parcelas.length" class="text-suave">Este cliente não tem parcelas em aberto.</div>
-        <q-markup-table v-else flat dense separator="horizontal">
+        <form v-if="parcelas.length" class="row q-col-gutter-sm items-center q-mb-sm" @submit.prevent="distribuir">
+          <q-input
+            v-model="valorADistribuir"
+            outlined
+            dense
+            type="number"
+            step="0.01"
+            min="0"
+            prefix="R$"
+            label="Distribuir um valor"
+            hint="Paga as parcelas da mais antiga para a mais nova; os juros são somados à parte"
+            class="col-12 col-sm-5 col-md-3"
+          />
+          <div class="col-auto"><q-btn type="submit" flat no-caps color="primary" label="Distribuir" :disable="!(Number(valorADistribuir) > 0)" /></div>
+        </form>
+        <q-markup-table v-if="parcelas.length" flat dense separator="horizontal">
           <thead>
             <tr>
               <th></th>
@@ -126,6 +141,7 @@
 <script setup>
 import { useQuasar } from 'quasar'
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 import LinhasPagamento from '@/componentes/LinhasPagamento.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
@@ -141,6 +157,7 @@ const semCaixa = ref('')
 const formas = ref([])
 const clientes = ref([])
 const clienteId = ref(null)
+const valorADistribuir = ref('')
 const parcelas = ref([])
 const jurosAoMes = ref('0')
 const pagamentos = ref([])
@@ -182,8 +199,9 @@ function buscarClientes(texto, atualizar, cancelar) {
     .catch(() => cancelar())
 }
 
-/** As parcelas do cliente, já com os juros sugeridos; começam desmarcadas, com o que falta para pagar. */
-async function carregarParcelas() {
+/** As parcelas do cliente, já com os juros sugeridos; começam desmarcadas (menos as que vieram marcadas da
+ * tela de contas a receber), com o que falta para pagar. */
+async function carregarParcelas(marcar = []) {
   parcelas.value = []
   pagamentos.value = []
   valorRecebido.value = ''
@@ -192,12 +210,26 @@ async function carregarParcelas() {
   try {
     const { data } = await api.get(`/crediario/clientes/${clienteId.value}/parcelas`)
     jurosAoMes.value = data.juros_ao_mes
-    parcelas.value = data.parcelas.map((p) => ({ ...p, marcada: false, pagar: Number(p.aberto).toFixed(2), juros: Number(p.juros).toFixed(2) }))
+    parcelas.value = data.parcelas.map((p) => ({
+      ...p, marcada: marcar.includes(p.id), pagar: Number(p.aberto).toFixed(2), juros: Number(p.juros).toFixed(2),
+    }))
   } catch (e) {
     $q.notify({ type: 'negative', message: mensagemDeErro(e) })
   } finally {
     carregando.value = false
   }
+}
+
+/** O valor que o cliente trouxe, distribuído da parcela mais antiga para a mais nova (como no VB6). */
+function distribuir() {
+  let resto = centavos(valorADistribuir.value)
+  for (const p of parcelas.value) {
+    const parte = Math.min(resto, centavos(p.aberto))
+    p.marcada = parte > 0
+    p.pagar = (parte > 0 ? parte / 100 : Number(p.aberto)).toFixed(2)
+    resto -= parte
+  }
+  if (resto > 0) $q.notify({ type: 'warning', message: `Sobraram ${formatarMoeda(resto / 100)}: o valor passa do que o cliente deve` })
 }
 
 function adicionar() {
@@ -240,7 +272,15 @@ function estornar() {
   })
 }
 
+const rota = useRoute()
+
 onMounted(async () => {
+  // vindo da tela de contas a receber: o cliente e as parcelas já escolhidos
+  if (rota.query.cliente) {
+    clienteId.value = Number(rota.query.cliente)
+    clientes.value = [{ id: clienteId.value, nome: rota.query.nome ?? '' }]
+    carregarParcelas(String(rota.query.parcelas ?? '').split(',').filter(Boolean).map(Number))
+  }
   try {
     const [f, c] = await Promise.all([api.get('/formas-pagamento', { params: { so_ativas: true } }), caixaDaMaquina.sessaoAberta()])
     formas.value = f.data

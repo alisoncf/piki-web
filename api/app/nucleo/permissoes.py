@@ -30,6 +30,7 @@ PERMISSOES: dict[str, str] = {
     "vendas.ver": "Consultar as vendas da loja",
     "vendas.vender": "Montar vendas no balcão, com desconto até o limite do perfil",
     "vendas.autorizar": "Autorizar parcelas acima do limite da forma de pagamento",
+    "receber.ver": "Consultar as contas a receber de todas as lojas, com os filtros e as somas",
 }
 
 # nome de cada área (a parte antes do ponto), para agrupar as permissões na tela de perfis
@@ -43,4 +44,5 @@ AREAS: dict[str, str] = {
     "entradas": "Entrada de notas",
     "caixa": "Caixa",
     "vendas": "Vendas",
+    "receber": "Contas a receber",
 }

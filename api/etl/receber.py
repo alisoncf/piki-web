@@ -192,17 +192,21 @@ def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clie
         parcela = db.get(ParcelaReceber, parcela_id) if parcela_id else None
         if parcela is None:
             parcela = ParcelaReceber(numero=ordem if renumerar else int(p["parcela_itd"]), vencimento=vencimento,
-                                     valor=valor, aberto=aberto)
+                                     vencimento_inicial=_data(p["vencini_itd"]) or vencimento, valor=valor, aberto=aberto)
             conta.parcelas.append(parcela)
             db.flush()
             db.add(MapaLegado(tabela="tab_itdoc", empresa_id=empresa.id, codigo=seq_itd, novo_id=parcela.id))
             parcelas_importadas[seq_itd] = parcela.id
             r.parcelas += 1
-        elif (parcela.vencimento, parcela.valor, parcela.aberto) != (vencimento, valor, aberto):
+        else:
+            inicial = _data(p["vencini_itd"]) or parcela.vencimento_inicial
+            if (parcela.vencimento, parcela.vencimento_inicial, parcela.valor, parcela.aberto) == (
+                    vencimento, inicial, valor, aberto):
+                continue
             if parcela.id in recebidas:
                 r.avisos.append(f"documento {num_doc}, parcela {parcela.numero}: já recebida no sistema novo; "
                                 "a mudança do VB6 não foi aplicada")
                 continue
-            parcela.vencimento, parcela.valor, parcela.aberto = vencimento, valor, aberto
+            parcela.vencimento, parcela.vencimento_inicial, parcela.valor, parcela.aberto = vencimento, inicial, valor, aberto
             r.atualizadas += 1
     conta.valor = sum((p.valor for p in conta.parcelas), ZERO)

@@ -58,6 +58,13 @@ export const MENU = [
     ],
   },
   {
+    titulo: 'Financeiro',
+    icone: 'account_balance',
+    filhos: [
+      { titulo: 'Contas a receber', icone: 'request_quote', rota: '/financeiro/receber', permissao: 'receber.ver' },
+    ],
+  },
+  {
     titulo: 'Compras',
     icone: 'shopping_cart',
     filhos: [

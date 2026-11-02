@@ -1,14 +1,19 @@
-from typing import Annotated
+from datetime import date
+from decimal import Decimal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dominios.receber import servico
-from app.dominios.receber.esquemas import ParcelaAberta, ParcelasDoCliente, Recebimento, RecebimentoDados
+from app.dominios.receber.esquemas import (
+    ClienteDaParcela, LinhaParcela, PaginaParcelas, ParcelaAberta, ParcelasDoCliente, Recebimento, RecebimentoDados,
+)
 from app.nucleo.contexto import Contexto, exige
 
 router = APIRouter(tags=["crediário"])
 
 Operar = Annotated[Contexto, Depends(exige("caixa.operar"))]
+Consultar = Annotated[Contexto, Depends(exige("receber.ver"))]
 
 _STATUS = {
     servico.NaoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -66,3 +71,53 @@ def estornar(recebimento_id: int, ctx: Operar) -> Recebimento:
         return Recebimento.model_validate(servico.estornar(ctx.db, ctx.empresa_id, ctx.usuario.id, recebimento_id))
     except servico.ErroReceber as e:
         raise _http(ctx, e)
+
+
+@router.get("/receber/parcelas", response_model=PaginaParcelas)
+def consultar(
+    ctx: Consultar,
+    situacao: Literal["aberto", "pagas", "todas"] = "aberto",
+    loja: Annotated[int | None, Query(description="A loja que vendeu; sem ela, todas")] = None,
+    cliente_id: int | None = None,
+    busca: Annotated[str | None, Query(description="Nome ou CPF/CNPJ do cliente")] = None,
+    documento: Annotated[str | None, Query(description="Começo do número do documento")] = None,
+    origem: Literal["venda", "acerto", "avulso"] | None = None,
+    historico: str | None = None,
+    data: Literal["vencimento", "inicial", "emissao"] = "vencimento",
+    de: date | None = None,
+    ate: date | None = None,
+    valor: Annotated[Decimal | None, Query(description="O que falta pagar, exato")] = None,
+    cidade_id: int | None = None,
+    setor_id: int | None = None,
+    orgao_id: int | None = None,
+    grupo_id: int | None = None,
+    bloqueio: Literal["bloqueados", "liberados"] | None = None,
+    credito_suspenso: bool | None = None,
+    ordem: Literal["vencimento", "cliente", "documento", "valor"] = "vencimento",
+    limite: Annotated[int, Query(ge=1, le=500)] = 100,
+    deslocamento: Annotated[int, Query(ge=0)] = 0,
+) -> PaginaParcelas:
+    """As parcelas de todas as lojas que passam nos filtros, com as somas da consulta toda (não só da página)."""
+    filtros = servico.Filtros(
+        situacao=situacao, empresa_id=loja, cliente_id=cliente_id, busca=busca, documento=documento, origem=origem,
+        historico=historico, data=data, de=de, ate=ate, valor=valor, cidade_id=cidade_id, setor_id=setor_id,
+        orgao_id=orgao_id, grupo_id=grupo_id, bloqueio=bloqueio, credito_suspenso=credito_suspenso,
+    )
+    itens, total, soma_valor, soma_aberto = servico.consultar(ctx.db, filtros, ordem, limite, deslocamento)
+    taxa = servico.juros_ao_mes(ctx.db)
+    linhas = []
+    for p in itens:
+        conta, cliente = p.conta, p.conta.cliente
+        dias, juros = servico.juros_sugerido(p.aberto, p.vencimento, taxa)
+        setor = cliente.setor
+        linhas.append(LinhaParcela(
+            id=p.id, conta_id=conta.id, documento=conta.documento, origem=conta.origem, loja=conta.empresa,
+            cliente=ClienteDaParcela(id=cliente.id, nome=cliente.nome, cpf_cnpj=cliente.cpf_cnpj,
+                                     bloqueado=cliente.bloqueado, credito_suspenso=cliente.credito_suspenso),
+            setor=setor.nome if setor else None,
+            cidade=f"{setor.cidade.nome}/{setor.cidade.uf}" if setor and setor.cidade else None,
+            historico=conta.historico, emissao=conta.criado_em.date(), numero=p.numero, parcelas=len(conta.parcelas),
+            vencimento=p.vencimento, vencimento_inicial=p.vencimento_inicial, valor=p.valor, aberto=p.aberto,
+            dias_atraso=dias, juros=juros,
+        ))
+    return PaginaParcelas(itens=linhas, total=total, soma_valor=soma_valor, soma_aberto=soma_aberto, juros_ao_mes=taxa)

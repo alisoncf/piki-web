@@ -6,6 +6,7 @@ import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
 import ReceberCrediarioPagina from '@/paginas/caixa/ReceberCrediarioPagina.vue'
+import ContasReceberPagina from '@/paginas/financeiro/ContasReceberPagina.vue'
 import { api } from '@/servicos/api'
 import { useSessaoStore } from '@/stores/sessao'
 
@@ -22,18 +23,20 @@ const PARCELAS = {
   ],
 }
 
-async function montar() {
+async function montar(caminho = '/caixa/crediario') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/caixa/crediario', name: 'receber-crediario', component: ReceberCrediarioPagina },
+      { path: '/financeiro/receber', name: 'contas-receber', component: ContasReceberPagina },
       { path: '/caixa', name: 'caixa', component: { render: () => h('div') } },
     ],
   })
-  await router.push('/caixa/crediario')
+  await router.push(caminho)
   const casca = { render: () => h(QLayout, () => h(QPageContainer, () => h(RouterView))) }
   const wrapper = mount(casca, { global: { plugins: [[Quasar, { plugins: { Notify, Dialog } }], router] }, attachTo: document.body })
   await flushPromises()
+  wrapper.router = router
   return wrapper
 }
 
@@ -90,5 +93,64 @@ describe('receber crediário', () => {
     })
     expect(wrapper.text()).toContain('Recebimento 40')
     expect(wrapper.findAll('button').some((b) => b.text().includes('Estornar'))).toBe(true)
+  })
+
+  it('contas a receber: filtra, soma e manda as selecionadas para o recebimento', async () => {
+    useSessaoStore().permissoes = ['receber.ver', 'caixa.operar']
+    const linha = (id, numero, cliente) => ({
+      id, conta_id: 7, documento: '02-0000777', origem: 'acerto', loja: BAIRRO, cliente, setor: 'Centro', cidade: 'Goiânia/GO',
+      historico: 'MIGR. CONS. 000087', emissao: '2026-09-13', numero, parcelas: 2, vencimento: '2026-10-13', vencimento_inicial: '2026-09-13',
+      valor: '300.00', aberto: '300.00', dias_atraso: 20, juros: '10.00',
+    })
+    const ANA = { id: 8, nome: 'Ana Ficticia', cpf_cnpj: null, bloqueado: true, credito_suspenso: false }
+    const BIA = { id: 9, nome: 'Bia Ficticia', cpf_cnpj: null, bloqueado: false, credito_suspenso: false }
+    const get = vi.spyOn(api, 'get').mockResolvedValue({
+      data: { itens: [linha(31, 1, ANA), linha(32, 2, ANA), linha(40, 1, BIA)], total: 3, soma_valor: '900.00', soma_aberto: '900.00', juros_ao_mes: '5.00' },
+    })
+    const wrapper = await montar('/financeiro/receber')
+    expect(wrapper.text()).toMatch(/3 parcelas · valor R\$\s900,00/)
+    expect(wrapper.text()).toContain('Bloqueado')
+    expect(wrapper.text()).toContain('inicial 13/09/2026')
+
+    const busca = wrapper.findAllComponents(QInput).find((c) => c.props('label') === 'Cliente (nome ou CPF)')
+    await busca.vm.$emit('update:modelValue', 'ana')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/receber/parcelas', { params: expect.objectContaining({ busca: 'ana', situacao: 'aberto', limite: 100, deslocamento: 0 }) })
+
+    const caixas = wrapper.findAllComponents(QCheckbox)
+    await caixas[1].vm.$emit('update:modelValue', true) // a primeira é a de "todas"
+    await caixas[3].vm.$emit('update:modelValue', true)
+    await flushPromises()
+    await wrapper.findAll('button').find((b) => b.text().includes('Receber 2 selecionadas')).trigger('click')
+    await flushPromises()
+    expect(wrapper.router.currentRoute.value.name).toBe('contas-receber') // a Bia é outra cliente: não vai
+    await caixas[3].vm.$emit('update:modelValue', false)
+    await caixas[2].vm.$emit('update:modelValue', true)
+    await flushPromises()
+    await wrapper.findAll('button').find((b) => b.text().includes('Receber 2 selecionadas')).trigger('click')
+    await flushPromises()
+    expect(wrapper.router.currentRoute.value.query).toEqual({ cliente: '8', nome: 'Ana Ficticia', parcelas: '31,32' })
+  })
+
+  it('vindo das contas a receber, as parcelas chegam marcadas e o valor é distribuído', async () => {
+    localStorage.setItem('piki.caixa', JSON.stringify({ empresa_id: 1, id: 5, nome: 'Cx Crediário' }))
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: {
+        '/formas-pagamento': [DINHEIRO, CREDIARIO],
+        '/caixas': [{ id: 5, nome: 'Cx Crediário', ativo: true, sessao: { id: 11 } }],
+        '/crediario/clientes/8/parcelas': PARCELAS,
+      }[url],
+    }))
+    const wrapper = await montar('/caixa/crediario?cliente=8&nome=Freguesa&parcelas=32')
+    expect(wrapper.findAllComponents(QCheckbox).map((c) => c.props('modelValue'))).toEqual([false, true])
+    const valor = wrapper.findAllComponents(QInput).find((c) => c.props('label') === 'Distribuir um valor')
+    await valor.vm.$emit('update:modelValue', '400')
+    await wrapper.findAll('form').find((f) => f.text().includes('Distribuir')).trigger('submit')
+    await flushPromises()
+    // a mais antiga toda (300) e 100 da outra; os juros da atrasada somam à parte
+    expect(wrapper.findAllComponents(QCheckbox).map((c) => c.props('modelValue'))).toEqual([true, true])
+    expect(wrapper.findAll('input[aria-label^="Valor da parcela"]').map((i) => i.element.value)).toEqual(['300.00', '100.00'])
+    expect(wrapper.text()).toMatch(/Total\s*R\$\s410,00/)
   })
 })

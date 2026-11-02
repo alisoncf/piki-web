@@ -82,3 +82,23 @@ def test_juros_sugeridos():
     hoje = date(2026, 11, 2)
     assert contas.juros_sugerido(Decimal("100.00"), date(2026, 10, 2), Decimal("5"), hoje) == (31, Decimal("5.17"))
     assert contas.juros_sugerido(Decimal("100.00"), hoje, Decimal("5"), hoje) == (0, Decimal("0.00"))
+
+
+def test_consulta_das_contas_a_receber_com_filtros(cliente, cenario, loja, admin, carnes):  # noqa: F811
+    r = cliente.get("/receber/parcelas", headers=admin).json()
+    assert (r["total"], r["soma_aberto"], r["juros_ao_mes"]) == (2, "400.00", "5.00")
+    vencida = r["itens"][0]  # do vencimento mais antigo para o mais novo
+    assert (vencida["loja"]["codigo"], vencida["cliente"]["nome"], vencida["dias_atraso"], vencida["juros"]) == (
+        "02", "Freguesa Ficticia", 20, "10.00")
+
+    def total(**filtros):
+        return cliente.get("/receber/parcelas", headers=admin, params=filtros).json()["total"]
+
+    assert total(loja=cenario["e1"]) == 0 and total(loja=cenario["e2"]) == 2
+    assert total(busca="fregues") == 2 and total(busca="ninguem") == 0
+    assert total(ate=date.today().isoformat()) == 1  # só a vencida
+    assert total(data="emissao", de=date.today().isoformat()) == 2
+    assert total(valor="100.00") == 1 and total(origem="acerto") == 0
+    assert cliente.get("/receber/parcelas", headers=admin, params={"ordem": "valor"}).json()["itens"][0]["aberto"] == "300.00"
+    # a consulta pede a permissão própria
+    assert cliente.get("/receber/parcelas", headers=loja["davi"]).status_code == 403

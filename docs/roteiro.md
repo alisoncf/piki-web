@@ -100,6 +100,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 
 - [~] Contas a pagar e a receber (`tab_doc`, `tab_itdoc`): o carnê do crediário gera a conta a receber, e o ETL das contas a receber de clientes rodou nas três cópias (D26, migração 0025) — 02/11/2026; faltam as operações do contas a receber (cobrança em lote, baixa de vários carnês), os representantes e as contas a pagar
 - [x] Baixa de parcelas em qualquer empresa, registrando o caixa de quem recebeu (D9, D26): juros de atraso sugeridos por dia, pagamento parcial, várias formas, estorno (migração 0024) — 02/11/2026
+- [~] Tela de contas a receber (D26): filtros, somas, seleção e baixa das selecionadas com distribuição do valor (migração 0026) — 02/11/2026; faltam a cobrança (conta e tipo), o desconto na baixa e as outras operações do VB6
 - [ ] Cheques
 - [ ] Cobrança e carnês
 - [ ] Testes comparando os resultados do sistema novo com os do VB6

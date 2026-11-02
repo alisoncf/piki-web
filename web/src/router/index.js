@@ -225,6 +225,12 @@ export const rotas = [
         meta: { permissao: ['caixa.operar', 'caixa.conferir'] },
       },
       {
+        path: 'financeiro/receber',
+        name: 'contas-receber',
+        component: () => import('@/paginas/financeiro/ContasReceberPagina.vue'),
+        meta: { permissao: 'receber.ver' },
+      },
+      {
         path: 'caixa/crediario',
         name: 'receber-crediario',
         component: () => import('@/paginas/caixa/ReceberCrediarioPagina.vue'),
