@@ -32,6 +32,7 @@ def _venda_no_crediario(cliente, loja, cliente_id, lencois, parcelas=3):  # noqa
     r = cliente.put(url, headers=davi, json={"cliente_id": cliente_id, "forma_pagamento_id": loja["formas"]["crediario"],
                                              "parcelas": parcelas})
     assert r.status_code == 200, r.text
+    assert cliente.post(f"{url}/fechar", headers=davi).status_code == 200
     return url, r.json()
 
 

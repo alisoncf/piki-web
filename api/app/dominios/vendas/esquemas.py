@@ -4,6 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.dominios.caixa.esquemas import FormaResumida, Pessoa
+from app.nucleo.documentos import cpf_valido, so_digitos
 
 
 def _vazio_para_none(valor: object) -> object:
@@ -23,8 +24,70 @@ class ComAutorizacao(BaseModel):
     autorizacao: Autorizacao | None = None
 
 
+class ConsumidorDados(BaseModel):
+    """Quem compra sem cadastro: o nome é obrigatório para fechar; o resto, se a pessoa quiser dar."""
+
+    nome: str | None = Field(default=None, max_length=60)
+    cpf: str | None = None
+    dia_nascimento: int | None = Field(default=None, ge=1, le=31)
+    mes_nascimento: int | None = Field(default=None, ge=1, le=12)
+    telefone: str | None = None
+    email: str | None = Field(default=None, max_length=100)
+
+    @field_validator("nome", "email", mode="before")
+    @classmethod
+    def _texto(cls, v: object) -> object:
+        return _vazio_para_none(v)
+
+    @field_validator("cpf", mode="before")
+    @classmethod
+    def _cpf(cls, v: object) -> str | None:
+        cpf = so_digitos(v) or None
+        if cpf and not cpf_valido(cpf):
+            raise ValueError("CPF inválido")
+        return cpf
+
+    @field_validator("telefone", mode="before")
+    @classmethod
+    def _telefone(cls, v: object) -> str | None:
+        numero = so_digitos(v) or None
+        if numero and len(numero) not in (10, 11):
+            raise ValueError("Telefone com DDD: 10 ou 11 dígitos")
+        return numero
+
+    @model_validator(mode="after")
+    def _aniversario(self) -> "ConsumidorDados":
+        if (self.dia_nascimento is None) != (self.mes_nascimento is None):
+            raise ValueError("Informe o dia e o mês do aniversário")
+        return self
+
+
+class EntregaDados(BaseModel):
+    taxa: Decimal = Field(default=Decimal(0), ge=0, max_digits=14, decimal_places=2, description="Entra no total, sem desconto")
+    cep: str | None = None
+    logradouro: str | None = Field(default=None, max_length=100)
+    numero: str | None = Field(default=None, max_length=20)
+    complemento: str | None = Field(default=None, max_length=60)
+    bairro: str | None = Field(default=None, max_length=60)
+    cidade_id: int | None = None
+    ponto_referencia: str | None = Field(default=None, max_length=60)
+    telefone: str | None = None
+
+    @field_validator("logradouro", "numero", "complemento", "bairro", "ponto_referencia", mode="before")
+    @classmethod
+    def _texto(cls, v: object) -> object:
+        return _vazio_para_none(v)
+
+    @field_validator("cep", "telefone", mode="before")
+    @classmethod
+    def _digitos(cls, v: object) -> str | None:
+        return so_digitos(v) or None
+
+
 class VendaDados(ComAutorizacao):
     cliente_id: int | None = None
+    consumidor: ConsumidorDados | None = Field(default=None, description="Sem cliente cadastrado: quem comprou")
+    entrega: EntregaDados | None = Field(default=None, description="Venda com entrega; null tira a entrega")
     forma_pagamento_id: int | None = Field(default=None, description="Ao trocar, o desconto da forma vale para todos os itens")
     parcelas: int = Field(default=1, ge=1, le=24)
     observacao: str | None = Field(default=None, max_length=200)
@@ -78,13 +141,76 @@ class PedidoCancelamento(BaseModel):
         return _vazio_para_none(v)
 
 
+class CidadeResumida(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    uf: str
+
+
+class SetorDoCliente(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    nome: str
+    cidade: CidadeResumida | None
+
+
+class TelefoneDoCliente(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    numero: str
+
+
 class ClienteResumido(BaseModel):
+    """O cliente cadastrado na venda, com o endereço para preencher a entrega."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     nome: str
     cpf_cnpj: str | None
     bloqueado: bool
+    cep: str | None = None
+    logradouro: str | None = None
+    numero: str | None = None
+    complemento: str | None = None
+    ponto_referencia: str | None = None
+    setor: SetorDoCliente | None = None
+    telefones: list[TelefoneDoCliente] = []
+
+
+class Consumidor(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    cpf: str | None
+    dia_nascimento: int | None
+    mes_nascimento: int | None
+    telefone: str | None
+    email: str | None
+
+
+class Entrega(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    taxa: Decimal
+    cep: str | None
+    logradouro: str | None
+    numero: str | None
+    complemento: str | None
+    bairro: str | None
+    cidade: CidadeResumida | None
+    ponto_referencia: str | None
+    telefone: str | None
+
+
+class BuscaPorCpf(BaseModel):
+    """O que já se sabe de quem tem este CPF: cliente cadastrado ou consumidor de outra compra."""
+
+    cliente: ClienteResumido | None
+    consumidor: Consumidor | None
 
 
 class ProdutoDoItem(BaseModel):
@@ -108,6 +234,7 @@ class Item(BaseModel):
     bruto: Decimal
     desconto: Decimal
     total: Decimal
+    em_queima: bool
     disponivel: Decimal | None = Field(default=None, description="Estoque da loja, para avisar quando falta")
 
 
@@ -155,6 +282,7 @@ class VendaResumo(BaseModel):
     criado_em: datetime
     vence_em: datetime
     vendedor: Pessoa
+    comprador: str | None = Field(description="O nome pelo qual o caixa acha a venda")
     cliente: ClienteResumido | None
     forma_pagamento: FormaResumida | None
     parcelas: int
@@ -166,6 +294,10 @@ class Venda(VendaResumo):
     subtotal: Decimal
     desconto: Decimal
     observacao: str | None
+    consumidor: Consumidor | None
+    entrega: Entrega | None
+    taxa_entrega: Decimal
+    fechada_em: datetime | None
     desconto_autorizado_por: Pessoa | None
     parcelas_autorizadas_por: Pessoa | None
     itens: list[Item]

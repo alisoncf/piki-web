@@ -20,14 +20,14 @@ const DAVI = { id: 4, nome: 'Davi Vendedor' }
 const LENCOL = { id: 7, codigo: 12, nome: 'Lençol Ficticio', preco_venda: '100.00', preco_queima: null, estoque: '5.000' }
 const ITEM = {
   id: 1, ordem: 1, produto: { id: 7, codigo: 12, unidade: 'UN', fracionado: false }, descricao: 'Lençol Ficticio',
-  quantidade: '1.000', preco: '100.00', bruto: '100.00', desconto: '0.00', total: '100.00', disponivel: '0.000',
+  quantidade: '1.000', preco: '100.00', bruto: '100.00', desconto: '0.00', total: '100.00', disponivel: '0.000', em_queima: false,
 }
 const VENDA = {
   id: 3, numero: 15, situacao: 'aberta', criado_em: '2026-11-02T10:00:00', vence_em: '2026-11-12T10:00:00', vendedor: DAVI,
   cliente: null, forma_pagamento: null, parcelas: 1, percentual_desconto: '0', subtotal: '0.00', desconto: '0.00', total: '0.00',
   observacao: null, desconto_autorizado_por: null, parcelas_autorizadas_por: null, itens: [], sessao_caixa: null,
   recebida_em: null, recebida_por: null, valor_recebido: null, troco: null, cancelada_em: null, cancelada_por: null,
-  motivo_cancelamento: null, avisos: [],
+  motivo_cancelamento: null, avisos: [], comprador: null, consumidor: null, entrega: null, taxa_entrega: '0.00', fechada_em: null,
 }
 const COM_ITEM = { ...VENDA, itens: [ITEM], subtotal: '100.00', total: '100.00' }
 
@@ -133,7 +133,7 @@ describe('vendas', () => {
 
   it('o caixa recebe no caixa aberto e lembra dele', async () => {
     entrar()
-    const noDinheiro = { ...COM_ITEM, forma_pagamento: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' } }
+    const noDinheiro = { ...COM_ITEM, forma_pagamento: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' }, situacao: 'fechada', comprador: 'José' }
     vi.spyOn(api, 'get').mockImplementation(gets(noDinheiro))
     const recebida = { ...noDinheiro, situacao: 'recebida', valor_recebido: '120.00', troco: '20.00', recebida_por: DAVI, sessao_caixa: { id: 11, caixa: { id: 5, nome: 'Cx 02' } }, recebida_em: '2026-11-02T11:00:00' }
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: recebida })
@@ -156,7 +156,7 @@ describe('vendas', () => {
     entrar()
     const credito = { limite: '500.00', em_aberto: '200.00', disponivel: '300.00', impedimento: null }
     const noCrediario = {
-      ...COM_ITEM, forma_pagamento: { id: 9, nome: 'Crediário', tipo: 'crediario' }, parcelas: 2,
+      ...COM_ITEM, forma_pagamento: { id: 9, nome: 'Crediário', tipo: 'crediario' }, parcelas: 2, situacao: 'fechada',
       cliente: { id: 8, nome: 'Freguesa Ficticia', cpf_cnpj: null, bloqueado: false }, credito,
     }
     const getPadrao = gets(noCrediario)
@@ -208,5 +208,52 @@ describe('vendas', () => {
     expect(wrapper.findAll('.parcela')).toHaveLength(2)
     expect(wrapper.text()).toContain('02/01/2027')
     expect(wrapper.text()).toContain('2/2')
+  })
+  it('venda a consumidor: o vendedor dá o nome e fecha a venda', async () => {
+    entrar(['vendas.vender'])
+    const noDinheiro = { ...COM_ITEM, forma_pagamento: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' } }
+    vi.spyOn(api, 'get').mockImplementation(gets(noDinheiro))
+    const comNome = { ...noDinheiro, comprador: 'José' }
+    const put = vi.spyOn(api, 'put').mockResolvedValue({ data: comNome })
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...comNome, situacao: 'fechada', fechada_em: '2026-11-02T10:30:00' } })
+    const { wrapper } = await montar(VendaPagina, '/vendas/3')
+    expect(botao(wrapper, 'Receber')).toBeUndefined() // quem recebe é o caixa, e só depois de fechada
+
+    const nome = wrapper.findAllComponents(QInput).find((c) => c.props('label')?.startsWith('Nome de quem está comprando'))
+    await nome.vm.$emit('update:modelValue', 'José')
+    await nome.vm.$emit('change')
+    await flushPromises()
+    expect(put).toHaveBeenCalledWith('/vendas/3', {
+      cliente_id: null, forma_pagamento_id: 1, parcelas: 1, observacao: '', entrega: null, autorizacao: null,
+      consumidor: { nome: 'José', cpf: null, dia_nascimento: null, mes_nascimento: null, telefone: null, email: null },
+    })
+    await botao(wrapper, 'Fechar venda').trigger('click')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/vendas/3/fechar')
+    expect(wrapper.text()).toContain('Fechada em 02/11/2026 10:30')
+    expect(botao(wrapper, 'Reabrir')).toBeDefined()
+  })
+
+  it('o CPF de cliente cadastrado troca o consumidor pelo cliente', async () => {
+    entrar(['vendas.vender'])
+    const MARIA = { id: 8, nome: 'Maria Ficticia', cpf_cnpj: '52998224725', bloqueado: false }
+    const padrao = gets(COM_ITEM)
+    vi.spyOn(api, 'get').mockImplementation((url, opcoes) =>
+      url === '/consumidores/52998224725' ? Promise.resolve({ data: { cliente: MARIA, consumidor: null } }) : padrao(url, opcoes),
+    )
+    const put = vi.spyOn(api, 'put').mockResolvedValue({ data: { ...COM_ITEM, cliente: MARIA, comprador: MARIA.nome } })
+    const { wrapper } = await montar(VendaPagina, '/vendas/3')
+    const cpf = wrapper.findAllComponents(QInput).find((c) => c.props('label') === 'CPF')
+    await cpf.vm.$emit('update:modelValue', '52998224725')
+    await cpf.vm.$emit('change')
+    await flushPromises()
+    expect(put).toHaveBeenCalledWith('/vendas/3', expect.objectContaining({ cliente_id: 8, consumidor: null }))
+  })
+
+  it('o produto em queima aparece marcado', async () => {
+    entrar()
+    vi.spyOn(api, 'get').mockImplementation(gets({ ...COM_ITEM, itens: [{ ...ITEM, em_queima: true }] }))
+    const { wrapper } = await montar(VendaPagina, '/vendas/3')
+    expect(wrapper.text()).toContain('Lençol Ficticio Queima')
   })
 })

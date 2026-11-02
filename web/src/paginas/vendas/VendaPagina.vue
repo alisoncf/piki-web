@@ -5,8 +5,10 @@
       <div class="piki-titulo col">{{ venda ? `Venda ${venda.numero}` : 'Venda' }}</div>
       <template v-if="venda">
         <q-badge :color="CORES[venda.situacao]" class="q-mr-md">{{ SITUACOES[venda.situacao] }}</q-badge>
-        <q-btn v-if="aberta && podeVender" flat no-caps color="negative" icon="close" label="Cancelar venda" @click="cancelar" />
-        <q-btn v-if="aberta && podeReceber" unelevated no-caps color="primary" icon="point_of_sale" label="Receber" class="q-ml-sm" @click="abrirRecebimento" />
+        <q-btn v-if="(aberta || fechada) && podeVender" flat no-caps color="negative" icon="close" label="Cancelar venda" @click="cancelar" />
+        <q-btn v-if="fechada && (podeVender || podeReceber)" flat no-caps icon="lock_open" label="Reabrir" class="q-ml-sm" @click="reabrir" />
+        <q-btn v-if="aberta && podeVender" unelevated no-caps color="primary" icon="done_all" label="Fechar venda" class="q-ml-sm" :loading="fechando" @click="fechar" />
+        <q-btn v-if="fechada && podeReceber" unelevated no-caps color="primary" icon="point_of_sale" label="Receber" class="q-ml-sm" @click="abrirRecebimento" />
       </template>
     </div>
 
@@ -32,7 +34,7 @@
           <q-list v-if="resultados.length" bordered separator class="q-mt-sm rounded-borders">
             <q-item v-for="p in resultados" :key="p.id" v-ripple clickable @click="incluir(p)">
               <q-item-section>
-                <q-item-label>{{ p.nome }}</q-item-label>
+                <q-item-label>{{ p.nome }} <q-badge v-if="Number(p.preco_queima)" color="deep-orange" label="Queima" /></q-item-label>
                 <q-item-label caption>{{ formatarCodigoProduto(p.codigo) }}<template v-if="p.estoque !== null && p.estoque !== undefined"> · estoque {{ formatarQuantidade(p.estoque) }}</template></q-item-label>
               </q-item-section>
               <q-item-section side>{{ formatarMoeda(p.preco_queima || p.preco_venda) }}</q-item-section>
@@ -52,7 +54,7 @@
         >
           <template #body-cell-descricao="props">
             <q-td :props="props">
-              <div>{{ props.row.descricao }}</div>
+              <div>{{ props.row.descricao }} <q-badge v-if="props.row.em_queima" color="deep-orange" label="Queima" /></div>
               <div class="text-caption text-suave">{{ formatarCodigoProduto(props.row.produto.codigo) }}</div>
               <div v-if="falta(props.row)" class="text-caption text-negative">
                 <q-icon name="warning" /> Estoque da loja: {{ formatarQuantidade(props.row.disponivel) }}
@@ -78,7 +80,7 @@
             use-input
             input-debounce="300"
             clearable
-            label="Cliente"
+            label="Cliente cadastrado"
             :options="clientes"
             option-value="id"
             option-label="nome"
@@ -90,6 +92,55 @@
           >
             <template #no-option><q-item><q-item-section class="text-suave">Digite parte do nome ou o CPF</q-item-section></q-item></template>
           </q-select>
+          <template v-if="!cabecalho.cliente_id">
+            <q-input
+              v-model="cabecalho.consumidor.nome"
+              outlined
+              label="Nome de quem está comprando *"
+              hint="Sem cadastro (venda a consumidor): pode ser só o primeiro nome; o caixa chama por ele"
+              maxlength="60"
+              :readonly="!editavel"
+              @change="salvarCabecalho"
+            />
+            <q-expansion-item v-model="maisDados" dense dense-toggle switch-toggle-side label="Mais dados do consumidor (opcional)" class="text-caption">
+              <div class="q-gutter-y-sm q-pt-sm">
+                <q-input
+                  v-model="cabecalho.consumidor.cpf"
+                  outlined
+                  dense
+                  label="CPF"
+                  mask="###.###.###-##"
+                  unmasked-value
+                  :readonly="!editavel"
+                  @change="aoMudarCpf"
+                />
+                <div class="row q-col-gutter-sm">
+                  <q-input
+                    v-model="cabecalho.consumidor.aniversario"
+                    outlined
+                    dense
+                    label="Aniversário (dia/mês)"
+                    mask="##/##"
+                    class="col-6"
+                    :readonly="!editavel"
+                    @change="salvarCabecalho"
+                  />
+                  <q-input
+                    v-model="cabecalho.consumidor.telefone"
+                    outlined
+                    dense
+                    label="Telefone"
+                    :mask="mascaraTelefone(cabecalho.consumidor.telefone)"
+                    unmasked-value
+                    class="col-6"
+                    :readonly="!editavel"
+                    @change="salvarCabecalho"
+                  />
+                </div>
+                <q-input v-model="cabecalho.consumidor.email" outlined dense type="email" label="E-mail" maxlength="100" :readonly="!editavel" @change="salvarCabecalho" />
+              </div>
+            </q-expansion-item>
+          </template>
           <q-select
             v-model="cabecalho.forma_pagamento_id"
             outlined
@@ -114,6 +165,29 @@
             @update:model-value="salvarCabecalho"
           />
           <q-input v-model="cabecalho.observacao" outlined label="Observação" maxlength="200" :readonly="!editavel" @change="salvarCabecalho" />
+          <q-toggle v-model="cabecalho.comEntrega" label="Com entrega" :disable="!editavel" @update:model-value="trocarEntrega" />
+          <div v-if="cabecalho.comEntrega" class="q-gutter-y-sm">
+            <q-input v-model="entrega.taxa" outlined dense type="number" step="0.01" min="0" prefix="R$" label="Taxa de entrega" :readonly="!editavel" @change="salvarCabecalho" />
+            <campo-cep v-model="entrega.cep" dense label="CEP" :buscando="buscandoCep" :readonly="!editavel" @buscar="buscarEnderecoDoCep" />
+            <q-input v-model="entrega.logradouro" outlined dense label="Rua *" maxlength="100" :readonly="!editavel" @change="salvarCabecalho" />
+            <div class="row q-col-gutter-sm">
+              <q-input v-model="entrega.numero" outlined dense label="Número *" maxlength="20" class="col-4" :readonly="!editavel" @change="salvarCabecalho" />
+              <q-input v-model="entrega.complemento" outlined dense label="Complemento" maxlength="60" class="col-8" :readonly="!editavel" @change="salvarCabecalho" />
+            </div>
+            <q-input v-model="entrega.bairro" outlined dense label="Bairro *" maxlength="60" :readonly="!editavel" @change="salvarCabecalho" />
+            <selecao-cidade v-model="entrega.cidade_id" v-model:cidade="cidadeEntrega" dense label="Cidade *" :readonly="!editavel" @update:model-value="salvarCabecalho" />
+            <q-input v-model="entrega.ponto_referencia" outlined dense label="Ponto de referência" maxlength="60" :readonly="!editavel" @change="salvarCabecalho" />
+            <q-input
+              v-model="entrega.telefone"
+              outlined
+              dense
+              label="Telefone de quem recebe"
+              :mask="mascaraTelefone(entrega.telefone)"
+              unmasked-value
+              :readonly="!editavel"
+              @change="salvarCabecalho"
+            />
+          </div>
           <div v-if="aberta && forma?.tipo === 'crediario' && !venda.cliente" class="text-caption text-negative">O crediário pede o cliente cadastrado.</div>
           <div v-if="venda.credito" class="credito q-pa-sm rounded-borders text-caption">
             <div v-if="venda.credito.impedimento" class="text-negative"><q-icon name="block" /> {{ venda.credito.impedimento }}</div>
@@ -137,6 +211,7 @@
             </span>
             <span>{{ formatarMoeda(-venda.desconto) }}</span>
           </div>
+          <div v-if="venda.entrega" class="row justify-between"><span>Entrega</span><span>{{ formatarMoeda(venda.taxa_entrega) }}</span></div>
           <q-separator class="q-my-sm" />
           <div class="row justify-between text-h6"><span>Total</span><span>{{ formatarMoeda(venda.total) }}</span></div>
           <div v-if="venda.parcelas > 1" class="text-right text-caption text-suave">
@@ -163,7 +238,8 @@
 
         <section class="cartao q-pa-md text-caption">
           <div>Vendedor: {{ venda.vendedor.nome }} · {{ formatarDataHora(venda.criado_em) }}</div>
-          <div v-if="aberta">Vence em {{ formatarDataHora(venda.vence_em).slice(0, 10) }}</div>
+          <div v-if="fechada">Fechada em {{ formatarDataHora(venda.fechada_em) }}: esperando o caixa</div>
+          <div v-if="aberta || fechada">Vence em {{ formatarDataHora(venda.vence_em).slice(0, 10) }}</div>
           <template v-if="venda.situacao === 'recebida'">
             <div>Recebida por {{ venda.recebida_por?.nome }} no {{ venda.sessao_caixa?.caixa.nome }} · {{ formatarDataHora(venda.recebida_em) }}</div>
             <div v-if="venda.troco !== null">Recebido {{ formatarMoeda(venda.valor_recebido) }} · troco {{ formatarMoeda(venda.troco) }}</div>
@@ -182,7 +258,17 @@
           <q-card-section class="piki-titulo">{{ item.descricao }}</q-card-section>
           <q-card-section class="q-gutter-sm q-pt-none">
             <q-input v-model="item.quantidade" outlined autofocus type="number" step="any" min="0" label="Quantidade *" />
-            <q-input v-model="item.desconto" outlined type="number" step="0.01" min="0" prefix="R$" label="Desconto no item" />
+            <q-input
+              v-model="item.desconto"
+              outlined
+              type="number"
+              step="0.01"
+              min="0"
+              prefix="R$"
+              label="Desconto no item"
+              :disable="item.em_queima"
+              :hint="item.em_queima ? 'Produto em queima: não tem desconto' : ''"
+            />
           </q-card-section>
           <q-card-actions align="right">
             <q-btn v-close-popup flat no-caps label="Cancelar" />
@@ -285,12 +371,17 @@ import { useQuasar } from 'quasar'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import CampoCep from '@/componentes/CampoCep.vue'
+import SelecaoCidade from '@/componentes/SelecaoCidade.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
-import { formatarCodigoProduto, formatarDataHora, formatarMoeda, formatarQuantidade } from '@/servicos/formatos'
+import { usarCep } from '@/servicos/cep'
+import { formatarCodigoProduto, formatarDataHora, formatarMoeda, formatarQuantidade, mascaraTelefone } from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
 
-const SITUACOES = { aberta: 'Aberta', recebida: 'Recebida', cancelada: 'Cancelada', vencida: 'Vencida' }
-const CORES = { aberta: 'warning', recebida: 'positive', cancelada: 'grey', vencida: 'grey-7' }
+const SITUACOES = { aberta: 'Aberta', fechada: 'Fechada', recebida: 'Recebida', cancelada: 'Cancelada', vencida: 'Vencida' }
+const CORES = { aberta: 'warning', fechada: 'primary', recebida: 'positive', cancelada: 'grey', vencida: 'grey-7' }
+const SEM_CONSUMIDOR = { nome: '', cpf: '', aniversario: '', telefone: '', email: '' }
+const SEM_ENTREGA = { taxa: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade_id: null, ponto_referencia: '', telefone: '' }
 // o caixa em que esta máquina recebe (um caixa por ponto)
 const CAIXA_DA_MAQUINA = 'piki.caixa'
 
@@ -303,7 +394,11 @@ const venda = ref(null)
 const carregando = ref(true)
 const formas = ref([])
 const clientes = ref([])
-const cabecalho = ref({ cliente_id: null, forma_pagamento_id: null, parcelas: 1, observacao: '' })
+const cabecalho = ref({ cliente_id: null, forma_pagamento_id: null, parcelas: 1, observacao: '', consumidor: { ...SEM_CONSUMIDOR }, comEntrega: false })
+const entrega = ref({ ...SEM_ENTREGA })
+const cidadeEntrega = ref(null) // { id, nome, uf }, para o campo mostrar o nome
+const maisDados = ref(false)
+const fechando = ref(false)
 const campoBusca = ref(null)
 const termo = ref('')
 const quantidade = ref('1')
@@ -318,6 +413,7 @@ const caixasAbertos = ref([])
 const podeVender = computed(() => sessao.pode('vendas.vender'))
 const podeReceber = computed(() => sessao.pode('caixa.operar'))
 const aberta = computed(() => venda.value?.situacao === 'aberta')
+const fechada = computed(() => venda.value?.situacao === 'fechada')
 const editavel = computed(() => aberta.value && podeVender.value)
 const url = computed(() => `/vendas/${rota.params.id}`)
 const forma = computed(() => formas.value.find((f) => f.id === venda.value?.forma_pagamento?.id) ?? null)
@@ -359,12 +455,27 @@ function falta(linha) {
 
 function mostrar(dados) {
   venda.value = dados
+  const c = dados.consumidor
   cabecalho.value = {
     cliente_id: dados.cliente?.id ?? null,
     forma_pagamento_id: dados.forma_pagamento?.id ?? null,
     parcelas: dados.parcelas,
     observacao: dados.observacao ?? '',
+    consumidor: {
+      nome: dados.cliente ? '' : (dados.comprador ?? ''),
+      cpf: c?.cpf ?? '',
+      aniversario: c?.dia_nascimento ? `${String(c.dia_nascimento).padStart(2, '0')}/${String(c.mes_nascimento).padStart(2, '0')}` : '',
+      telefone: c?.telefone ?? '',
+      email: c?.email ?? '',
+    },
+    comEntrega: !!dados.entrega,
   }
+  const e = dados.entrega
+  entrega.value = e
+    ? { ...SEM_ENTREGA, ...Object.fromEntries(Object.entries(e).map(([k, v]) => [k, v ?? ''])), cidade_id: e.cidade?.id ?? null, taxa: String(Number(e.taxa)) }
+    : { ...SEM_ENTREGA }
+  delete entrega.value.cidade
+  cidadeEntrega.value = e?.cidade ?? null
   if (dados.cliente && !clientes.value.some((c) => c.id === dados.cliente.id)) clientes.value = [dados.cliente, ...clientes.value]
 }
 
@@ -430,7 +541,14 @@ async function incluir(produto) {
 }
 
 function abrirItem(linha) {
-  item.value = { aberto: true, id: linha.id, descricao: linha.descricao, quantidade: String(Number(linha.quantidade)), desconto: String(Number(linha.desconto)) }
+  item.value = {
+    aberto: true,
+    id: linha.id,
+    descricao: linha.descricao,
+    em_queima: linha.em_queima,
+    quantidade: String(Number(linha.quantidade)),
+    desconto: String(Number(linha.desconto)),
+  }
 }
 
 async function salvarItem() {
@@ -458,9 +576,96 @@ async function darDesconto() {
   if (ok) desconto.value.aberto = false
 }
 
+function dadosDoConsumidor() {
+  const { nome, cpf, aniversario, telefone, email } = cabecalho.value.consumidor
+  const [dia, mes] = /^\d{2}\/\d{2}$/.test(aniversario ?? '') ? aniversario.split('/').map(Number) : [null, null]
+  return { nome: nome || null, cpf: cpf || null, dia_nascimento: dia, mes_nascimento: mes, telefone: telefone || null, email: email || null }
+}
+
+function dadosDaEntrega() {
+  if (!cabecalho.value.comEntrega) return null
+  const e = entrega.value
+  return { ...e, taxa: String(Number(e.taxa) || 0) }
+}
+
 function salvarCabecalho() {
   const { cliente_id, forma_pagamento_id, parcelas: n, observacao } = cabecalho.value
-  return enviar((autorizacao) => api.put(url.value, { cliente_id, forma_pagamento_id, parcelas: n, observacao, autorizacao }))
+  const consumidor = cliente_id ? null : dadosDoConsumidor()
+  return enviar((autorizacao) =>
+    api.put(url.value, { cliente_id, forma_pagamento_id, parcelas: n, observacao, consumidor, entrega: dadosDaEntrega(), autorizacao }),
+  )
+}
+
+/** CPF completo: traz o que já se sabe de quem tem esse CPF (cliente cadastrado ou consumidor de outra compra). */
+async function aoMudarCpf() {
+  const cpf = cabecalho.value.consumidor.cpf
+  if (cpf?.length === 11) {
+    try {
+      const { data } = await api.get(`/consumidores/${cpf}`)
+      if (data.cliente) {
+        clientes.value = [data.cliente, ...clientes.value.filter((c) => c.id !== data.cliente.id)]
+        cabecalho.value.cliente_id = data.cliente.id
+        $q.notify({ type: 'info', message: `Este CPF é do cliente cadastrado ${data.cliente.nome}` })
+      } else if (data.consumidor) {
+        const c = data.consumidor
+        const atual = cabecalho.value.consumidor
+        cabecalho.value.consumidor = {
+          nome: atual.nome || c.nome,
+          cpf,
+          aniversario: atual.aniversario || (c.dia_nascimento ? `${String(c.dia_nascimento).padStart(2, '0')}/${String(c.mes_nascimento).padStart(2, '0')}` : ''),
+          telefone: atual.telefone || c.telefone || '',
+          email: atual.email || c.email || '',
+        }
+      }
+    } catch (e) {
+      $q.notify({ type: 'warning', message: mensagemDeErro(e) })
+      return
+    }
+  }
+  salvarCabecalho()
+}
+
+/** Ao ligar a entrega com cliente cadastrado, o endereço dele já vem preenchido. */
+function trocarEntrega(ligada) {
+  const cliente = venda.value?.cliente
+  if (ligada && cliente && !entrega.value.logradouro) {
+    entrega.value = {
+      ...entrega.value,
+      cep: cliente.cep ?? '',
+      logradouro: cliente.logradouro ?? '',
+      numero: cliente.numero ?? '',
+      complemento: cliente.complemento ?? '',
+      bairro: cliente.setor?.nome ?? '',
+      cidade_id: cliente.setor?.cidade?.id ?? null,
+      ponto_referencia: cliente.ponto_referencia ?? '',
+      telefone: cliente.telefones?.[0]?.numero ?? '',
+    }
+    cidadeEntrega.value = cliente.setor?.cidade ?? null
+  }
+  salvarCabecalho()
+}
+
+const { buscando: buscandoCep, buscar: buscarCep } = usarCep(entrega, { cep: 'cep', rua: 'logradouro', bairro: 'bairro', cidade: 'cidade_id' }, { cidade: cidadeEntrega, limiteRua: 100 })
+
+async function buscarEnderecoDoCep() {
+  await buscarCep()
+  salvarCabecalho()
+}
+
+async function fechar() {
+  fechando.value = true
+  const data = await enviar(() => api.post(`${url.value}/fechar`))
+  fechando.value = false
+  if (data) $q.notify({ type: 'positive', message: `Venda fechada: ${data.comprador} já pode ir ao caixa` })
+}
+
+function reabrir() {
+  $q.dialog({
+    title: 'Reabrir venda',
+    message: 'A venda volta para o vendedor mudar e sai da fila do caixa.',
+    cancel: { flat: true, label: 'Voltar' },
+    ok: { label: 'Reabrir' },
+  }).onOk(() => enviar(() => api.post(`${url.value}/reabrir`)))
 }
 
 function trocarForma() {

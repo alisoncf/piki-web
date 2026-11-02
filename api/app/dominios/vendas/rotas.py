@@ -6,18 +6,21 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.dominios.vendas import servico
 from app.dominios.empresas.modelos import Empresa
 from app.dominios.vendas.esquemas import (
+    BuscaPorCpf, ClienteResumido, Consumidor,
     Carne, ClienteDoCarne, Credito, ImpressaoCarne, Item, ItemAlteracao, ItemNovo, LojaDoCarne, PaginaVendas,
     PedidoCancelamento, PedidoDesconto, PedidoRecebimento, Venda, VendaDados, VendaResumo,
 )
-from app.dominios.vendas.modelos import ABERTA, SITUACOES
+from app.dominios.vendas.modelos import ABERTA, FECHADA, SITUACOES
 from app.dominios.vendas.modelos import Venda as ModeloVenda
 from app.nucleo.contexto import Contexto, exige
+from app.nucleo.documentos import cpf_valido, so_digitos
 
 router = APIRouter(tags=["vendas"])
 
 Ver = Annotated[Contexto, Depends(exige("vendas.ver", "vendas.vender", "caixa.operar"))]
 Vender = Annotated[Contexto, Depends(exige("vendas.vender"))]
 Receber = Annotated[Contexto, Depends(exige("caixa.operar"))]
+Reabrir = Annotated[Contexto, Depends(exige("vendas.vender", "caixa.operar"))]
 
 _STATUS = {
     servico.NaoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -39,7 +42,7 @@ def _venda(ctx: Contexto, venda: ModeloVenda, avisos: list[str] | None = None) -
         resposta.credito = Credito.model_validate(credito)
     if venda.entrada is not None and (carne := servico.carne(ctx.db, venda)) is not None:
         resposta.carne = Carne.model_validate(carne)
-    if venda.situacao == ABERTA:
+    if venda.situacao in (ABERTA, FECHADA):
         saldos = servico.disponiveis(ctx.db, venda)
         resposta.itens = [Item.model_validate(i).model_copy(update={"disponivel": saldos.get(i.produto_id, Decimal("0.000"))})
                           for i in venda.itens]
@@ -118,6 +121,35 @@ def dar_desconto(venda_id: int, pedido: PedidoDesconto, ctx: Vender) -> Venda:
         return _venda(ctx, servico.dar_desconto(ctx.db, ctx.empresa_id, ctx.usuario, venda_id, pedido))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
+
+
+@router.post("/vendas/{venda_id}/fechar", response_model=Venda)
+def fechar(venda_id: int, ctx: Vender) -> Venda:
+    """O vendedor fecha a venda com o cliente; ela vai para o caixa receber."""
+    try:
+        return _venda(ctx, servico.fechar(ctx.db, ctx.empresa_id, venda_id))
+    except servico.ErroVenda as e:
+        raise _http(ctx, e)
+
+
+@router.post("/vendas/{venda_id}/reabrir", response_model=Venda)
+def reabrir(venda_id: int, ctx: Reabrir) -> Venda:
+    """A venda fechada volta a ser aberta, para o vendedor mudar."""
+    try:
+        return _venda(ctx, servico.reabrir(ctx.db, ctx.empresa_id, venda_id))
+    except servico.ErroVenda as e:
+        raise _http(ctx, e)
+
+
+@router.get("/consumidores/{cpf}", response_model=BuscaPorCpf)
+def buscar_cpf(cpf: str, ctx: Vender) -> BuscaPorCpf:
+    """Quem tem este CPF: cliente cadastrado ou consumidor que já comprou (para preencher a venda)."""
+    cpf = so_digitos(cpf)
+    if not cpf_valido(cpf):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "CPF inválido")
+    cliente, consumidor = servico.buscar_cpf(ctx.db, cpf)
+    return BuscaPorCpf(cliente=ClienteResumido.model_validate(cliente) if cliente else None,
+                       consumidor=Consumidor.model_validate(consumidor) if consumidor else None)
 
 
 @router.post("/vendas/{venda_id}/cancelar", response_model=Venda)

@@ -11,7 +11,7 @@ router = APIRouter(tags=["endereços"])
 
 @router.get("/cep/{cep}", response_model=EnderecoDoCep)
 def consultar_cep(
-    cep: str, ctx: Annotated[Contexto, Depends(exige("clientes.editar", "funcionarios.editar", "fornecedores.editar"))]
+    cep: str, ctx: Annotated[Contexto, Depends(exige("clientes.editar", "funcionarios.editar", "fornecedores.editar", "vendas.vender"))]
 ) -> EnderecoDoCep:
     """Endereço do CEP no ViaCEP e o setor da cidade que corresponde ao bairro (para as fichas de cliente, funcionário e fornecedor)."""
     try:

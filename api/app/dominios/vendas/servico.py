@@ -1,10 +1,11 @@
 """Regras da venda (D26).
 
-O vendedor abre a venda, inclui os itens, escolhe a forma de pagamento e dá o
-desconto; o caixa recebe. O desconto fica em cada item: o da forma e o dado no
-total são rateados entre os itens. Desconto acima do limite do perfil, e
-parcelas acima do limite da forma, pedem o login e a senha de quem pode
-autorizar, que fica registrado na venda.
+O vendedor abre a venda, inclui os itens, escolhe a forma de pagamento, dá o
+desconto e fecha a venda com o cliente; o caixa recebe a venda fechada. O
+desconto fica em cada item: o da forma e o dado no total são rateados entre os
+itens, menos os em queima, que não têm desconto. Desconto acima do limite do
+perfil, e parcelas acima do limite da forma, pedem o login e a senha de quem
+pode autorizar, que fica registrado na venda.
 
 As funções que mudam a venda conferem a autorização antes de mexer em
 qualquer coisa: a senha errada conta tentativa e grava na hora.
@@ -19,15 +20,20 @@ from app.dominios.acesso import servico as acesso
 from app.dominios.acesso.modelos import Usuario
 from app.dominios.caixa import servico as caixa
 from app.dominios.caixa.modelos import ABERTO, FormaPagamento, LancamentoCaixa
+from app.dominios.cidades.modelos import Cidade
+from app.dominios.clientes import repositorio as repo_clientes
 from app.dominios.clientes.modelos import Cliente
 from app.dominios.estoque import repositorio as repo_estoque
 from app.dominios.estoque import servico as estoque
 from app.dominios.produtos.modelos import Produto
 from app.dominios.receber import servico as contas
 from app.dominios.receber.modelos import ContaReceber
-from app.dominios.vendas.esquemas import Autorizacao, ItemAlteracao, ItemNovo, PedidoDesconto, PedidoRecebimento, VendaDados
+from app.dominios.vendas.esquemas import (
+    Autorizacao, ConsumidorDados, EntregaDados, ItemAlteracao, ItemNovo, PedidoDesconto, PedidoRecebimento, VendaDados,
+)
 from app.dominios.vendas.modelos import (
-    ABERTA, CANCELADA, DIAS_PARA_VENCER, RECEBIDA, SITUACOES, VENCIDA, ItemVenda, Venda,
+    ABERTA, CANCELADA, DIAS_PARA_VENCER, FECHADA, RECEBIDA, SITUACOES, VENCIDA, Consumidor, EntregaVenda, ItemVenda,
+    Venda,
 )
 
 ZERO = Decimal("0.00")
@@ -71,8 +77,8 @@ def documento(venda: Venda) -> str:
 # ------------------------------------------------------------ consultar
 
 def vencer_abertas(db: Session, empresa_id: int) -> None:
-    """A venda aberta há mais de 10 dias vence e não pode mais ser recebida."""
-    db.execute(update(Venda).where(Venda.empresa_id == empresa_id, Venda.situacao == ABERTA,
+    """A venda aberta ou fechada há mais de 10 dias vence e não pode mais ser recebida."""
+    db.execute(update(Venda).where(Venda.empresa_id == empresa_id, Venda.situacao.in_([ABERTA, FECHADA]),
                                    Venda.vence_em < datetime.now()).values(situacao=VENCIDA))
     db.commit()
 
@@ -90,7 +96,7 @@ def listar(db: Session, empresa_id: int, situacao: str | None, busca: str | None
         if termo.isdigit():
             filtros.append(Venda.numero == int(termo))
         else:
-            filtros.append(Venda.cliente_id.in_(select(Cliente.id).where(Cliente.nome.ilike(f"%{termo}%"))))
+            filtros.append(Venda.comprador.ilike(f"%{termo}%"))
     total = db.scalar(select(func.count()).select_from(Venda).where(*filtros))
     itens = db.scalars(select(Venda).where(*filtros).order_by(Venda.id.desc()).limit(limite).offset(deslocamento))
     return list(itens), total
@@ -100,7 +106,7 @@ def obter(db: Session, empresa_id: int, venda_id: int) -> Venda:
     venda = db.get(Venda, venda_id)
     if venda is None or venda.empresa_id != empresa_id:
         raise NaoEncontrado("Venda não encontrada")
-    if venda.situacao == ABERTA and venda.vence_em < datetime.now():
+    if venda.situacao in (ABERTA, FECHADA) and venda.vence_em < datetime.now():
         venda.situacao = VENCIDA
         db.commit()
     return venda
@@ -113,11 +119,19 @@ def _salvar(db: Session, venda: Venda) -> Venda:
     return venda
 
 
-def _aberta(db: Session, empresa_id: int, venda_id: int) -> Venda:
+def _na_situacao(db: Session, empresa_id: int, venda_id: int, *situacoes: str) -> Venda:
     venda = obter(db, empresa_id, venda_id)
-    if venda.situacao != ABERTA:
+    if venda.situacao not in situacoes:
+        if venda.situacao == FECHADA:
+            raise DadoInvalido("Esta venda está fechada; reabra para mudar")
+        if venda.situacao == ABERTA:
+            raise DadoInvalido("O vendedor ainda não fechou esta venda")
         raise DadoInvalido(f"Esta venda está {SITUACOES[venda.situacao].lower()}")
     return venda
+
+
+def _aberta(db: Session, empresa_id: int, venda_id: int) -> Venda:
+    return _na_situacao(db, empresa_id, venda_id, ABERTA)
 
 
 # ------------------------------------------------------------ montar
@@ -144,42 +158,55 @@ def _autorizador(db: Session, autorizacao: Autorizacao | None) -> Usuario | None
         raise DadoInvalido("Login ou senha de quem autoriza não confere")
 
 
+def _com_desconto(venda: Venda) -> list[ItemVenda]:
+    """Os itens que aceitam desconto: os em queima, não."""
+    return [i for i in venda.itens if not i.em_queima]
+
+
+def _base_do_desconto(venda: Venda) -> Decimal:
+    return sum((i.bruto for i in _com_desconto(venda)), ZERO)
+
+
 def _recalcular(venda: Venda) -> None:
     for item in venda.itens:
         item.total = item.bruto - item.desconto
     venda.subtotal = sum((i.bruto for i in venda.itens), ZERO)
     venda.desconto = sum((i.desconto for i in venda.itens), ZERO)
-    venda.total = venda.subtotal - venda.desconto
+    venda.total = venda.subtotal - venda.desconto + venda.taxa_entrega
 
 
 def _ratear(venda: Venda, valor: Decimal) -> None:
-    """Divide o desconto entre os itens, na proporção do valor de cada um; os centavos que sobram vão no maior."""
-    subtotal = sum((i.bruto for i in venda.itens), ZERO)
-    if valor > subtotal:
-        raise DadoInvalido("O desconto passa do valor da venda")
-    if not venda.itens:
-        return
-    maior = max(venda.itens, key=lambda i: i.bruto)
+    """Divide o desconto entre os itens que aceitam desconto, na proporção do valor de cada um;
+    os centavos que sobram vão no maior."""
+    itens = _com_desconto(venda)
+    base = _base_do_desconto(venda)
+    if valor > base:
+        raise DadoInvalido("O desconto passa do valor dos itens que aceitam desconto" if len(itens) < len(venda.itens)
+                           else "O desconto passa do valor da venda")
     for item in venda.itens:
-        if item is not maior:
-            item.desconto = _centavos(valor * item.bruto / subtotal) if subtotal else ZERO
-    maior.desconto = valor - sum((i.desconto for i in venda.itens if i is not maior), ZERO)
+        item.desconto = ZERO
+    if itens:
+        maior = max(itens, key=lambda i: i.bruto)
+        for item in itens:
+            if item is not maior:
+                item.desconto = _centavos(valor * item.bruto / base) if base else ZERO
+        maior.desconto = valor - sum((i.desconto for i in itens if i is not maior), ZERO)
     _recalcular(venda)
 
 
 def _aplicar_percentual(venda: Venda) -> None:
-    subtotal = sum((i.bruto for i in venda.itens), ZERO)
-    _ratear(venda, _centavos(subtotal * venda.percentual_desconto / CEM))
+    _ratear(venda, _centavos(_base_do_desconto(venda) * venda.percentual_desconto / CEM))
 
 
 def _conferir_desconto(db: Session, venda: Venda, usuario: Usuario, autorizador: Usuario | None) -> None:
     """O desconto vai até o maior entre o da forma, o limite de quem está vendendo e o de quem já autorizou."""
-    if venda.desconto <= 0 or venda.subtotal <= 0:
+    base = _base_do_desconto(venda)
+    if venda.desconto <= 0 or base <= 0:
         return
 
     def cabe(limite: Decimal) -> bool:
         # o arredondamento item a item pode passar um centavo por item
-        return venda.desconto <= _centavos(venda.subtotal * limite / CEM) + CENTAVO * len(venda.itens)
+        return venda.desconto <= _centavos(base * limite / CEM) + CENTAVO * len(venda.itens)
 
     limites = [acesso.limite_de_desconto(db, usuario, venda.empresa_id)]
     if venda.forma_pagamento is not None:
@@ -188,7 +215,7 @@ def _conferir_desconto(db: Session, venda: Venda, usuario: Usuario, autorizador:
         limites.append(acesso.limite_de_desconto(db, venda.desconto_autorizado_por, venda.empresa_id))
     if cabe(max(limites)):
         return
-    percentual = _percentual(venda.desconto * CEM / venda.subtotal)
+    percentual = _percentual(venda.desconto * CEM / base)
     if autorizador is None:
         raise PedeAutorizacao(f"O desconto de {percentual} passa do seu limite ({_percentual(max(limites))}). "
                               "Peça a autorização de quem pode dar mais.")
@@ -219,14 +246,60 @@ def _conferir_parcelas(db: Session, venda: Venda, permissoes: set[str], usuario:
     venda.parcelas_autorizadas_por = autorizador
 
 
+def _aplicar_consumidor(db: Session, venda: Venda, dados: ConsumidorDados | None) -> None:
+    """Quem compra sem cadastro. Com CPF, telefone, e-mail ou aniversário, vira (ou atualiza) o cadastro curto do
+    consumidor; o CPF acha quem já comprou antes. Só com o nome, fica só na venda."""
+    venda.comprador = dados.nome if dados else None
+    if dados is None or not (dados.cpf or dados.telefone or dados.email or dados.dia_nascimento):
+        venda.consumidor = None
+        return
+    if not dados.nome:
+        raise DadoInvalido("Informe o nome de quem está comprando")
+    atual = venda.consumidor
+    registro = db.scalar(select(Consumidor).where(Consumidor.cpf == dados.cpf)) if dados.cpf else None
+    if registro is None and atual is not None and atual.cpf in (None, dados.cpf):
+        registro = atual
+    if registro is None:
+        registro = Consumidor()
+        db.add(registro)
+    registro.nome = dados.nome
+    # o que não foi dado agora continua como estava (veio da compra anterior)
+    for campo in ("cpf", "dia_nascimento", "mes_nascimento", "telefone", "email"):
+        if getattr(dados, campo) is not None:
+            setattr(registro, campo, getattr(dados, campo))
+    venda.consumidor = registro
+
+
+def _aplicar_entrega(db: Session, venda: Venda, dados: EntregaDados | None) -> None:
+    if dados is None:
+        venda.entrega = None
+        return
+    if dados.cidade_id is not None and db.get(Cidade, dados.cidade_id) is None:
+        raise NaoEncontrado("Cidade não encontrada")
+    entrega = venda.entrega or EntregaVenda()
+    for campo, valor in dados.model_dump().items():
+        setattr(entrega, campo, valor)
+    entrega.cidade = db.get(Cidade, dados.cidade_id) if dados.cidade_id else None
+    venda.entrega = entrega
+
+
 def alterar(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str], venda_id: int,
             dados: VendaDados) -> Venda:
-    """Cliente, forma de pagamento, parcelas e observação. Trocar a forma aplica o desconto dela a todos os itens."""
+    """Cliente (ou consumidor), forma de pagamento, parcelas, entrega e observação.
+    Trocar a forma aplica o desconto dela a todos os itens."""
     autorizador = _autorizador(db, dados.autorizacao)
     venda = _aberta(db, empresa_id, venda_id)
-    if dados.cliente_id is not None and db.get(Cliente, dados.cliente_id) is None:
-        raise NaoEncontrado("Cliente não encontrado")
-    venda.cliente_id = dados.cliente_id
+    if dados.cliente_id is not None:
+        cliente = db.get(Cliente, dados.cliente_id)
+        if cliente is None:
+            raise NaoEncontrado("Cliente não encontrado")
+        venda.cliente = cliente
+        venda.consumidor = None
+        venda.comprador = cliente.nome
+    else:
+        venda.cliente = None
+        _aplicar_consumidor(db, venda, dados.consumidor)
+    _aplicar_entrega(db, venda, dados.entrega)
     if dados.forma_pagamento_id != venda.forma_pagamento_id:
         forma = None
         if dados.forma_pagamento_id is not None:
@@ -240,6 +313,7 @@ def alterar(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str]
         _aplicar_percentual(venda)
     venda.parcelas = dados.parcelas
     venda.observacao = dados.observacao
+    _recalcular(venda)
     _conferir_desconto(db, venda, usuario, autorizador)
     _conferir_parcelas(db, venda, permissoes, usuario, autorizador)
     return _salvar(db, venda)
@@ -258,10 +332,11 @@ def incluir_item(db: Session, empresa_id: int, usuario: Usuario, venda_id: int, 
         raise DadoInvalido(f"{produto.nome} não aceita quantidade com fração")
     if item is None:
         item = ItemVenda(ordem=max((i.ordem for i in venda.itens), default=0) + 1, produto=produto,
-                         descricao=produto.nome, quantidade=quantidade,
+                         descricao=produto.nome, quantidade=quantidade, em_queima=bool(produto.preco_queima),
                          preco=produto.preco_queima or produto.preco_venda, desconto=ZERO)
         venda.itens.append(item)
-        item.desconto = _centavos(item.bruto * venda.percentual_desconto / CEM)
+        if not item.em_queima:
+            item.desconto = _centavos(item.bruto * venda.percentual_desconto / CEM)
     else:
         antes = item.bruto
         item.quantidade = quantidade
@@ -286,6 +361,8 @@ def alterar_item(db: Session, empresa_id: int, usuario: Usuario, venda_id: int, 
     if not item.produto.fracionado and _tem_fracao(dados.quantidade):
         raise DadoInvalido(f"{item.descricao} não aceita quantidade com fração")
     item.quantidade = dados.quantidade
+    if dados.desconto > 0 and item.em_queima:
+        raise DadoInvalido(f"{item.descricao} está em queima e não tem desconto")
     if dados.desconto > item.bruto:
         raise DadoInvalido("O desconto passa do valor do item")
     item.desconto = dados.desconto
@@ -307,17 +384,57 @@ def dar_desconto(db: Session, empresa_id: int, usuario: Usuario, venda_id: int, 
     venda = _aberta(db, empresa_id, venda_id)
     if not venda.itens:
         raise DadoInvalido("Inclua os itens antes de dar o desconto")
-    subtotal = sum((i.bruto for i in venda.itens), ZERO)
-    valor = pedido.valor if pedido.valor is not None else _centavos(subtotal * pedido.percentual / CEM)
+    base = _base_do_desconto(venda)
+    if not base:
+        raise DadoInvalido("Os itens desta venda estão em queima e não têm desconto")
+    valor = pedido.valor if pedido.valor is not None else _centavos(base * pedido.percentual / CEM)
     _ratear(venda, valor)
-    venda.percentual_desconto = (valor * CEM / subtotal).quantize(Decimal("0.0001")) if subtotal else Decimal(0)
+    venda.percentual_desconto = (valor * CEM / base).quantize(Decimal("0.0001"))
     _conferir_desconto(db, venda, usuario, autorizador)
     return _salvar(db, venda)
 
 
-def cancelar(db: Session, empresa_id: int, usuario_id: int, venda_id: int, motivo: str) -> Venda:
-    """Só a venda aberta; a recebida é desfeita pela devolução (etapa 5)."""
+def fechar(db: Session, empresa_id: int, venda_id: int) -> Venda:
+    """O vendedor fecha a venda com o cliente; daí ela vai para o caixa, que acha pelo nome de quem comprou."""
     venda = _aberta(db, empresa_id, venda_id)
+    if not venda.itens:
+        raise DadoInvalido("A venda não tem itens")
+    forma = venda.forma_pagamento
+    if forma is None:
+        raise DadoInvalido("Escolha a forma de pagamento")
+    if not forma.ativo:
+        raise DadoInvalido(f"A forma {forma.nome} está desativada; escolha outra")
+    if venda.cliente is not None:
+        venda.comprador = venda.cliente.nome
+    elif forma.tipo == "crediario":
+        raise DadoInvalido("O crediário pede o cliente cadastrado")
+    if not venda.comprador:
+        raise DadoInvalido("Informe o nome de quem está comprando")
+    entrega = venda.entrega
+    if entrega is not None and not (entrega.logradouro and entrega.numero and entrega.bairro and entrega.cidade_id):
+        raise DadoInvalido("Falta o endereço da entrega: rua, número, bairro e cidade")
+    venda.situacao = FECHADA
+    venda.fechada_em = datetime.now()
+    return _salvar(db, venda)
+
+
+def reabrir(db: Session, empresa_id: int, venda_id: int) -> Venda:
+    """A venda fechada volta para o vendedor mudar (o cliente mudou de ideia no caixa...)."""
+    venda = _na_situacao(db, empresa_id, venda_id, FECHADA)
+    venda.situacao = ABERTA
+    venda.fechada_em = None
+    return _salvar(db, venda)
+
+
+def buscar_cpf(db: Session, cpf: str) -> tuple[Cliente | None, Consumidor | None]:
+    """Quem tem este CPF: cliente cadastrado ou consumidor que já comprou."""
+    return (repo_clientes.cliente_por_documento(db, cpf),
+            db.scalar(select(Consumidor).where(Consumidor.cpf == cpf)))
+
+
+def cancelar(db: Session, empresa_id: int, usuario_id: int, venda_id: int, motivo: str) -> Venda:
+    """Só a venda aberta ou fechada; a recebida é desfeita pela devolução (etapa 5)."""
+    venda = _na_situacao(db, empresa_id, venda_id, ABERTA, FECHADA)
     venda.situacao = CANCELADA
     venda.cancelada_em = datetime.now()
     venda.cancelada_por_id = usuario_id
@@ -368,15 +485,13 @@ def _forma_da_entrada(db: Session, venda: Venda, pedido: PedidoRecebimento) -> F
 
 def receber(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str], venda_id: int,
             pedido: PedidoRecebimento) -> tuple[Venda, list[str]]:
-    """O caixa recebe: lança a entrada no caixa e baixa o estoque. Devolve a venda e os avisos de estoque negativo.
+    """O caixa recebe a venda fechada: lança no caixa e baixa o estoque. Devolve a venda e os avisos de estoque negativo.
 
     No crediário, a entrada (se houver) entra no caixa na forma em que foi paga, e o resto vira o carnê,
     em parcelas iguais e sem juros.
     """
     autorizador = _autorizador(db, pedido.autorizacao)
-    venda = _aberta(db, empresa_id, venda_id)
-    if not venda.itens:
-        raise DadoInvalido("A venda não tem itens")
+    venda = _na_situacao(db, empresa_id, venda_id, FECHADA)
     forma = venda.forma_pagamento
     if forma is None:
         raise DadoInvalido("Escolha a forma de pagamento")
@@ -440,8 +555,10 @@ def receber(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str]
 
 
 def credito(db: Session, venda: Venda) -> contas.Credito | None:
-    """O crédito do cliente, para a tela mostrar enquanto a venda no crediário está aberta."""
-    if venda.situacao != ABERTA or venda.cliente is None or venda.forma_pagamento is None             or venda.forma_pagamento.tipo != "crediario":
+    """O crédito do cliente, para a tela mostrar enquanto a venda no crediário não foi recebida."""
+    if venda.situacao not in (ABERTA, FECHADA) or venda.cliente is None or venda.forma_pagamento is None:
+        return None
+    if venda.forma_pagamento.tipo != "crediario":
         return None
     return contas.credito(db, venda.cliente)
 

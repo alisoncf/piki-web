@@ -32,7 +32,7 @@
     >
       <template #top>
         <div class="row items-center q-gutter-md full-width">
-          <q-input v-model="busca" dense outlined debounce="300" placeholder="Número da venda ou cliente" clearable class="col-12 col-sm">
+          <q-input v-model="busca" dense outlined debounce="300" placeholder="Número da venda ou nome de quem comprou" clearable class="col-12 col-sm">
             <template #prepend><q-icon name="search" /></template>
           </q-input>
           <q-btn-toggle v-model="situacao" no-caps unelevated toggle-color="primary" :options="SITUACOES" />
@@ -59,12 +59,13 @@ import { useSessaoStore } from '@/stores/sessao'
 
 const SITUACOES = [
   { label: 'Abertas', value: 'aberta' },
+  { label: 'Fechadas', value: 'fechada' },
   { label: 'Recebidas', value: 'recebida' },
   { label: 'Canceladas', value: 'cancelada' },
   { label: 'Vencidas', value: 'vencida' },
   { label: 'Todas', value: null },
 ]
-const CORES = { aberta: 'warning', recebida: 'positive', cancelada: 'grey', vencida: 'grey-7' }
+const CORES = { aberta: 'warning', fechada: 'primary', recebida: 'positive', cancelada: 'grey', vencida: 'grey-7' }
 const nomeSituacao = (s) => SITUACOES.find((x) => x.value === s)?.label.slice(0, -1) ?? s
 
 const $q = useQuasar()
@@ -75,7 +76,8 @@ const vendas = ref([])
 const carregando = ref(false)
 const criando = ref(false)
 const busca = ref('')
-const situacao = ref('aberta')
+// o caixa começa pelas fechadas, que esperam para ser recebidas
+const situacao = ref(sessao.pode('caixa.operar') && !sessao.pode('vendas.vender') ? 'fechada' : 'aberta')
 const minhas = ref(false)
 const paginacao = ref({ page: 1, rowsPerPage: 20, rowsNumber: 0 })
 
@@ -83,7 +85,7 @@ const colunas = [
   { name: 'numero', label: 'Venda', field: 'numero', align: 'left' },
   { name: 'data', label: 'Aberta em', field: 'criado_em', align: 'left', format: formatarDataHora },
   { name: 'vendedor', label: 'Vendedor', field: (v) => v.vendedor.nome, align: 'left' },
-  { name: 'cliente', label: 'Cliente', field: (v) => v.cliente?.nome ?? '', align: 'left' },
+  { name: 'comprador', label: 'Comprador', field: (v) => v.comprador ?? v.cliente?.nome ?? '', align: 'left' },
   { name: 'forma', label: 'Pagamento', align: 'left', field: (v) => (v.forma_pagamento ? `${v.forma_pagamento.nome}${v.parcelas > 1 ? ` ${v.parcelas}x` : ''}` : '') },
   { name: 'total', label: 'Total', field: 'total', align: 'right', format: formatarMoeda },
   { name: 'situacao', label: 'Situação', field: 'situacao', align: 'left' },

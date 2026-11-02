@@ -241,6 +241,12 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - Numeração própria por loja. A venda aberta pode ser cancelada com o motivo; a recebida, só pela devolução (etapa 5).
 - Permissões: `vendas.ver`, `vendas.vender` e `vendas.autorizar`; quem recebe precisa de `caixa.operar`.
 
+**Ajustes da venda (02/11/2026)**
+- Pedido do Alison. O vendedor **fecha** a venda com o cliente, e só a venda fechada vai para o caixa, que a acha pelo nome de quem comprou (a lista do caixa começa nas fechadas). Para fechar: itens, forma de pagamento e o nome de quem compra (o crediário pede o cliente cadastrado; a entrega, o endereço). A venda fechada não muda; o vendedor ou o caixa reabre, e ela sai da fila do caixa. Fechada também vence em 10 dias.
+- **Venda a consumidor** (o cliente 0 do VB6): sem cliente cadastrado, o nome de quem compra é obrigatório, mas pode ser só o primeiro nome. CPF, aniversário (dia e mês), telefone e e-mail são opcionais. Com algum deles, a pessoa entra num cadastro curto de consumidores (global); o CPF acha quem já comprou e preenche o resto, e o CPF de um cliente cadastrado troca o consumidor pelo cliente. Só com o nome, fica só na venda (como o `nomecli_ven` do VB6).
+- **Entrega:** a venda pode ter entrega, com a taxa (entra no total, sem desconto) e o endereço (rua, número, bairro e cidade obrigatórios para fechar; CEP, complemento, referência e telefone de quem recebe). Com cliente cadastrado, o endereço dele vem preenchido. O controle da entrega em si fica na etapa 5.
+- **Queima:** o produto vendido pelo preço de queima aparece marcado e não tem desconto nenhum: nem o da forma de pagamento, nem o do total (rateado só entre os outros itens), nem o do item. O limite de desconto é conferido sobre os itens que aceitam desconto.
+
 **Crediário (etapa 3, 02/11/2026)**
 - Regras do Alison: o limite restante do cliente é o limite de crédito menos todas as parcelas em aberto (em todas as lojas). O carnê não tem entrada; se o cliente pagar uma parte na hora, o caixa informa a entrada ao receber. Não há juros no crediário; pode haver juros de atraso ao receber a parcela.
 - O crediário pede o cliente cadastrado. Cliente bloqueado ou com o crédito suspenso não compra no crediário, nem com autorização.

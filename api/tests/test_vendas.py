@@ -7,6 +7,7 @@ import pytest
 from app.dominios.acesso import repositorio
 from app.dominios.acesso import servico as acesso
 from app.dominios.acesso.modelos import Perfil
+from app.dominios.cidades.modelos import Cidade
 from app.dominios.empresas.modelos import Empresa
 from app.dominios.estoque.modelos import Estoque
 from app.dominios.produtos.modelos import Produto
@@ -37,7 +38,8 @@ def loja(banco, cliente, cenario, admin):
         lencol = Produto(codigo=1, nome="Lençol Ficticio Casal", preco_venda=Decimal("100.00"))
         toalha = Produto(codigo=2, nome="Toalha Ficticia", preco_venda=Decimal("30.00"), preco_queima=Decimal("20.00"))
         tecido = Produto(codigo=3, nome="Tecido Ficticio", unidade="M", fracionado=True, preco_venda=Decimal("10.00"))
-        db.add_all([lencol, toalha, tecido])
+        lencol2 = Produto(codigo=4, nome="Lençol Ficticio Solteiro", preco_venda=Decimal("50.00"))
+        db.add_all([lencol, toalha, tecido, lencol2])
         db.flush()
         db.add(Estoque(empresa_id=cenario["e1"], produto_id=lencol.id, quantidade=Decimal("5"), reservado=Decimal(0)))
         vendedor = acesso.criar_perfil(db, "Vendedor", ["vendas.vender", "caixa.operar"])
@@ -46,7 +48,7 @@ def loja(banco, cliente, cenario, admin):
         gerente.desconto_maximo = Decimal("15")
         acesso.dar_acesso(db, repositorio.usuario_por_login(db, "davi"), db.get(Empresa, cenario["e1"]), vendedor)
         db.commit()
-        produtos = {"lencol": lencol.id, "toalha": toalha.id, "tecido": tecido.id}
+        produtos = {"lencol": lencol.id, "toalha": toalha.id, "tecido": tecido.id, "lencol2": lencol2.id}
     caixa = cliente.post("/caixas", headers=admin, json={"nome": "Cx 02"}).json()
     sessao = cliente.post(f"/caixas/{caixa['id']}/abrir", headers=admin, json={"fundo": "50"}).json()
     return {"formas": formas, "produtos": produtos, "sessao": sessao["id"], "davi": _auth(cliente, "davi", cenario["e1"])}
@@ -70,21 +72,35 @@ def test_monta_a_venda_e_o_caixa_recebe(banco, cliente, cenario, admin, loja):
     assert cliente.post(f"{url}/itens", headers=davi, json={"produto_id": p["toalha"], "quantidade": "0.5"}).status_code == 422
     assert cliente.post(f"{url}/itens", headers=davi, json={"produto_id": p["tecido"], "quantidade": "1.5"}).status_code == 200
 
-    # no dinheiro, os 5% da forma vão para todos os itens, sem pedir autorização
-    venda = cliente.put(url, headers=davi, json={"forma_pagamento_id": loja["formas"]["dinheiro"]}).json()
-    assert (venda["subtotal"], venda["desconto"], venda["total"]) == ("335.00", "16.75", "318.25")
-    assert [i["desconto"] for i in venda["itens"]] == ["15.00", "1.00", "0.75"]
+    # no dinheiro, os 5% da forma vão para os itens, sem pedir autorização; a toalha está em queima e fica sem desconto
+    dados = {"forma_pagamento_id": loja["formas"]["dinheiro"]}
+    venda = cliente.put(url, headers=davi, json=dados).json()
+    assert (venda["subtotal"], venda["desconto"], venda["total"]) == ("335.00", "15.75", "319.25")
+    assert [(i["desconto"], i["em_queima"]) for i in venda["itens"]] == [("15.00", False), ("0.00", True), ("0.75", False)]
     assert sum(Decimal(i["total"]) for i in venda["itens"]) == Decimal(venda["total"])
+
+    # o caixa só recebe depois que o vendedor fecha, e para fechar é preciso o nome de quem compra
+    r = cliente.post(f"{url}/receber", headers=davi, json={"sessao_caixa_id": loja["sessao"]})
+    assert r.status_code == 422 and r.json()["detail"] == "O vendedor ainda não fechou esta venda"
+    r = cliente.post(f"{url}/fechar", headers=davi)
+    assert r.status_code == 422 and r.json()["detail"] == "Informe o nome de quem está comprando"
+    venda = cliente.put(url, headers=davi, json=dados | {"consumidor": {"nome": "José"}}).json()
+    assert (venda["comprador"], venda["consumidor"]) == ("José", None)  # só com o nome, não vira cadastro
+    venda = cliente.post(f"{url}/fechar", headers=davi).json()
+    assert venda["situacao"] == "fechada" and venda["fechada_em"]
+    r = cliente.post(f"{url}/itens", headers=davi, json={"produto_id": p["lencol"]})
+    assert r.status_code == 422 and "reabra" in r.json()["detail"]
+    assert cliente.get("/vendas", headers=davi, params={"situacao": "fechada", "busca": "jos"}).json()["total"] == 1
 
     # o caixa recebe: entra no caixa e baixa o estoque
     r = cliente.post(f"{url}/receber", headers=davi, json={"sessao_caixa_id": loja["sessao"], "valor_recebido": "320"})
     assert r.status_code == 200, r.text
     venda = r.json()
-    assert (venda["situacao"], venda["troco"], venda["recebida_por"]["nome"]) == ("recebida", "1.75", "Davi Sem Acesso")
+    assert (venda["situacao"], venda["troco"], venda["recebida_por"]["nome"]) == ("recebida", "0.75", "Davi Sem Acesso")
     assert venda["avisos"] == ["Toalha Ficticia: o estoque da loja ficou em -1", "Tecido Ficticio: o estoque da loja ficou em -1.5"]
     sessao = cliente.get(f"/caixas/sessoes/{loja['sessao']}", headers=admin).json()
-    assert [(x["descricao_motivo"], x["valor"], x["documento"]) for x in sessao["lancamentos"]] == [("Venda", "318.25", f"venda {venda['numero']}")]
-    assert sessao["totais"][0]["saldo"] == "368.25"  # fundo 50 + venda
+    assert [(x["descricao_motivo"], x["valor"], x["documento"]) for x in sessao["lancamentos"]] == [("Venda", "319.25", f"venda {venda['numero']}")]
+    assert sessao["totais"][0]["saldo"] == "369.25"  # fundo 50 + venda
     lancamento = sessao["lancamentos"][0]["id"]
     assert cliente.post(f"/caixas/sessoes/{loja['sessao']}/lancamentos/{lancamento}/estornar", headers=admin).status_code == 422
     with banco() as db:
@@ -120,9 +136,17 @@ def test_desconto_no_total_e_rateado_e_acima_do_limite_pede_autorizacao(cliente,
     venda = cliente.put(f"{url}/itens/{item['id']}", headers=davi, json={"quantidade": "1", "desconto": "15"}).json()
     assert (venda["itens"][0]["total"], venda["total"]) == ("85.00", "114.70")
     assert cliente.put(f"{url}/itens/{item['id']}", headers=davi, json={"quantidade": "1", "desconto": "30"}).status_code == 403
-    # item novo leva o % da venda
+    # item novo leva o % da venda, menos o em queima
+    venda = cliente.post(f"{url}/itens", headers=davi, json={"produto_id": p["lencol2"]}).json()
+    assert venda["itens"][2]["desconto"] == "5.00"
     venda = cliente.post(f"{url}/itens", headers=davi, json={"produto_id": p["toalha"]}).json()
-    assert venda["itens"][2]["desconto"] == "2.00"
+    toalha = venda["itens"][3]
+    assert (toalha["desconto"], toalha["em_queima"]) == ("0.00", True)
+    r = cliente.put(f"{url}/itens/{toalha['id']}", headers=davi, json={"quantidade": "1", "desconto": "1"})
+    assert r.status_code == 422 and r.json()["detail"] == "Toalha Ficticia está em queima e não tem desconto"
+    # o desconto no total é rateado só entre os que aceitam desconto
+    venda = cliente.post(f"{url}/desconto", headers=davi, json={"valor": "10.00"}).json()
+    assert [i["desconto"] for i in venda["itens"]] == ["5.47", "1.80", "2.73", "0.00"]
 
 
 def test_parcelas_acima_do_limite_da_forma(cliente, loja, admin):
@@ -142,10 +166,11 @@ def test_parcelas_acima_do_limite_da_forma(cliente, loja, admin):
                                                  "autorizacao": {"login": "caio", "senha": "senha-caio"}}).json()
     assert (venda["parcelas"], venda["parcelas_autorizadas_por"]["nome"]) == (5, "Caio Admin")
 
-    # o crediário ainda não é recebido
-    cliente.put(url, headers=davi, json={"forma_pagamento_id": loja["formas"]["crediario"], "parcelas": 2})
-    r = cliente.post(f"{url}/receber", headers=davi, json={"sessao_caixa_id": loja["sessao"]})
-    assert r.status_code == 422 and "crediário" in r.json()["detail"]
+    # o crediário pede o cliente cadastrado (o consumidor só com o nome não basta)
+    cliente.put(url, headers=davi, json={"forma_pagamento_id": loja["formas"]["crediario"], "parcelas": 2,
+                                         "consumidor": {"nome": "José"}})
+    r = cliente.post(f"{url}/fechar", headers=davi)
+    assert r.status_code == 422 and r.json()["detail"] == "O crediário pede o cliente cadastrado"
 
 
 def test_lista_vence_e_cancela(banco, cliente, cenario, loja, admin):
@@ -176,3 +201,49 @@ def test_perfil_com_limite_de_desconto(cliente, cenario, admin):
     ana = _auth(cliente, "ana", cenario["e1"])
     r = cliente.put(f"/acesso/perfis/{r.json()['id']}", headers=ana, json={"nome": "Caixa", "desconto_maximo": "10", "permissoes": []})
     assert r.status_code == 403 and "desconto máximo" in r.json()["detail"]
+
+
+def test_consumidor_sem_cadastro_e_entrega(banco, cliente, loja):
+    davi, p = loja["davi"], loja["produtos"]
+    url = f"/vendas/{cliente.post('/vendas', headers=davi).json()['id']}"
+    cliente.post(f"{url}/itens", headers=davi, json={"produto_id": p["lencol"]})
+    dinheiro = loja["formas"]["dinheiro"]
+
+    # com o CPF (ou telefone, ou e-mail), vira o cadastro curto do consumidor
+    maria = {"nome": "Maria", "cpf": "529.982.247-25", "dia_nascimento": 15, "mes_nascimento": 3,
+             "telefone": "(62) 99999-0000", "email": "maria@exemplo.com"}
+    assert cliente.put(url, headers=davi, json={"consumidor": maria | {"cpf": "111.111.111-11"}}).status_code == 422
+    assert cliente.put(url, headers=davi, json={"consumidor": maria | {"mes_nascimento": None}}).status_code == 422
+    venda = cliente.put(url, headers=davi, json={"forma_pagamento_id": dinheiro, "consumidor": maria}).json()
+    assert venda["comprador"] == "Maria"
+    assert {k: venda["consumidor"][k] for k in ("cpf", "telefone", "dia_nascimento")} == {
+        "cpf": "52998224725", "telefone": "62999990000", "dia_nascimento": 15}
+    # na próxima compra, o CPF traz o que já se sabe
+    achado = cliente.get("/consumidores/52998224725", headers=davi).json()
+    assert (achado["cliente"], achado["consumidor"]["email"]) == (None, "maria@exemplo.com")
+    assert cliente.get("/consumidores/11111111111", headers=davi).status_code == 422
+
+    # com entrega: a taxa entra no total, sem desconto, e o endereço é pedido para fechar
+    entrega = {"taxa": "15.00", "logradouro": "Rua Ficticia", "numero": "10", "bairro": "Centro"}
+    venda = cliente.put(url, headers=davi, json={"forma_pagamento_id": dinheiro, "consumidor": maria,
+                                                 "entrega": entrega}).json()
+    assert (venda["desconto"], venda["taxa_entrega"], venda["total"]) == ("5.00", "15.00", "110.00")
+    r = cliente.post(f"{url}/fechar", headers=davi)
+    assert r.status_code == 422 and r.json()["detail"] == "Falta o endereço da entrega: rua, número, bairro e cidade"
+    with banco() as db:
+        cidade = Cidade(codigo_ibge="5208707", nome="Goiânia", uf="GO", nome_busca="goiania")
+        db.add(cidade)
+        db.commit()
+        cidade_id = cidade.id
+    venda = cliente.put(url, headers=davi, json={"forma_pagamento_id": dinheiro, "consumidor": maria,
+                                                 "entrega": entrega | {"cidade_id": cidade_id}}).json()
+    assert venda["entrega"]["cidade"]["nome"] == "Goiânia"
+    assert cliente.post(f"{url}/fechar", headers=davi).json()["situacao"] == "fechada"
+
+    # o caixa devolve para o vendedor, que tira a entrega e fecha de novo
+    assert cliente.post(f"{url}/reabrir", headers=davi).json()["situacao"] == "aberta"
+    venda = cliente.put(url, headers=davi, json={"forma_pagamento_id": dinheiro, "consumidor": maria}).json()
+    assert (venda["entrega"], venda["total"]) == (None, "95.00")
+    assert cliente.post(f"{url}/fechar", headers=davi).json()["situacao"] == "fechada"
+    r = cliente.post(f"{url}/receber", headers=davi, json={"sessao_caixa_id": loja["sessao"]})
+    assert r.status_code == 200, r.text
