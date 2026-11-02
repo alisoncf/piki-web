@@ -35,6 +35,7 @@ def parcelas(cliente_id: int, ctx: Operar) -> ParcelasDoCliente:
         conta = p.conta
         resposta.append(ParcelaAberta(
             id=p.id, conta_id=conta.id, loja=conta.empresa, venda=conta.venda.numero if conta.venda else None,
+            documento=conta.documento, origem=conta.origem,
             numero=p.numero, parcelas=len(conta.parcelas), vencimento=p.vencimento, valor=p.valor, aberto=p.aberto,
             dias_atraso=dias, juros=juros,
         ))

@@ -250,12 +250,21 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - Do troco do VB6, respondido pelo Alison em 02/11/2026: o desconto gerencial (acima do limite do funcionário e da forma) é o da tela da venda, com autorização, e não vai para o recebimento. O "cliente promocional" (venda sem nota) não precisa. Reorganizar as parcelas do carnê e o tipo de cobrança são possíveis, mas em outra tela, depois. Ficam para depois também o vale de funcionário e o cartão presente (etapa 5).
 - NF-e e NFC-e: o Alison vai mostrar a tela de hoje (lista das notas transmitidas e não transmitidas, com as configurações). As tabelas do VB6 para notas são complexas; a ideia é simplificar no sistema novo. Fica para a etapa 4, com cuidado próprio.
 
+**Importação das contas a receber do VB6 (02/11/2026)**
+- `python -m etl receber`, por loja, depois dos clientes e usuários. Entram os documentos a receber de clientes com alguma parcela em aberto, com todas as parcelas (as pagas também, para o carnê continuar "3 de 5"). Os de representantes e de funcionários ficam para a consignação e os vales; o ETL só mostra o total deles.
+- **Números repetidos entre as lojas** (pedido do Alison): o seq_doc, o seq_itd e o num_doc do VB6 são sequências de cada loja. A ligação com o VB6 fica no `legado_mapa` por loja (`tab_doc` e `tab_itdoc`), e a conta guarda o num_doc, sempre mostrado com o código da loja: 01-0000777 e 02-0000777 são contas diferentes.
+- A origem vem do `esp_doc`: venda (V), acerto de consignação (A) ou avulsa. Todas contam no limite do cliente, como no VB6.
+- Reimportar atualiza o que falta, o vencimento e o valor das parcelas já importadas (inclusive as quitadas depois no VB6), menos as que já tiveram recebimento no sistema novo. A matriz está atualizada; as filiais vão ser atualizadas pelo Alison e reimportadas.
+- Rodado nas três cópias em 02/11/2026: 01 com 44.022 parcelas em aberto (R$ 6,09 milhões, das quais R$ 2,67 milhões de acertos de consignação), 02 com 3.437 (R$ 727 mil) e 03 com 7.447 (R$ 999 mil). Ficaram de fora 11 documentos da matriz (R$ 1.553,50) de clientes que não existem mais na `tab_clientes`.
+- O que apareceu: 9.520 clientes devem algo; 199 em mais de uma loja; R$ 4,77 milhões estão vencidos, R$ 3,04 milhões há mais de um ano (4.997 clientes). Como quase ninguém tem limite, 9.160 desses clientes já estão acima do limite e o crediário deles vai pedir a gerência.
+- Ficam para as operações do contas a receber que o Alison vai mostrar: mudança de carnês para a cobrança em lote, baixa de vários carnês, cobrador e tipo de cobrança das parcelas.
+
 **Recebimento das parcelas do crediário (02/11/2026)**
 - Regra do Alison: os juros de atraso são só **sugeridos**, contados por dia: % ao mês ÷ 30 × dias de atraso, sobre o que falta pagar da parcela (como o `F_CalculaJuros` do VB6). Hoje é 5% ao mês; fica na forma Crediário (tela de formas de pagamento), e o ETL traz o `juros_par` da loja. Não há multa nem carência.
 - Tela "Receber crediário" (menu Caixa): o caixa escolhe o cliente e vê as parcelas em aberto de **todas as lojas**, com a loja, a venda, o vencimento, os dias de atraso e os juros sugeridos. Marca as que vai receber; pode mudar os juros e pagar só uma parte da parcela.
 - O cliente paga em uma ou mais formas (não no crediário), com troco do dinheiro, como na venda. O recebimento é da loja e do caixa deste computador (D9); cada forma entra no caixa como "Recebimento de crediário", que só se desfaz pelo estorno do recebimento.
 - Recebimento errado é estornado enquanto o caixa estiver aberto: as parcelas voltam a dever o que deviam e os lançamentos saem do caixa.
-- Permissão: `caixa.operar`. Ficam para depois: o recibo impresso, a consulta dos recebimentos e a importação das parcelas em aberto do VB6.
+- Permissão: `caixa.operar`. Ficam para depois: o recibo impresso e a consulta dos recebimentos.
 
 **Ajustes da venda (02/11/2026)**
 - Pedido do Alison. O vendedor **fecha** a venda com o cliente, e só a venda fechada vai para o caixa, que a acha pelo nome de quem comprou (a lista do caixa começa nas fechadas). Para fechar: itens, forma de pagamento e o nome de quem compra (o crediário pede o cliente cadastrado; a entrega, o endereço). A venda fechada não muda; o vendedor ou o caixa reabre, e ela sai da fila do caixa. Fechada também vence em 10 dias.
@@ -271,7 +280,7 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - ~~O primeiro vencimento é escolhido pelo caixa~~ (substituído em 02/11/2026). O caixa escolhe a **data base** (hoje, se não mudar; até um mês atrás, como no VB6), e a 1ª parcela vence um intervalo depois dela (um mês, com o intervalo de 30 dias da forma). As outras vencem no mesmo dia dos meses seguintes; se o dia não existe no mês, no último dia dele.
 - No caixa entram a entrada, em cada forma em que foi paga, e o valor a prazo, na forma Crediário (como o DUP do VB6).
 - O carnê é uma conta a receber da loja que vendeu, com as parcelas (o que falta pagar de cada uma). Sai na janela de impressão do navegador logo depois de receber, e pode ser impresso de novo pela venda. Cada parcela tem o canhoto, que fica na loja, e a parte do cliente.
-- Ficam para depois: a baixa das parcelas (em qualquer loja, com os juros de atraso), o contrato impresso e a importação das parcelas em aberto do VB6. Até essa importação, o "em aberto" só soma os carnês do sistema novo.
+- Ficam para depois: a baixa das parcelas (em qualquer loja, com os juros de atraso), o contrato impresso. (A baixa e a importação do VB6 foram feitas em 02/11/2026.)
 
 **Formas de pagamento** (lista única para todas as lojas)
 - Uma forma por tipo (dinheiro, PIX, cartão de crédito, de débito, crediário, cartão presente, depósito, vale): as "1X DUP" a "10X DUP" do VB6 viram o "Crediário" com até 10 parcelas, e a parcela é escolhida na venda. Cada forma tem desconto, máximo de parcelas, até quantas não pedem autorização, intervalo e ordem na tela. O cheque deixou de existir (entra desativado, só para as vendas antigas). Confirmado pelo Alison em 02/11/2026: o cartão de crédito continua com os 5% de desconto do VB6 e vai até 12x sem autorização.

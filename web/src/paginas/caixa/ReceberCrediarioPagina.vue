@@ -43,8 +43,7 @@
           <thead>
             <tr>
               <th></th>
-              <th class="text-left">Loja</th>
-              <th class="text-left">Venda</th>
+              <th class="text-left">Documento</th>
               <th class="text-left">Parcela</th>
               <th class="text-left">Vencimento</th>
               <th class="text-right">Falta</th>
@@ -55,8 +54,10 @@
           <tbody>
             <tr v-for="p in parcelas" :key="p.id" :class="{ 'text-suave': !p.marcada }">
               <td><q-checkbox v-model="p.marcada" dense :aria-label="`Pagar a parcela ${p.numero}/${p.parcelas}`" /></td>
-              <td>{{ p.loja.codigo }}</td>
-              <td>{{ p.venda ?? '' }}</td>
+              <td>
+                {{ p.documento }}
+                <q-badge v-if="p.origem !== 'venda'" outline color="grey-7" class="q-ml-xs">{{ p.origem === 'acerto' ? 'Acerto' : 'Avulsa' }}</q-badge>
+              </td>
               <td>{{ p.numero }}/{{ p.parcelas }}</td>
               <td>
                 {{ formatarDataHora(p.vencimento) }}

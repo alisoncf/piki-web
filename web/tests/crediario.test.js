@@ -17,8 +17,8 @@ const BAIRRO = { id: 2, codigo: '02', nome: 'Loja Bairro' }
 const PARCELAS = {
   juros_ao_mes: '5.00',
   parcelas: [
-    { id: 31, conta_id: 7, loja: BAIRRO, venda: 15, numero: 1, parcelas: 2, vencimento: '2026-10-13', valor: '300.00', aberto: '300.00', dias_atraso: 20, juros: '10.00' },
-    { id: 32, conta_id: 7, loja: BAIRRO, venda: 15, numero: 2, parcelas: 2, vencimento: '2026-11-13', valor: '300.00', aberto: '300.00', dias_atraso: 0, juros: '0.00' },
+    { id: 31, conta_id: 7, loja: BAIRRO, venda: null, documento: '02-0000777', origem: 'acerto', numero: 1, parcelas: 2, vencimento: '2026-10-13', valor: '300.00', aberto: '300.00', dias_atraso: 20, juros: '10.00' },
+    { id: 32, conta_id: 7, loja: BAIRRO, venda: null, documento: '02-0000777', origem: 'acerto', numero: 2, parcelas: 2, vencimento: '2026-11-13', valor: '300.00', aberto: '300.00', dias_atraso: 0, juros: '0.00' },
   ],
 }
 
@@ -70,6 +70,7 @@ describe('receber crediário', () => {
     await wrapper.findComponent(QSelect).vm.$emit('update:modelValue', 8)
     await flushPromises()
     expect(wrapper.text()).toContain('20 dias de atraso')
+    expect(wrapper.text()).toContain('02-0000777 Acerto')
     expect(wrapper.text()).toContain('Juros sugeridos: 5% ao mês')
 
     await wrapper.findAllComponents(QCheckbox)[0].vm.$emit('update:modelValue', true)

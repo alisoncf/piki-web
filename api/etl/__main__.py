@@ -7,6 +7,7 @@
     python -m etl usuarios --origem "mysql+pymysql://..." --empresa 01
     python -m etl caixa --origem "mysql+pymysql://..." --empresa 01
     python -m etl estoque --origem "mysql+pymysql://..." --empresa 02
+    python -m etl receber --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-receber-01.txt
     python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun"
 
 Para um MariaDB local em que o root entra pela autenticação do Windows (sem
@@ -22,6 +23,7 @@ import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+import app.registro_modelos  # noqa: F401 (todos os modelos, para as relações entre domínios)
 from app.nucleo.banco import engine
 from etl.caixa import importar_caixa
 from etl.clientes import importar_clientes
@@ -30,6 +32,7 @@ from etl.fornecedores import importar_fornecedores
 from etl.estoque import importar_estoque
 from etl.funcionarios import EmpresaNaoImportada, importar_funcionarios
 from etl.produtos import importar_produtos
+from etl.receber import importar_receber
 from etl.usuarios import importar_usuarios
 
 
@@ -76,6 +79,10 @@ def main(argv: list[str] | None = None) -> None:
     cx = sub.add_parser("caixa", help="importa as formas de pagamento e os caixas de uma loja")
     cx.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     cx.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
+    rc = sub.add_parser("receber", help="importa as contas a receber de clientes em aberto (depois dos clientes e usuários)")
+    rc.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
+    rc.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
+    rc.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
     args = p.parse_args(argv)
     # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
     sys.stdout.reconfigure(encoding="utf-8")
@@ -147,6 +154,14 @@ def main(argv: list[str] | None = None) -> None:
                 r = importar_caixa(conexao, db, args.empresa)
                 print(f"formas de pagamento novas: {r.formas}, caixas novos: {r.caixas}")
                 _avisos(r.avisos, None)
+            elif args.comando == "receber":
+                r = importar_receber(conexao, db, args.empresa)
+                print(f"contas novas: {r.contas}, parcelas novas: {r.parcelas}, parcelas atualizadas: {r.atualizadas}")
+                print(f"em aberto: {r.parcelas_em_aberto} parcelas, R$ {r.em_aberto}; "
+                      f"documentos de cliente não importado: {r.sem_cliente}")
+                for linha in r.fora:
+                    print(f"fora: {linha}")
+                _avisos(r.avisos, args.avisos)
     except (ConflitoEmpresa, EmpresaNaoImportada) as erro:
         print(f"erro: {erro}", file=sys.stderr)
         sys.exit(1)

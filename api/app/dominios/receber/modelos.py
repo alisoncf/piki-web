@@ -18,8 +18,16 @@ from app.dominios.empresas.modelos import Empresa
 from app.nucleo.banco import Base, ComDatas
 
 
+# de onde veio a conta (esp_doc do VB6: V venda, A acerto de consignação, F e outros avulsos)
+ORIGENS = {"venda": "Venda", "acerto": "Acerto de consignação", "avulso": "Avulsa"}
+
+
 class ContaReceber(ComDatas, Base):
-    """Um carnê: o valor a prazo de uma venda, dividido em parcelas."""
+    """Um carnê: o valor a prazo de uma venda (ou de um acerto, ou avulso, vindos do VB6), dividido em parcelas.
+
+    O número dos documentos do VB6 se repete entre as lojas: o da conta importada fica em documento_legado,
+    e só identifica junto com a loja (empresa_id).
+    """
 
     __tablename__ = "conta_receber"
 
@@ -29,15 +37,26 @@ class ContaReceber(ComDatas, Base):
     venda_id: Mapped[int | None] = mapped_column(ForeignKey("venda.id"), unique=True)
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # soma das parcelas
     historico: Mapped[str] = mapped_column(String(80))
-    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))  # quem lançou
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))  # quem lançou (no VB6, pode faltar)
+    origem: Mapped[str] = mapped_column(String(10), server_default="venda", default="venda")  # ver ORIGENS
+    documento_legado: Mapped[str | None] = mapped_column(String(20))  # num_doc do VB6 (na venda, o num_ven)
 
     cliente: Mapped[Cliente] = relationship(lazy="joined")
-    usuario: Mapped[Usuario] = relationship(lazy="joined")
+    usuario: Mapped[Usuario | None] = relationship(lazy="joined")
     empresa: Mapped[Empresa] = relationship(lazy="joined")
     venda: Mapped["Venda | None"] = relationship()  # noqa: F821 (vendas.modelos); só quando pedida
     parcelas: Mapped[list["ParcelaReceber"]] = relationship(
         back_populates="conta", cascade="all, delete-orphan", order_by="ParcelaReceber.numero", lazy="selectin"
     )
+
+    @property
+    def documento(self) -> str:
+        """Como a conta é chamada na tela: loja e número do VB6 (01-0001234) ou, nas novas, a venda ou o id."""
+        if self.documento_legado:
+            return f"{self.empresa.codigo}-{self.documento_legado}"
+        if self.venda is not None:
+            return f"{self.empresa.codigo}-venda {self.venda.numero}"
+        return str(self.id)
 
 
 class ParcelaReceber(Base):

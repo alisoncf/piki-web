@@ -98,7 +98,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 
 ## Onda 3 · Financeiro
 
-- [~] Contas a pagar e a receber (`tab_doc`, `tab_itdoc`): o carnê do crediário já gera a conta a receber (D26); faltam a importação do VB6 e as contas a pagar
+- [~] Contas a pagar e a receber (`tab_doc`, `tab_itdoc`): o carnê do crediário gera a conta a receber, e o ETL das contas a receber de clientes rodou nas três cópias (D26, migração 0025) — 02/11/2026; faltam as operações do contas a receber (cobrança em lote, baixa de vários carnês), os representantes e as contas a pagar
 - [x] Baixa de parcelas em qualquer empresa, registrando o caixa de quem recebeu (D9, D26): juros de atraso sugeridos por dia, pagamento parcial, várias formas, estorno (migração 0024) — 02/11/2026
 - [ ] Cheques
 - [ ] Cobrança e carnês

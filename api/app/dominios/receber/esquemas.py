@@ -20,7 +20,9 @@ class ParcelaAberta(BaseModel):
     id: int
     conta_id: int
     loja: LojaResumida  # a que vendeu
-    venda: int | None  # o número da venda na loja
+    venda: int | None  # o número da venda na loja (das vendas do sistema novo)
+    documento: str = Field(description="Loja e número: 01-0001234 (o do VB6 se repete entre as lojas)")
+    origem: str = Field(description="venda, acerto (de consignação) ou avulso")
     numero: int
     parcelas: int
     vencimento: date
