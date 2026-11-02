@@ -180,7 +180,7 @@ def test_perfis(cliente, cenario, admin, gerente):
     r = cliente.post("/acesso/perfis", headers=admin, json={"nome": " Caixa ", "descricao": "", "permissoes": ["clientes.ver"]})
     assert r.status_code == 201, r.text
     caixa = r.json()
-    assert caixa == {"id": caixa["id"], "nome": "Caixa", "descricao": None, "permissoes": ["clientes.ver"], "usuarios": 0}
+    assert caixa == {"id": caixa["id"], "nome": "Caixa", "descricao": None, "desconto_maximo": "0.00", "permissoes": ["clientes.ver"], "usuarios": 0}
     assert cliente.post("/acesso/perfis", headers=admin, json={"nome": "Caixa"}).status_code == 409
     assert cliente.post("/acesso/perfis", headers=admin, json={"nome": "X", "permissoes": ["nao.existe"]}).status_code == 422
 

@@ -12,6 +12,7 @@ from app.dominios.fornecedores.rotas import router as fornecedores
 from app.dominios.funcionarios.rotas import router as funcionarios
 from app.dominios.produtos.rotas import router as produtos
 from app.dominios.sistema.rotas import router as sistema
+from app.dominios.vendas.rotas import router as vendas
 
 app = FastAPI(
     title="Piki API",
@@ -31,3 +32,4 @@ app.include_router(produtos)
 app.include_router(estoque)
 app.include_router(entradas)
 app.include_router(caixa)
+app.include_router(vendas)

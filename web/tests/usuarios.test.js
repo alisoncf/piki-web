@@ -168,6 +168,6 @@ describe('perfis', () => {
     await wrapper.findAll('button').find((b) => b.text() === 'Marcar todas' && b.element.closest('section').textContent.includes('Clientes')).trigger('click')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
-    expect(post).toHaveBeenCalledWith('/acesso/perfis', { nome: 'Caixa', descricao: '', permissoes: ['clientes.ver'] })
+    expect(post).toHaveBeenCalledWith('/acesso/perfis', { nome: 'Caixa', descricao: '', desconto_maximo: '0', permissoes: ['clientes.ver'] })
   })
 })

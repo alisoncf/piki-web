@@ -27,6 +27,9 @@ PERMISSOES: dict[str, str] = {
     "caixa.operar": "Abrir, lançar entradas e saídas e fechar o caixa (sem ver o saldo esperado)",
     "caixa.conferir": "Ver o saldo esperado do caixa e os fechamentos, com as diferenças",
     "caixa.configurar": "Cadastrar caixas da loja e formas de pagamento",
+    "vendas.ver": "Consultar as vendas da loja",
+    "vendas.vender": "Montar vendas no balcão, com desconto até o limite do perfil",
+    "vendas.autorizar": "Autorizar parcelas acima do limite da forma de pagamento",
 }
 
 # nome de cada área (a parte antes do ponto), para agrupar as permissões na tela de perfis
@@ -39,4 +42,5 @@ AREAS: dict[str, str] = {
     "estoque": "Estoque",
     "entradas": "Entrada de notas",
     "caixa": "Caixa",
+    "vendas": "Vendas",
 }

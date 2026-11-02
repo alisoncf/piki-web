@@ -228,11 +228,21 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - A venda aberta vence em 10 dias.
 - Cartão: registra o número de parcelas; a baixa vem depois, pelo extrato da financeira. O pagamento integrado (TEF, por um intermediário) fica para uma etapa própria.
 - Crediário: cliente cadastrado, sem bloqueio e dentro do limite; o carnê sai na hora.
-- Toda venda gera a NFC-e e um canhoto para retirar o produto no pacote; há impressora térmica e impressora comum.
+- Toda venda gera a NFC-e e um canhoto para retirar o produto no pacote; há impressora térmica e impressora comum. A impressão usa a janela de impressão do navegador (sem programa instalado no caixa).
 - Histórico: importar todas as vendas do VB6 (ou os últimos 10 anos, se ficar lento).
 
+**Como a venda ficou (etapa 2, 02/11/2026)**
+- Cada perfil tem o seu "desconto máximo na venda" (%), na tela de perfis; o administrador vai até 100%. No VB6 o limite era por usuário (`tab_defusu.desconto_usu`); não foi importado: os valores vão ser dados nos perfis.
+- O desconto permitido é o maior entre o da forma de pagamento, o do perfil de quem está vendendo e o de quem já autorizou na venda. Acima disso, a tela pede o login e a senha de alguém com limite maior, e a venda guarda quem autorizou. Parcelas acima do "sem autorização" da forma pedem alguém com a permissão `vendas.autorizar`.
+- Ao escolher (ou trocar) a forma, o desconto dela vale para todos os itens, substituindo o que havia. O desconto no total, em % ou em reais, é rateado pelo valor de cada item (os centavos que sobram vão no maior); o item que entra depois leva o mesmo %. O desconto também pode ser dado direto no item.
+- O preço do item é o de queima, quando o produto tem; senão, o de venda.
+- Uma forma de pagamento por venda, como no VB6.
+- A venda aberta não reserva estoque; a baixa acontece quando o caixa recebe, e o estoque pode ficar negativo, com aviso. O recebimento lança a entrada no caixa (motivo "venda"), que só é desfeita pela venda.
+- Numeração própria por loja. A venda aberta pode ser cancelada com o motivo; a recebida, só pela devolução (etapa 5). O crediário ainda não é recebido (etapa 3).
+- Permissões: `vendas.ver`, `vendas.vender` e `vendas.autorizar`; quem recebe precisa de `caixa.operar`.
+
 **Formas de pagamento** (lista única para todas as lojas)
-- Uma forma por tipo (dinheiro, PIX, cartão de crédito, de débito, crediário, cartão presente, depósito, vale): as "1X DUP" a "10X DUP" do VB6 viram o "Crediário" com até 10 parcelas, e a parcela é escolhida na venda. Cada forma tem desconto, máximo de parcelas, até quantas não pedem autorização, intervalo e ordem na tela. O cheque deixou de existir (entra desativado, só para as vendas antigas).
+- Uma forma por tipo (dinheiro, PIX, cartão de crédito, de débito, crediário, cartão presente, depósito, vale): as "1X DUP" a "10X DUP" do VB6 viram o "Crediário" com até 10 parcelas, e a parcela é escolhida na venda. Cada forma tem desconto, máximo de parcelas, até quantas não pedem autorização, intervalo e ordem na tela. O cheque deixou de existir (entra desativado, só para as vendas antigas). Confirmado pelo Alison em 02/11/2026: o cartão de crédito continua com os 5% de desconto do VB6 e vai até 12x sem autorização.
 
 **Caixa**
 - O caixa é o ponto de recebimento (Cx 02, Consignado, Crediário...), não a pessoa: várias pessoas lançam no mesmo caixa, e cada lançamento guarda quem fez. Os nomes do VB6 continuam.

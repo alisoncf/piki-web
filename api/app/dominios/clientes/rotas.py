@@ -34,7 +34,8 @@ def _http(erro: servico.ErroCliente) -> HTTPException:
 
 @router.get("/clientes", response_model=PaginaClientes)
 def listar_clientes(
-    ctx: Ver,
+    # o vendedor escolhe o cliente da venda sem precisar ver a ficha
+    ctx: Annotated[Contexto, Depends(exige("clientes.ver", "vendas.vender"))],
     busca: Annotated[str | None, Query(description="Parte do nome, início do CPF/CNPJ ou final do telefone")] = None,
     setor_id: int | None = None,
     orgao_id: int | None = None,

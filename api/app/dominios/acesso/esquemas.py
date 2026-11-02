@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -128,6 +129,8 @@ class Permissao(BaseModel):
 class PerfilDados(BaseModel):
     nome: str = Field(min_length=1, max_length=50)
     descricao: str | None = Field(default=None, max_length=150)
+    desconto_maximo: Decimal = Field(default=Decimal(0), ge=0, le=100, max_digits=5, decimal_places=2,
+                                     description="% de desconto na venda sem pedir autorização")
     permissoes: list[str] = []
 
     @field_validator("nome", "descricao", mode="before")
@@ -140,5 +143,6 @@ class Perfil(BaseModel):
     id: int
     nome: str
     descricao: str | None
+    desconto_maximo: Decimal
     permissoes: list[str]
     usuarios: int = Field(description="Quantos acessos (usuário numa empresa) usam o perfil")

@@ -32,7 +32,8 @@ def _http(erro: servico.ErroProduto) -> HTTPException:
 
 @router.get("/produtos", response_model=PaginaProdutos)
 def listar_produtos(
-    ctx: Ver,
+    # o vendedor procura o produto na venda sem precisar ver a ficha
+    ctx: Annotated[Contexto, Depends(exige("produtos.ver", "vendas.vender"))],
     busca: Annotated[str | None, Query(description="Código, código de barras, código do fornecedor ou palavras do nome")] = None,
     secao_id: int | None = None,
     subsecao_id: int | None = None,

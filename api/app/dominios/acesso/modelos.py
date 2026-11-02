@@ -1,7 +1,8 @@
 """Usuários, perfis e permissões (decisões D9 e D10). As empresas ficam no domínio empresas."""
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, false
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Table, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.empresas.modelos import Empresa
@@ -32,6 +33,8 @@ class Perfil(ComDatas, Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     nome: Mapped[str] = mapped_column(String(50), unique=True)
     descricao: Mapped[str | None] = mapped_column(String(150))
+    # % de desconto que dá na venda sem pedir autorização (D26)
+    desconto_maximo: Mapped[Decimal] = mapped_column(Numeric(5, 2), server_default="0", default=Decimal(0))
     permissoes: Mapped[list[Permissao]] = relationship(secondary=perfil_permissao, lazy="selectin")
 
 

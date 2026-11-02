@@ -130,11 +130,11 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 
 ## Onda 7 · PDV e caixa
 
-- [ ] Definir o formato do PDV: desktop ou web com agente local para impressora e TEF
+- [x] Formato do PDV: web, imprimindo pela janela do navegador (D26); o TEF decide se vai precisar de um agente local — 02/11/2026
 - [ ] NFC-e e canhoto de retirada
 - [ ] TEF (SiTef)
 - [x] Formas de pagamento e caixa (D26): caixas da loja, abertura com fundo de troco, entradas e saídas, fechamento com conferência cega (migração 0019); ETL das formas e caixas rodado nas três cópias — 02/11/2026
-- [ ] Venda (D26): vendedor monta, caixa recebe, desconto pela forma com limite do perfil e autorização, venda aberta vence em 10 dias
+- [x] Venda (D26): vendedor monta, caixa recebe, desconto pela forma com limite do perfil e autorização, venda aberta vence em 10 dias (migração 0020) — 02/11/2026
 - [ ] Crediário na venda: limite do cliente, parcelas e carnê
 - [ ] Trocas, cancelamento, entrega, cartão presente
 - [ ] Controle de vales por funcionário

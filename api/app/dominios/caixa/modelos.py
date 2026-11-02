@@ -27,7 +27,7 @@ TIPOS_DE_FORMA = {
     "outro": ("Outro", "99"),
 }
 
-# motivo dos lançamentos avulsos (os de venda e recebimento virão com essas telas)
+# motivo dos lançamentos avulsos, feitos na tela do caixa
 MOTIVOS = {
     "suprimento": ("entrada", "Entrada de troco"),
     "outra_entrada": ("entrada", "Outra entrada"),
@@ -35,6 +35,11 @@ MOTIVOS = {
     "despesa": ("saida", "Despesa"),
     "vale": ("saida", "Vale de funcionário"),
     "comissao": ("saida", "Comissão de cobrador"),
+}
+
+# lançados por outras telas (a venda...), e só desfeitos por lá
+MOTIVOS_AUTOMATICOS = {
+    "venda": ("entrada", "Venda"),
 }
 
 ABERTO = "aberto"
@@ -114,7 +119,7 @@ class LancamentoCaixa(Base):
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # sempre positivo; o tipo diz se entra ou sai
     historico: Mapped[str | None] = mapped_column(String(80))
     funcionario_id: Mapped[int | None] = mapped_column(ForeignKey("funcionario.id"))  # do vale ou da comissão
-    documento: Mapped[str | None] = mapped_column(String(40))  # "venda 123" (vendas virão depois)
+    documento: Mapped[str | None] = mapped_column(String(40))  # "venda 123"
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
     # o lançamento errado não some: é estornado, com quem e quando
     estornado_em: Mapped[datetime | None] = mapped_column(DateTime)
@@ -128,7 +133,7 @@ class LancamentoCaixa(Base):
 
     @property
     def descricao_motivo(self) -> str:
-        return MOTIVOS.get(self.motivo, ("", self.motivo))[1]
+        return (MOTIVOS | MOTIVOS_AUTOMATICOS).get(self.motivo, ("", self.motivo))[1]
 
 
 class ConferenciaCaixa(Base):

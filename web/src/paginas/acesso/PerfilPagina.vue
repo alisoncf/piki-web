@@ -21,7 +21,19 @@
             :rules="[(v) => !!v?.trim() || 'Informe o nome']"
             class="col-12 col-md-4"
           />
-          <q-input v-model="form.descricao" outlined label="Descrição" maxlength="150" class="col-12 col-md-8" />
+          <q-input v-model="form.descricao" outlined label="Descrição" maxlength="150" class="col-12 col-md-6" />
+          <q-input
+            v-model="form.desconto_maximo"
+            outlined
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            suffix="%"
+            label="Desconto máximo na venda"
+            hint="Acima disto, pede autorização"
+            class="col-12 col-md-2"
+          />
         </div>
       </section>
 
@@ -78,7 +90,7 @@ const novo = computed(() => !rota.params.id)
 const carregando = ref(true)
 const salvando = ref(false)
 const catalogo = ref([])
-const form = ref({ nome: '', descricao: '' })
+const form = ref({ nome: '', descricao: '', desconto_maximo: '0' })
 const marcadas = ref(new Set())
 const originais = ref(new Set()) // as que o perfil já tinha: tirar sempre pode
 const usuarios = ref(0)
@@ -112,7 +124,7 @@ function alternarArea(area) {
 }
 
 function preencher(perfil) {
-  form.value = { nome: perfil.nome, descricao: perfil.descricao ?? '' }
+  form.value = { nome: perfil.nome, descricao: perfil.descricao ?? '', desconto_maximo: String(Number(perfil.desconto_maximo)) }
   marcadas.value = new Set(perfil.permissoes)
   originais.value = new Set(perfil.permissoes)
   usuarios.value = perfil.usuarios
@@ -136,7 +148,7 @@ onMounted(async () => {
 async function salvar() {
   salvando.value = true
   try {
-    const dados = { ...form.value, permissoes: [...marcadas.value] }
+    const dados = { ...form.value, desconto_maximo: String(form.value.desconto_maximo || '0'), permissoes: [...marcadas.value] }
     const resp = novo.value ? await api.post('/acesso/perfis', dados) : await api.put(`/acesso/perfis/${rota.params.id}`, dados)
     $q.notify({ type: 'positive', message: 'Perfil salvo', timeout: 1500 })
     if (novo.value) await roteador.replace({ name: 'perfil', params: { id: resp.data.id } })

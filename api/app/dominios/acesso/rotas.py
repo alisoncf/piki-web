@@ -183,7 +183,7 @@ def salvar_acesso(usuario_id: int, empresa_id: int, dados: AcessoDados,
 
 
 def _perfil(db, perfil) -> Perfil:
-    return Perfil(id=perfil.id, nome=perfil.nome, descricao=perfil.descricao,
+    return Perfil(id=perfil.id, nome=perfil.nome, descricao=perfil.descricao, desconto_maximo=perfil.desconto_maximo,
                   permissoes=sorted(p.codigo for p in perfil.permissoes), usuarios=repo.usos_do_perfil(db, perfil.id))
 
 

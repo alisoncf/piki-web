@@ -35,8 +35,10 @@ def _sessao(ctx: Contexto, sessao: SessaoCaixa) -> Sessao:
 
 
 @router.get("/formas-pagamento", response_model=list[Forma])
-def listar_formas(ctx: Annotated[Contexto, Depends(exige("caixa.operar", "caixa.conferir", "caixa.configurar"))],
-                  so_ativas: bool = False) -> list[Forma]:
+def listar_formas(
+    ctx: Annotated[Contexto, Depends(exige("caixa.operar", "caixa.conferir", "caixa.configurar", "vendas.vender", "vendas.ver"))],
+    so_ativas: bool = False,
+) -> list[Forma]:
     return [Forma.model_validate(f) for f in servico.listar_formas(ctx.db, so_ativas)]
 
 

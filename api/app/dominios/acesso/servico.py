@@ -1,6 +1,7 @@
 """Regras de acesso (decisão D10). Não depende de HTTP: levanta erros de domínio."""
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -148,6 +149,14 @@ def permissoes_na_empresa(db: Session, usuario: Usuario, empresa_id: int) -> set
     if vinculo is None:
         return set()
     return {p.codigo for p in vinculo.perfil.permissoes}
+
+
+def limite_de_desconto(db: Session, usuario: Usuario, empresa_id: int) -> Decimal:
+    """O % de desconto que o usuário dá na venda sem pedir autorização: o do perfil dele na empresa (D26)."""
+    if usuario.administrador:
+        return Decimal(100)
+    vinculo = repo.acesso(db, usuario.id, empresa_id)
+    return vinculo.perfil.desconto_maximo if vinculo else Decimal(0)
 
 
 # ---------------------------------------------------------- administração
@@ -377,8 +386,12 @@ def _aplicar_perfil(db: Session, gestor: Gestor, perfil: Perfil, dados) -> None:
         novas = set(dados.permissoes) - {p.codigo for p in perfil.permissoes} - gestor.permissoes
         if novas:
             raise Proibido(f"Você não pode dar permissões que não tem: {', '.join(sorted(novas))}")
+        meu_limite = limite_de_desconto(db, gestor.usuario, gestor.empresa_id)
+        if dados.desconto_maximo > max(meu_limite, perfil.desconto_maximo or 0):
+            raise Proibido(f"Você não pode dar desconto máximo acima do seu ({meu_limite:g}%)")
     sincronizar_permissoes(db)
     perfil.nome, perfil.descricao = dados.nome, dados.descricao
+    perfil.desconto_maximo = dados.desconto_maximo.quantize(Decimal("0.01"))
     perfil.permissoes = list(db.scalars(select(Permissao).where(Permissao.codigo.in_(dados.permissoes))))
 
 

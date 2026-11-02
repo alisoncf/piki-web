@@ -41,6 +41,13 @@ export const MENU = [
     ],
   },
   {
+    titulo: 'Vendas',
+    icone: 'shopping_bag',
+    filhos: [
+      { titulo: 'Vendas', icone: 'shopping_bag', rota: '/vendas', permissao: ['vendas.ver', 'vendas.vender', 'caixa.operar'] },
+    ],
+  },
+  {
     titulo: 'Caixa',
     icone: 'point_of_sale',
     filhos: [
