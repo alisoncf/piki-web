@@ -31,3 +31,9 @@ def nome_proprio(texto: str | None) -> str | None:
             # a inicial de cada parte: "d'oeste" → "D'Oeste", "sul-americana" → "Sul-Americana"
             palavras.append(re.sub(r"(^|[-'/(])(\w)", lambda m: m.group(1) + m.group(2).upper(), palavra))
     return " ".join(palavras)
+
+
+def moeda(valor) -> str:
+    """Para mensagens: Decimal("1234.5") → "R$ 1.234,50"."""
+    texto = f"{valor:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {texto}"

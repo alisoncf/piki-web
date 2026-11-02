@@ -42,6 +42,18 @@
               <q-input v-model.number="editando.parcelas" outlined type="number" min="1" label="Parcelas (máximo)" class="col-6" />
               <q-input v-model.number="editando.parcelas_sem_autorizacao" outlined type="number" min="1" label="Sem autorização até" class="col-6" />
               <q-input v-model.number="editando.intervalo" outlined type="number" min="0" suffix="dias" label="Intervalo das parcelas" class="col-6" />
+              <q-input
+                v-if="editando.tipo === 'crediario'"
+                v-model="editando.juros_atraso"
+                outlined
+                type="number"
+                step="0.01"
+                min="0"
+                suffix="% ao mês"
+                label="Juros de atraso"
+                hint="Sugerido ao receber a parcela atrasada, contado por dia"
+                class="col-6"
+              />
             </div>
             <q-toggle v-model="editando.ativo" label="Ativa" />
           </q-card-section>
@@ -93,7 +105,7 @@ async function carregar() {
 function abrir(forma) {
   editando.value = forma
     ? { ...forma }
-    : { nome: '', tipo: 'dinheiro', desconto: '0', parcelas: 1, parcelas_sem_autorizacao: 1, intervalo: 30, ordem: formas.value.length + 1, ativo: true }
+    : { nome: '', tipo: 'dinheiro', desconto: '0', parcelas: 1, parcelas_sem_autorizacao: 1, intervalo: 30, juros_atraso: '0', ordem: formas.value.length + 1, ativo: true }
   dialogo.value = true
 }
 
@@ -102,6 +114,7 @@ async function salvar() {
   try {
     const { id, codigo_nfce, ...dados } = editando.value
     dados.desconto = String(dados.desconto || '0')
+    dados.juros_atraso = String(dados.juros_atraso || '0')
     await (id ? api.put(`/formas-pagamento/${id}`, dados) : api.post('/formas-pagamento', dados))
     dialogo.value = false
     await carregar()

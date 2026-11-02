@@ -36,6 +36,7 @@ from app.dominios.vendas.modelos import (
     ABERTA, CANCELADA, DIAS_PARA_VENCER, FECHADA, RECEBIDA, SITUACOES, VENCIDA, Consumidor, EntregaVenda, ItemVenda,
     PagamentoVenda, Venda,
 )
+from app.nucleo.textos import moeda
 
 ZERO = Decimal("0.00")
 CENTAVO = Decimal("0.01")
@@ -451,11 +452,6 @@ def cancelar(db: Session, empresa_id: int, usuario_id: int, venda_id: int, motiv
 
 # ------------------------------------------------------------ receber
 
-def _moeda(valor: Decimal) -> str:
-    texto = f"{valor:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
-    return f"R$ {texto}"
-
-
 def _conferir_limite(db: Session, venda: Venda, a_prazo: Decimal, permissoes: set[str], usuario: Usuario,
                      autorizador: Usuario | None) -> None:
     """O crediário vai até o limite disponível do cliente (o limite menos o que está em aberto em todas as lojas);
@@ -465,8 +461,8 @@ def _conferir_limite(db: Session, venda: Venda, a_prazo: Decimal, permissoes: se
         raise DadoInvalido(credito.impedimento)
     if a_prazo <= credito.disponivel:
         return
-    mensagem = (f"O crediário de {_moeda(a_prazo)} passa do limite disponível do cliente "
-                f"({_moeda(max(credito.disponivel, ZERO))})")
+    mensagem = (f"O crediário de {moeda(a_prazo)} passa do limite disponível do cliente "
+                f"({moeda(max(credito.disponivel, ZERO))})")
     if PERMISSAO_PARCELAS in permissoes:
         venda.limite_autorizado_por = usuario
         return
@@ -571,9 +567,9 @@ def receber(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str]
                              forma.intervalo, f"Venda {venda.numero} {venda.cliente.nome}", usuario.id)
         lancamentos.append((forma, a_prazo))
     elif pago < venda.total:
-        raise DadoInvalido(f"Falta lançar {_moeda(venda.total - pago)}")
+        raise DadoInvalido(f"Falta lançar {moeda(venda.total - pago)}")
     elif pago > venda.total:
-        raise DadoInvalido(f"O lançado passa do total em {_moeda(pago - venda.total)}; "
+        raise DadoInvalido(f"O lançado passa do total em {moeda(pago - venda.total)}; "
                            "o troco sai do valor que o cliente deu no dinheiro")
 
     no_dinheiro = sum((p.valor for p in pagamentos if p.forma_pagamento.tipo == "dinheiro"), ZERO)
@@ -581,7 +577,7 @@ def receber(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str]
     if no_dinheiro:
         venda.valor_recebido = pedido.valor_recebido or no_dinheiro
         if venda.valor_recebido < no_dinheiro:
-            raise DadoInvalido(f"O valor que o cliente deu é menor que os {_moeda(no_dinheiro)} no dinheiro")
+            raise DadoInvalido(f"O valor que o cliente deu é menor que os {moeda(no_dinheiro)} no dinheiro")
     venda.pagamentos = pagamentos
     venda.modelo_nota = pedido.modelo_nota
     for forma_lancada, valor in [(p.forma_pagamento, p.valor) for p in pagamentos] + lancamentos:

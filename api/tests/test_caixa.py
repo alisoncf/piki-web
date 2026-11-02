@@ -1,4 +1,6 @@
 """Formas de pagamento e caixa (D26). Dados fictícios."""
+from decimal import Decimal
+
 import pytest
 from sqlalchemy import create_engine, select, text
 
@@ -120,6 +122,8 @@ def test_etl_formas_e_caixas(banco, cenario, tmp_path):
                       ("20", "10X DUP", 0, "DUP", 10, "S"), ("04", "2X CHEQUE", 0, "CHP", 2, "N"), ("99", "ESQUISITA", 0, "XXX", 1, "N")]:
             c.execute(text("INSERT INTO tab_formaspag VALUES (:c, :n, :d, :t, 'S', :p, 30, :g, 'S')"),
                       dict(zip("cndtpg", linha)))
+        c.execute(text("CREATE TABLE tab_parametros (juros_par REAL)"))
+        c.execute(text("INSERT INTO tab_parametros VALUES (5)"))
         c.execute(text("CREATE TABLE tab_caixas (cod_cai TEXT, nome_cai TEXT, status_cai TEXT)"))
         for linha in [("00", "SEM CAIXA", "A"), ("02", "Cx 02", "A"), ("05", "Crediário", "A")]:
             c.execute(text("INSERT INTO tab_caixas VALUES (:c, :n, :s)"), dict(zip("cns", linha)))
@@ -128,6 +132,7 @@ def test_etl_formas_e_caixas(banco, cenario, tmp_path):
         assert (r.formas, r.caixas) == (3, 3) and "XXX" in r.avisos[0]
         crediario = db.scalar(select(FormaPagamento).where(FormaPagamento.tipo == "crediario"))
         assert (crediario.nome, crediario.parcelas, crediario.parcelas_sem_autorizacao) == ("Crediário", 10, 6)
+        assert crediario.juros_atraso == Decimal("5.00")  # o juros_par da loja
         assert db.scalar(select(FormaPagamento).where(FormaPagamento.nome == "Cheque")).ativo is False
         # todos os códigos de crediário apontam para a mesma forma
         assert {mapa.buscar(db, "tab_formaspag", cenario["e1"], c) for c in ("06", "13", "20")} == {crediario.id}

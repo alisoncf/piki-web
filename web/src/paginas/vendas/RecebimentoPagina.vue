@@ -57,42 +57,7 @@
             <div v-if="!pagamentos.length" class="text-caption text-suave q-mb-sm">
               {{ crediario ? 'Sem entrada: a venda toda vai para o carnê.' : 'Lance como o cliente vai pagar.' }}
             </div>
-            <div v-for="(pg, i) in pagamentos" :key="i" class="row q-col-gutter-sm items-start q-mb-sm">
-              <q-select
-                v-model="pg.forma_pagamento_id"
-                outlined
-                dense
-                label="Forma"
-                :options="formasAVista"
-                option-value="id"
-                option-label="nome"
-                emit-value
-                map-options
-                class="col-12 col-sm-5"
-                @update:model-value="pg.parcelas = 1"
-              />
-              <q-input v-model="pg.valor" outlined dense type="number" step="0.01" min="0" prefix="R$" label="Valor" class="col">
-                <template v-if="faltaLancar > 0" #append>
-                  <q-btn flat dense no-caps size="sm" color="primary" label="Restante" @click="pg.valor = (Number(pg.valor || 0) + faltaLancar).toFixed(2)" />
-                </template>
-              </q-input>
-              <q-select
-                v-if="formaPorId(pg.forma_pagamento_id)?.parcelas > 1"
-                v-model="pg.parcelas"
-                outlined
-                dense
-                label="Parcelas"
-                :options="opcoesParcelas(formaPorId(pg.forma_pagamento_id))"
-                emit-value
-                map-options
-                class="col-3"
-              />
-              <div class="col-auto"><q-btn flat round dense icon="delete" aria-label="Tirar" @click="pagamentos.splice(i, 1)" /></div>
-            </div>
-            <div v-if="noDinheiro > 0" class="row q-col-gutter-sm items-center q-mt-sm">
-              <q-input v-model="valorRecebido" outlined autofocus type="number" step="0.01" min="0" prefix="R$" label="Valor que o cliente deu (dinheiro)" class="col-12 col-sm-6" />
-              <div v-if="troco > 0" class="col text-h6">Troco {{ formatarMoeda(troco) }}</div>
-            </div>
+            <linhas-pagamento v-model:valor-recebido="valorRecebido" :linhas="pagamentos" :formas="formasAVista" :falta="faltaLancar" com-parcelas />
           </section>
 
           <section v-if="crediario" class="cartao q-pa-md q-mb-md">
@@ -175,9 +140,11 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import DialogoAutorizacao from '@/componentes/DialogoAutorizacao.vue'
+import LinhasPagamento from '@/componentes/LinhasPagamento.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
 import { usarAutorizacao } from '@/servicos/autorizacao'
 import { formatarMoeda } from '@/servicos/formatos'
+import { centavos, completos, noDinheiro as somarDinheiro, novaLinha, somar, troco as calcularTroco } from '@/servicos/pagamentos'
 import { useCaixaDaMaquinaStore } from '@/stores/caixaDaMaquina'
 
 const $q = useQuasar()
@@ -202,18 +169,14 @@ const forma = computed(() => formaPorId(venda.value?.forma_pagamento?.id))
 const crediario = computed(() => forma.value?.tipo === 'crediario')
 const formasAVista = computed(() => formas.value.filter((f) => f.tipo !== 'crediario'))
 const totalVenda = computed(() => Number(venda.value?.total || 0))
-const centavos = (v) => Math.round(Number(v || 0) * 100)
-const pago = computed(() => pagamentos.value.reduce((soma, pg) => soma + centavos(pg.valor), 0) / 100)
+const pago = computed(() => somar(pagamentos.value))
 const faltaLancar = computed(() => (crediario.value ? 0 : Math.max(0, centavos(totalVenda.value) - centavos(pago.value)) / 100))
-const noDinheiro = computed(() =>
-  pagamentos.value.filter((pg) => formaPorId(pg.forma_pagamento_id)?.tipo === 'dinheiro').reduce((soma, pg) => soma + centavos(pg.valor), 0) / 100,
-)
-const troco = computed(() => (noDinheiro.value && valorRecebido.value ? (centavos(valorRecebido.value) - centavos(noDinheiro.value)) / 100 : 0))
+const noDinheiro = computed(() => somarDinheiro(pagamentos.value, formas.value))
+const troco = computed(() => calcularTroco(valorRecebido.value, noDinheiro.value))
 const passaDoLimite = computed(() => !!venda.value?.credito && Number(venda.value.credito.disponivel) < totalVenda.value - pago.value)
 const podeConfirmar = computed(() => {
   if (!sessaoCaixa.value || venda.value?.situacao !== 'fechada') return false
-  if (pagamentos.value.some((pg) => !pg.forma_pagamento_id || !(Number(pg.valor) > 0))) return false
-  if (noDinheiro.value && valorRecebido.value && troco.value < 0) return false
+  if (!completos(pagamentos.value, valorRecebido.value, noDinheiro.value)) return false
   return crediario.value ? pago.value < totalVenda.value && !!dataBase.value : centavos(pago.value) === centavos(totalVenda.value)
 })
 
@@ -268,9 +231,7 @@ function pagamentosIniciais() {
 }
 
 function adicionar() {
-  const usadas = new Set(pagamentos.value.map((pg) => pg.forma_pagamento_id))
-  const sugerida = formasAVista.value.find((f) => !usadas.has(f.id)) ?? formasAVista.value[0]
-  pagamentos.value.push({ forma_pagamento_id: sugerida?.id ?? null, valor: faltaLancar.value ? faltaLancar.value.toFixed(2) : '', parcelas: 1 })
+  pagamentos.value.push(novaLinha(pagamentos.value, formasAVista.value, faltaLancar.value))
 }
 
 async function mandar(pedido) {
@@ -325,26 +286,12 @@ async function confirmar() {
   else roteador.push({ name: 'vendas' })
 }
 
-/** A sessão aberta do caixa em que este computador está. */
-async function acharCaixa() {
-  const doComputador = caixaDaMaquina.caixa
-  if (!doComputador) {
-    semCaixa.value = 'Este computador não está em nenhum caixa. Entre num caixa aberto para receber.'
-    return
-  }
-  const { data } = await api.get('/caixas')
-  const c = data.find((x) => x.id === doComputador.id)
-  if (!c?.sessao) {
-    semCaixa.value = `O ${doComputador.nome} está fechado. Abra o caixa para receber.`
-    return
-  }
-  sessaoCaixa.value = { id: c.sessao.id, nome: c.nome }
-}
-
 onMounted(async () => {
   try {
-    const [v, f] = await Promise.all([api.get(url.value), api.get('/formas-pagamento', { params: { so_ativas: true } }), acharCaixa()])
+    const [v, f, c] = await Promise.all([api.get(url.value), api.get('/formas-pagamento', { params: { so_ativas: true } }), caixaDaMaquina.sessaoAberta()])
     formas.value = f.data
+    sessaoCaixa.value = c.sessao ?? null
+    semCaixa.value = c.aviso ?? ''
     venda.value = v.data
     pagamentosIniciais()
   } catch (e) {

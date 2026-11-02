@@ -52,6 +52,7 @@ export const MENU = [
     icone: 'point_of_sale',
     filhos: [
       { titulo: 'Caixa', icone: 'point_of_sale', rota: '/caixa', permissao: ['caixa.operar', 'caixa.conferir'] },
+      { titulo: 'Receber crediário', icone: 'request_quote', rota: '/caixa/crediario', permissao: 'caixa.operar' },
       { titulo: 'Formas de pagamento', icone: 'payments', rota: '/caixa/formas', permissao: 'caixa.configurar' },
       { titulo: 'Caixas da loja', icone: 'storefront', rota: '/caixa/caixas', permissao: 'caixa.configurar' },
     ],

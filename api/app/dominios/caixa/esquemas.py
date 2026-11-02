@@ -23,6 +23,8 @@ class FormaDados(BaseModel):
     parcelas: int = Field(default=1, ge=1, le=24, description="Máximo de parcelas")
     parcelas_sem_autorizacao: int = Field(default=1, ge=1, le=24, description="Acima disto, pede a gerência")
     intervalo: int = Field(default=30, ge=0, le=365, description="Dias entre as parcelas")
+    juros_atraso: Decimal = Field(default=Decimal(0), ge=0, lt=100, max_digits=5, decimal_places=2,
+                                  description="Crediário: % ao mês sugerido na parcela atrasada, por dia de atraso")
     ordem: int = 0
     ativo: bool = True
 

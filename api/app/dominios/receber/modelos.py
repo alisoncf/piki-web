@@ -2,17 +2,19 @@
 
 Por enquanto nascem só do crediário da venda: o que não foi pago na entrada vira
 parcelas, impressas no carnê. A conta é da loja que vendeu, mas o limite do
-cliente soma o que está em aberto em todas as lojas. A baixa das parcelas (com
-os juros de atraso) vem depois.
+cliente soma o que está em aberto em todas as lojas, e a parcela pode ser paga
+em qualquer loja: o recebimento é da loja e do caixa de quem recebeu.
 """
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.acesso.modelos import Usuario
+from app.dominios.caixa.modelos import FormaPagamento, SessaoCaixa
 from app.dominios.clientes.modelos import Cliente
+from app.dominios.empresas.modelos import Empresa
 from app.nucleo.banco import Base, ComDatas
 
 
@@ -31,6 +33,8 @@ class ContaReceber(ComDatas, Base):
 
     cliente: Mapped[Cliente] = relationship(lazy="joined")
     usuario: Mapped[Usuario] = relationship(lazy="joined")
+    empresa: Mapped[Empresa] = relationship(lazy="joined")
+    venda: Mapped["Venda | None"] = relationship()  # noqa: F821 (vendas.modelos); só quando pedida
     parcelas: Mapped[list["ParcelaReceber"]] = relationship(
         back_populates="conta", cascade="all, delete-orphan", order_by="ParcelaReceber.numero", lazy="selectin"
     )
@@ -47,4 +51,68 @@ class ParcelaReceber(Base):
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     aberto: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # o que falta pagar (reman_itd no VB6)
 
-    conta: Mapped[ContaReceber] = relationship(back_populates="parcelas")
+    conta: Mapped[ContaReceber] = relationship(back_populates="parcelas", lazy="selectin")
+
+
+class RecebimentoCrediario(Base):
+    """O cliente paga parcelas no caixa (de qualquer loja): quanto de cada uma, os juros e como pagou."""
+
+    __tablename__ = "recebimento_crediario"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), index=True)  # a loja que recebeu
+    sessao_caixa_id: Mapped[int] = mapped_column(ForeignKey("caixa_sessao.id"), index=True)
+    cliente_id: Mapped[int] = mapped_column(ForeignKey("cliente.id"), index=True)
+    data_hora: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
+    valor_recebido: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # o que o cliente deu, no dinheiro
+    estornado_em: Mapped[datetime | None] = mapped_column(DateTime)
+    estornado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+
+    empresa: Mapped[Empresa] = relationship(lazy="joined")
+    sessao_caixa: Mapped[SessaoCaixa] = relationship(lazy="joined")
+    cliente: Mapped[Cliente] = relationship(lazy="joined")
+    usuario: Mapped[Usuario] = relationship(foreign_keys=[usuario_id], lazy="joined")
+    estornado_por: Mapped[Usuario | None] = relationship(foreign_keys=[estornado_por_id], lazy="joined")
+    itens: Mapped[list["ItemRecebimento"]] = relationship(
+        back_populates="recebimento", cascade="all, delete-orphan", order_by="ItemRecebimento.id", lazy="selectin")
+    pagamentos: Mapped[list["PagamentoRecebimento"]] = relationship(
+        back_populates="recebimento", cascade="all, delete-orphan", order_by="PagamentoRecebimento.id", lazy="selectin")
+
+    @property
+    def total(self) -> Decimal:
+        return sum((i.valor + i.juros for i in self.itens), Decimal("0.00"))
+
+    @property
+    def troco(self) -> Decimal | None:
+        if self.valor_recebido is None:
+            return None
+        return self.valor_recebido - sum((p.valor for p in self.pagamentos if p.forma_pagamento.tipo == "dinheiro"),
+                                         Decimal("0.00"))
+
+
+class ItemRecebimento(Base):
+    """Quanto foi pago de uma parcela (pode ser só uma parte) e os juros de atraso cobrados."""
+
+    __tablename__ = "recebimento_crediario_item"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    recebimento_id: Mapped[int] = mapped_column(ForeignKey("recebimento_crediario.id", ondelete="CASCADE"), index=True)
+    parcela_id: Mapped[int] = mapped_column(ForeignKey("conta_receber_parcela.id"), index=True)
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # abatido do que falta pagar da parcela
+    juros: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal(0))
+
+    recebimento: Mapped[RecebimentoCrediario] = relationship(back_populates="itens")
+    parcela: Mapped[ParcelaReceber] = relationship(lazy="joined")
+
+
+class PagamentoRecebimento(Base):
+    __tablename__ = "recebimento_crediario_pagamento"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    recebimento_id: Mapped[int] = mapped_column(ForeignKey("recebimento_crediario.id", ondelete="CASCADE"), index=True)
+    forma_pagamento_id: Mapped[int] = mapped_column(ForeignKey("forma_pagamento.id"))
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+
+    recebimento: Mapped[RecebimentoCrediario] = relationship(back_populates="pagamentos")
+    forma_pagamento: Mapped[FormaPagamento] = relationship(lazy="joined")

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
+import { api } from '@/servicos/api'
 import { useSessaoStore } from '@/stores/sessao'
 
 // o caixa em que este computador está: quem entra no caixa aqui deixa o computador nele,
@@ -42,5 +43,14 @@ export const useCaixaDaMaquinaStore = defineStore('caixaDaMaquina', () => {
     gravar(null)
   }
 
-  return { caixa, entrar, sair }
+  /** A sessão aberta do caixa deste computador: { sessao: { id, nome } }, ou { aviso } se não dá para receber. */
+  async function sessaoAberta() {
+    if (!caixa.value) return { aviso: 'Este computador não está em nenhum caixa. Entre num caixa aberto para receber.' }
+    const { data } = await api.get('/caixas')
+    const c = data.find((x) => x.id === caixa.value.id)
+    if (!c?.sessao) return { aviso: `O ${caixa.value.nome} está fechado. Abra o caixa para receber.` }
+    return { sessao: { id: c.sessao.id, nome: c.nome } }
+  }
+
+  return { caixa, entrar, sair, sessaoAberta }
 })

@@ -1,17 +1,39 @@
-"""Regras das contas a receber: o limite de crédito do cliente e as parcelas do carnê."""
+"""Regras das contas a receber: o limite de crédito do cliente, as parcelas do carnê e o recebimento delas.
+
+A parcela pode ser paga em qualquer loja, toda ou só uma parte. Os juros de atraso são só sugeridos (o
+caixa pode mudar): % ao mês da forma Crediário, contado por dia, sobre o que falta pagar (como no VB6).
+"""
 import calendar
 from dataclasses import dataclass
-from datetime import date, timedelta
-from decimal import ROUND_DOWN, Decimal
+from datetime import date, datetime, timedelta
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.dominios.caixa import servico as caixa
+from app.dominios.caixa.modelos import ABERTO, FormaPagamento, LancamentoCaixa
 from app.dominios.clientes.modelos import Cliente
-from app.dominios.receber.modelos import ContaReceber, ParcelaReceber
+from app.dominios.receber.esquemas import RecebimentoDados
+from app.dominios.receber.modelos import (
+    ContaReceber, ItemRecebimento, PagamentoRecebimento, ParcelaReceber, RecebimentoCrediario,
+)
+from app.nucleo.textos import moeda
 
 ZERO = Decimal("0.00")
 CENTAVO = Decimal("0.01")
+
+
+class ErroReceber(Exception):
+    """Erro de regra do recebimento; a mensagem vai para o usuário."""
+
+
+class NaoEncontrado(ErroReceber):
+    pass
+
+
+class DadoInvalido(ErroReceber):
+    pass
 
 
 @dataclass
@@ -79,3 +101,124 @@ def lancar_carne(db: Session, empresa_id: int, cliente_id: int, venda_id: int | 
 
 def conta_da_venda(db: Session, venda_id: int) -> ContaReceber | None:
     return db.scalar(select(ContaReceber).where(ContaReceber.venda_id == venda_id))
+
+
+# ------------------------------------------------------------ receber parcelas
+
+def juros_ao_mes(db: Session) -> Decimal:
+    """O % ao mês de juros de atraso, da forma Crediário (o juros_par do VB6)."""
+    taxa = db.scalar(select(FormaPagamento.juros_atraso).where(FormaPagamento.tipo == "crediario")
+                     .order_by(FormaPagamento.ativo.desc(), FormaPagamento.id))
+    return taxa or ZERO
+
+
+def juros_sugerido(aberto: Decimal, vencimento: date, taxa: Decimal, hoje: date | None = None) -> tuple[int, Decimal]:
+    """Dias de atraso e os juros: o % ao mês dividido por 30, vezes os dias, sobre o que falta pagar."""
+    dias = ((hoje or date.today()) - vencimento).days
+    if dias <= 0:
+        return 0, ZERO
+    return dias, (aberto * taxa / 100 / 30 * dias).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+
+
+def parcelas_abertas(db: Session, cliente_id: int) -> list[ParcelaReceber]:
+    """O que o cliente tem para pagar, em todas as lojas, do vencimento mais antigo ao mais novo."""
+    if db.get(Cliente, cliente_id) is None:
+        raise NaoEncontrado("Cliente não encontrado")
+    return list(db.scalars(
+        select(ParcelaReceber).join(ContaReceber)
+        .where(ContaReceber.cliente_id == cliente_id, ParcelaReceber.aberto > 0)
+        .order_by(ParcelaReceber.vencimento, ParcelaReceber.id)))
+
+
+def _documento(recebimento: RecebimentoCrediario) -> str:
+    return f"crediário {recebimento.id}"
+
+
+def receber(db: Session, empresa_id: int, usuario_id: int, dados: RecebimentoDados) -> RecebimentoCrediario:
+    """O caixa recebe parcelas do cliente (de qualquer loja): abate do que falta de cada uma e lança no caixa,
+    em cada forma em que o cliente pagou."""
+    try:
+        sessao = caixa.obter_sessao(db, empresa_id, dados.sessao_caixa_id)
+    except caixa.ErroCaixa as e:
+        raise NaoEncontrado(str(e))
+    if sessao.situacao != ABERTO:
+        raise DadoInvalido(f"O caixa {sessao.caixa.nome} está fechado")
+    cliente = db.get(Cliente, dados.cliente_id)
+    if cliente is None:
+        raise NaoEncontrado("Cliente não encontrado")
+
+    recebimento = RecebimentoCrediario(empresa_id=empresa_id, sessao_caixa_id=sessao.id, cliente_id=dados.cliente_id,
+                                       usuario_id=usuario_id)
+    vistas = set()
+    for item in dados.itens:
+        parcela = db.get(ParcelaReceber, item.parcela_id)
+        if parcela is None or parcela.conta.cliente_id != dados.cliente_id:
+            raise NaoEncontrado("Parcela não encontrada")
+        if parcela.id in vistas:
+            raise DadoInvalido(f"A parcela {parcela.numero} entrou duas vezes")
+        vistas.add(parcela.id)
+        if item.valor > parcela.aberto:
+            raise DadoInvalido(f"Da parcela {parcela.numero}/{len(parcela.conta.parcelas)} faltam só "
+                               f"{moeda(parcela.aberto)}")
+        parcela.aberto -= item.valor
+        recebimento.itens.append(ItemRecebimento(parcela=parcela, valor=item.valor, juros=item.juros))
+
+    for pagamento in dados.pagamentos:
+        forma = db.get(FormaPagamento, pagamento.forma_pagamento_id)
+        if forma is None or not forma.ativo:
+            raise NaoEncontrado("Forma de pagamento não encontrada")
+        if forma.tipo == "crediario":
+            raise DadoInvalido("A parcela do crediário não se paga com crediário")
+        recebimento.pagamentos.append(PagamentoRecebimento(forma_pagamento=forma, valor=pagamento.valor))
+    total = recebimento.total
+    pago = sum((p.valor for p in recebimento.pagamentos), ZERO)
+    if pago < total:
+        raise DadoInvalido(f"Falta lançar {moeda(total - pago)}")
+    if pago > total:
+        raise DadoInvalido(f"O lançado passa do total em {moeda(pago - total)}; "
+                           "o troco sai do valor que o cliente deu no dinheiro")
+    no_dinheiro = sum((p.valor for p in recebimento.pagamentos if p.forma_pagamento.tipo == "dinheiro"), ZERO)
+    if no_dinheiro:
+        recebimento.valor_recebido = dados.valor_recebido or no_dinheiro
+        if recebimento.valor_recebido < no_dinheiro:
+            raise DadoInvalido(f"O valor que o cliente deu é menor que os {moeda(no_dinheiro)} no dinheiro")
+
+    db.add(recebimento)
+    db.flush()
+    for pagamento in recebimento.pagamentos:
+        db.add(LancamentoCaixa(sessao_id=sessao.id, tipo="entrada", motivo="crediario",
+                               forma_pagamento_id=pagamento.forma_pagamento.id, valor=pagamento.valor,
+                               documento=_documento(recebimento), usuario_id=usuario_id,
+                               historico=f"Crediário {cliente.nome}"[:80]))
+    db.commit()
+    db.expire_all()
+    return recebimento
+
+
+def obter(db: Session, empresa_id: int, recebimento_id: int) -> RecebimentoCrediario:
+    recebimento = db.get(RecebimentoCrediario, recebimento_id)
+    if recebimento is None or recebimento.empresa_id != empresa_id:
+        raise NaoEncontrado("Recebimento não encontrado")
+    return recebimento
+
+
+def estornar(db: Session, empresa_id: int, usuario_id: int, recebimento_id: int) -> RecebimentoCrediario:
+    """Recebimento errado: as parcelas voltam a dever o que deviam e os lançamentos saem do caixa.
+    Só enquanto o caixa em que foi recebido está aberto."""
+    recebimento = obter(db, empresa_id, recebimento_id)
+    if recebimento.estornado_em is not None:
+        raise DadoInvalido("Este recebimento já foi estornado")
+    if recebimento.sessao_caixa.situacao != ABERTO:
+        raise DadoInvalido("O caixa deste recebimento já foi fechado")
+    for item in recebimento.itens:
+        item.parcela.aberto += item.valor
+    agora = datetime.now()
+    for lancamento in recebimento.sessao_caixa.lancamentos:
+        if lancamento.documento == _documento(recebimento) and lancamento.estornado_em is None:
+            lancamento.estornado_em = agora
+            lancamento.estornado_por_id = usuario_id
+    recebimento.estornado_em = agora
+    recebimento.estornado_por_id = usuario_id
+    db.commit()
+    db.expire_all()
+    return recebimento

@@ -40,6 +40,7 @@ MOTIVOS = {
 # lançados por outras telas (a venda...), e só desfeitos por lá
 MOTIVOS_AUTOMATICOS = {
     "venda": ("entrada", "Venda"),
+    "crediario": ("entrada", "Recebimento de crediário"),
 }
 
 ABERTO = "aberto"
@@ -59,6 +60,8 @@ class FormaPagamento(ComDatas, Base):
     # acima disto, as parcelas pedem autorização da gerência
     parcelas_sem_autorizacao: Mapped[int] = mapped_column(Integer, default=1)
     intervalo: Mapped[int] = mapped_column(Integer, default=30)  # dias entre as parcelas
+    # crediário: % ao mês sugerido de juros na parcela atrasada, por dia de atraso (juros_par do VB6)
+    juros_atraso: Mapped[Decimal] = mapped_column(Numeric(5, 2), server_default="0", default=Decimal(0))
     ordem: Mapped[int] = mapped_column(Integer, default=0)  # na tela da venda
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 

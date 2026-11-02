@@ -70,6 +70,9 @@ def importar_caixa(origem: Connection, db: Session, codigo_empresa: str) -> Resu
         g["intervalo"] = int(intervalo or 30)
         g["ativo"] = g["ativo"] or (visivel or "S").strip().upper() != "N"
 
+    # juros de atraso do crediário: % ao mês, nos parâmetros da loja
+    juros = Decimal(str(origem.execute(text("SELECT juros_par FROM tab_parametros LIMIT 1")).scalar() or 0))
+
     for nome, g in grupos.items():
         _, tipo, ordem = _FORMAS[g["tipo_cai"]]
         forma = db.scalar(select(FormaPagamento).where(FormaPagamento.nome == nome))
@@ -79,6 +82,7 @@ def importar_caixa(origem: Connection, db: Session, codigo_empresa: str) -> Resu
                 nome=nome, tipo=tipo, desconto=g["desconto"], parcelas=parcelas,
                 parcelas_sem_autorizacao=parcelas if tipo == "cartao_credito" else g["livres"],
                 intervalo=g["intervalo"], ordem=ordem, ativo=g["ativo"] and nome != "Cheque",
+                juros_atraso=juros.quantize(Decimal("0.01")) if tipo == "crediario" else Decimal(0),
             )
             db.add(forma)
             db.flush()
