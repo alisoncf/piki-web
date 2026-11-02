@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -58,10 +58,15 @@ class PedidoDesconto(ComAutorizacao):
         return self
 
 
-class PedidoRecebimento(BaseModel):
+class PedidoRecebimento(ComAutorizacao):
     sessao_caixa_id: int
     valor_recebido: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2,
                                            description="No dinheiro, o que o cliente deu (para o troco)")
+    # só no crediário
+    entrada: Decimal = Field(default=Decimal(0), ge=0, max_digits=14, decimal_places=2,
+                             description="Crediário: o que o cliente paga na hora; o resto vira o carnê")
+    forma_entrada_id: int | None = Field(default=None, description="Crediário: a forma em que a entrada foi paga")
+    primeiro_vencimento: date | None = Field(default=None, description="Crediário: sem ele, um mês depois de hoje")
 
 
 class PedidoCancelamento(BaseModel):
@@ -113,6 +118,34 @@ class SessaoDoCaixa(BaseModel):
     caixa: Pessoa
 
 
+class Credito(BaseModel):
+    """O crédito do cliente no crediário: o limite menos o que está em aberto em todas as lojas."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    limite: Decimal
+    em_aberto: Decimal
+    disponivel: Decimal
+    impedimento: str | None = Field(description="Bloqueado ou com o crédito suspenso: não compra no crediário")
+
+
+class Parcela(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    numero: int
+    vencimento: date
+    valor: Decimal
+    aberto: Decimal
+
+
+class Carne(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    valor: Decimal
+    parcelas: list[Parcela]
+
+
 class VendaResumo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -141,10 +174,40 @@ class Venda(VendaResumo):
     recebida_por: Pessoa | None
     valor_recebido: Decimal | None
     troco: Decimal | None
+    entrada: Decimal | None
+    forma_entrada: FormaResumida | None
+    limite_autorizado_por: Pessoa | None
+    carne: Carne | None = Field(default=None, description="Crediário recebido: as parcelas")
+    credito: Credito | None = Field(default=None, description="Venda aberta no crediário: o crédito do cliente")
     cancelada_em: datetime | None
     cancelada_por: Pessoa | None
     motivo_cancelamento: str | None
     avisos: list[str] = Field(default=[], description="Ao receber: produtos que ficaram com estoque negativo")
+
+
+class LojaDoCarne(BaseModel):
+    nome: str
+    cnpj: str | None
+    endereco: str
+    telefone: str | None
+
+
+class ClienteDoCarne(BaseModel):
+    id: int
+    nome: str
+    cpf_cnpj: str | None
+    endereco: str
+    cidade: str
+
+
+class ImpressaoCarne(BaseModel):
+    """O que vai no carnê impresso."""
+
+    loja: LojaDoCarne
+    venda: int
+    data: datetime
+    cliente: ClienteDoCarne
+    carne: Carne
 
 
 class PaginaVendas(BaseModel):

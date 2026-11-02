@@ -98,7 +98,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 
 ## Onda 3 · Financeiro
 
-- [ ] Contas a pagar e a receber (`tab_doc`, `tab_itdoc`)
+- [~] Contas a pagar e a receber (`tab_doc`, `tab_itdoc`): o carnê do crediário já gera a conta a receber (D26); faltam a importação do VB6 e as contas a pagar
 - [ ] Baixa de parcelas em qualquer empresa, registrando o caixa de quem recebeu (D9)
 - [ ] Cheques
 - [ ] Cobrança e carnês
@@ -135,7 +135,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 - [ ] TEF (SiTef)
 - [x] Formas de pagamento e caixa (D26): caixas da loja, abertura com fundo de troco, entradas e saídas, fechamento com conferência cega (migração 0019); ETL das formas e caixas rodado nas três cópias — 02/11/2026
 - [x] Venda (D26): vendedor monta, caixa recebe, desconto pela forma com limite do perfil e autorização, venda aberta vence em 10 dias (migração 0020) — 02/11/2026
-- [ ] Crediário na venda: limite do cliente, parcelas e carnê
+- [x] Crediário na venda (D26): limite do cliente somando todas as lojas, entrada, parcelas sem juros e carnê pela janela de impressão (migração 0021) — 02/11/2026
 - [ ] Trocas, cancelamento, entrega, cartão presente
 - [ ] Controle de vales por funcionário
 - [ ] Conciliação do cartão pelo extrato da financeira

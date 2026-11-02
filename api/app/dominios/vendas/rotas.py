@@ -4,9 +4,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dominios.vendas import servico
+from app.dominios.empresas.modelos import Empresa
 from app.dominios.vendas.esquemas import (
-    Item, ItemAlteracao, ItemNovo, PaginaVendas, PedidoCancelamento, PedidoDesconto, PedidoRecebimento, Venda,
-    VendaDados, VendaResumo,
+    Carne, ClienteDoCarne, Credito, ImpressaoCarne, Item, ItemAlteracao, ItemNovo, LojaDoCarne, PaginaVendas,
+    PedidoCancelamento, PedidoDesconto, PedidoRecebimento, Venda, VendaDados, VendaResumo,
 )
 from app.dominios.vendas.modelos import ABERTA, SITUACOES
 from app.dominios.vendas.modelos import Venda as ModeloVenda
@@ -34,6 +35,10 @@ def _http(ctx: Contexto, erro: servico.ErroVenda) -> HTTPException:
 def _venda(ctx: Contexto, venda: ModeloVenda, avisos: list[str] | None = None) -> Venda:
     resposta = Venda.model_validate(venda)
     resposta.avisos = avisos or []
+    if (credito := servico.credito(ctx.db, venda)) is not None:
+        resposta.credito = Credito.model_validate(credito)
+    if venda.entrada is not None and (carne := servico.carne(ctx.db, venda)) is not None:
+        resposta.carne = Carne.model_validate(carne)
     if venda.situacao == ABERTA:
         saldos = servico.disponiveis(ctx.db, venda)
         resposta.itens = [Item.model_validate(i).model_copy(update={"disponivel": saldos.get(i.produto_id, Decimal("0.000"))})
@@ -123,11 +128,53 @@ def cancelar(venda_id: int, pedido: PedidoCancelamento, ctx: Vender) -> Venda:
         raise _http(ctx, e)
 
 
-@router.post("/vendas/{venda_id}/receber", response_model=Venda)
+@router.post("/vendas/{venda_id}/receber", response_model=Venda, responses={403: {"description": "Pede autorização"}})
 def receber(venda_id: int, pedido: PedidoRecebimento, ctx: Receber) -> Venda:
-    """O caixa recebe: entra no caixa e baixa o estoque. `avisos` traz os produtos que ficaram negativos."""
+    """O caixa recebe: entra no caixa e baixa o estoque. `avisos` traz os produtos que ficaram negativos.
+
+    No crediário, o que não foi pago na entrada vira o carnê. Acima do limite disponível do cliente:
+    403 com o cabeçalho X-Pede-Autorizacao, como no desconto.
+    """
     try:
-        venda, avisos = servico.receber(ctx.db, ctx.empresa_id, ctx.usuario.id, venda_id, pedido)
+        venda, avisos = servico.receber(ctx.db, ctx.empresa_id, ctx.usuario, ctx.permissoes, venda_id, pedido)
     except servico.ErroVenda as e:
         raise _http(ctx, e)
     return _venda(ctx, venda, avisos)
+
+
+def _juntar(*partes: str | None, separador: str = " ") -> str:
+    return separador.join(p.strip() for p in partes if p and p.strip())
+
+
+@router.get("/vendas/{venda_id}/carne", response_model=ImpressaoCarne)
+def carne(venda_id: int, ctx: Ver) -> ImpressaoCarne:
+    """O que vai no carnê impresso da venda no crediário."""
+    try:
+        venda = servico.obter(ctx.db, ctx.empresa_id, venda_id)
+    except servico.ErroVenda as e:
+        raise _http(ctx, e)
+    conta = servico.carne(ctx.db, venda)
+    if conta is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Esta venda não tem carnê")
+    loja = ctx.db.get(Empresa, venda.empresa_id)
+    cidade_loja = f"{loja.cidade.nome}/{loja.cidade.uf}" if loja.cidade else None
+    cliente = conta.cliente
+    setor = cliente.setor
+    cidade = setor.cidade if setor else None
+    return ImpressaoCarne(
+        loja=LojaDoCarne(
+            nome=loja.nome_fantasia or loja.nome, cnpj=loja.cnpj, telefone=loja.telefone,
+            endereco=_juntar(_juntar(loja.logradouro, loja.numero, loja.complemento, separador=", "),
+                             loja.bairro, cidade_loja, separador=" - "),
+        ),
+        venda=venda.numero,
+        data=venda.recebida_em,
+        cliente=ClienteDoCarne(
+            id=cliente.id, nome=cliente.nome, cpf_cnpj=cliente.cpf_cnpj,
+            endereco=_juntar(_juntar(cliente.logradouro, cliente.numero and f"nº {cliente.numero}", cliente.complemento),
+                             setor and _juntar(setor.tipo, setor.nome), cliente.cep and f"CEP {cliente.cep}",
+                             separador=" - "),
+            cidade=f"{cidade.nome}/{cidade.uf}" if cidade else "",
+        ),
+        carne=Carne.model_validate(conta),
+    )

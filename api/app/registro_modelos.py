@@ -12,6 +12,7 @@ from app.dominios.estoque import modelos as estoque  # noqa: F401
 from app.dominios.fornecedores import modelos as fornecedores  # noqa: F401
 from app.dominios.funcionarios import modelos as funcionarios  # noqa: F401
 from app.dominios.produtos import modelos as produtos  # noqa: F401
+from app.dominios.receber import modelos as receber  # noqa: F401
 from app.dominios.vendas import modelos as vendas  # noqa: F401
 from app.nucleo import legado  # noqa: F401
 from app.nucleo.banco import Base  # noqa: F401

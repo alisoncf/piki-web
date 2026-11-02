@@ -238,8 +238,18 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - O preço do item é o de queima, quando o produto tem; senão, o de venda.
 - Uma forma de pagamento por venda, como no VB6.
 - A venda aberta não reserva estoque; a baixa acontece quando o caixa recebe, e o estoque pode ficar negativo, com aviso. O recebimento lança a entrada no caixa (motivo "venda"), que só é desfeita pela venda.
-- Numeração própria por loja. A venda aberta pode ser cancelada com o motivo; a recebida, só pela devolução (etapa 5). O crediário ainda não é recebido (etapa 3).
+- Numeração própria por loja. A venda aberta pode ser cancelada com o motivo; a recebida, só pela devolução (etapa 5).
 - Permissões: `vendas.ver`, `vendas.vender` e `vendas.autorizar`; quem recebe precisa de `caixa.operar`.
+
+**Crediário (etapa 3, 02/11/2026)**
+- Regras do Alison: o limite restante do cliente é o limite de crédito menos todas as parcelas em aberto (em todas as lojas). O carnê não tem entrada; se o cliente pagar uma parte na hora, o caixa informa a entrada ao receber. Não há juros no crediário; pode haver juros de atraso ao receber a parcela.
+- O crediário pede o cliente cadastrado. Cliente bloqueado ou com o crédito suspenso não compra no crediário, nem com autorização.
+- Ao escolher o crediário, a venda mostra o limite do cliente, o que está em aberto e o disponível. Acima do disponível, o caixa pede o login e a senha de quem tem `vendas.autorizar` (ou uma entrada maior), e a venda guarda quem autorizou. No VB6 o limite só aparecia na tela, sem bloquear.
+- A entrada é paga numa forma que não seja o crediário (com troco, se for no dinheiro). O resto é dividido nas parcelas escolhidas na venda, iguais e sem juros; os centavos que sobram vão na última, como no VB6.
+- O primeiro vencimento é escolhido pelo caixa (sugere um mês depois de hoje; não pode ser antes de hoje). As outras vencem no mesmo dia dos meses seguintes (intervalo de 30 dias na forma); se o dia não existe no mês, no último dia dele.
+- No caixa entram a entrada, na forma em que foi paga, e o valor a prazo, na forma Crediário (como o DUP do VB6).
+- O carnê é uma conta a receber da loja que vendeu, com as parcelas (o que falta pagar de cada uma). Sai na janela de impressão do navegador logo depois de receber, e pode ser impresso de novo pela venda. Cada parcela tem o canhoto, que fica na loja, e a parte do cliente.
+- Ficam para depois: a baixa das parcelas (em qualquer loja, com os juros de atraso), o contrato impresso e a importação das parcelas em aberto do VB6. Até essa importação, o "em aberto" só soma os carnês do sistema novo.
 
 **Formas de pagamento** (lista única para todas as lojas)
 - Uma forma por tipo (dinheiro, PIX, cartão de crédito, de débito, crediário, cartão presente, depósito, vale): as "1X DUP" a "10X DUP" do VB6 viram o "Crediário" com até 10 parcelas, e a parcela é escolhida na venda. Cada forma tem desconto, máximo de parcelas, até quantas não pedem autorização, intervalo e ordem na tela. O cheque deixou de existir (entra desativado, só para as vendas antigas). Confirmado pelo Alison em 02/11/2026: o cartão de crédito continua com os 5% de desconto do VB6 e vai até 12x sem autorização.

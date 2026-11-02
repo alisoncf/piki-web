@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
+import CarnePagina from '@/paginas/vendas/CarnePagina.vue'
 import VendaPagina from '@/paginas/vendas/VendaPagina.vue'
 import VendasPagina from '@/paginas/vendas/VendasPagina.vue'
 import { api } from '@/servicos/api'
@@ -14,6 +15,7 @@ import { useSessaoStore } from '@/stores/sessao'
 const MATRIZ = { id: 1, codigo: '01', nome: 'MATRIZ', tema: { principal: '#2f6fb0', fundo: '#eef3f9', menu: '#1f2835' } }
 const DINHEIRO = { id: 1, nome: 'Dinheiro', tipo: 'dinheiro', desconto: '5.00', parcelas: 1, parcelas_sem_autorizacao: 1 }
 const CARTAO = { id: 2, nome: 'Cartão de crédito', tipo: 'cartao_credito', desconto: '0.00', parcelas: 10, parcelas_sem_autorizacao: 3 }
+const CREDIARIO = { id: 9, nome: 'Crediário', tipo: 'crediario', desconto: '0.00', parcelas: 10, parcelas_sem_autorizacao: 6 }
 const DAVI = { id: 4, nome: 'Davi Vendedor' }
 const LENCOL = { id: 7, codigo: 12, nome: 'Lençol Ficticio', preco_venda: '100.00', preco_queima: null, estoque: '5.000' }
 const ITEM = {
@@ -36,6 +38,7 @@ async function montar(componente, caminho) {
     routes: [
       { path: '/vendas', name: 'vendas', component: componente === VendasPagina ? componente : vazio },
       { path: '/vendas/:id', name: 'venda', component: componente === VendaPagina ? componente : vazio },
+      { path: '/vendas/:id/carne', name: 'carne', component: componente === CarnePagina ? componente : vazio },
     ],
   })
   await router.push(caminho)
@@ -144,8 +147,66 @@ describe('vendas', () => {
     expect(document.body.textContent).toContain('Troco R$')
     document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
     await flushPromises()
-    expect(post).toHaveBeenCalledWith('/vendas/3/receber', { sessao_caixa_id: 11, valor_recebido: '120' })
+    expect(post).toHaveBeenCalledWith('/vendas/3/receber', { sessao_caixa_id: 11, valor_recebido: '120', autorizacao: null })
     expect(localStorage.getItem('piki.caixa')).toBe('5')
     expect(wrapper.text()).toContain('Recebida por Davi Vendedor no Cx 02')
+  })
+
+  it('no crediário mostra o limite do cliente e recebe com entrada', async () => {
+    entrar()
+    const credito = { limite: '500.00', em_aberto: '200.00', disponivel: '300.00', impedimento: null }
+    const noCrediario = {
+      ...COM_ITEM, forma_pagamento: { id: 9, nome: 'Crediário', tipo: 'crediario' }, parcelas: 2,
+      cliente: { id: 8, nome: 'Freguesa Ficticia', cpf_cnpj: null, bloqueado: false }, credito,
+    }
+    const getPadrao = gets(noCrediario)
+    vi.spyOn(api, 'get').mockImplementation((url, opcoes) =>
+      url === '/formas-pagamento' ? Promise.resolve({ data: [DINHEIRO, CARTAO, CREDIARIO] }) : getPadrao(url, opcoes),
+    )
+    const recebida = {
+      ...noCrediario, situacao: 'recebida', credito: null, entrada: '40.00', forma_entrada: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' },
+      valor_recebido: '50.00', troco: '10.00', recebida_por: DAVI, sessao_caixa: { id: 11, caixa: { id: 5, nome: 'Cx 02' } }, recebida_em: '2026-11-02T11:00:00',
+      carne: { id: 21, valor: '60.00', parcelas: [{ numero: 1, vencimento: '2026-12-02', valor: '30.00', aberto: '30.00' }, { numero: 2, vencimento: '2027-01-02', valor: '30.00', aberto: '30.00' }] },
+    }
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: recebida })
+    const { wrapper, router } = await montar(VendaPagina, '/vendas/3')
+    expect(wrapper.text()).toContain('Em aberto (todas as lojas)')
+    expect(wrapper.text()).toMatch(/Disponível\s*R\$\s300,00/)
+    expect(wrapper.text()).not.toContain('Passa do disponível')
+
+    await botao(wrapper, 'Receber').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toMatch(/Carnê: 2x de R\$\s50,00/)
+    const campo = (rotulo) => wrapper.findAllComponents(QInput).find((c) => c.props('label')?.startsWith(rotulo))
+    await campo('Entrada').vm.$emit('update:modelValue', '40')
+    await flushPromises()
+    expect(document.body.textContent).toMatch(/Carnê: 2x de R\$\s30,00/)
+    await campo('Valor recebido').vm.$emit('update:modelValue', '50')
+    await campo('Primeiro vencimento').vm.$emit('update:modelValue', '2026-12-02')
+    await flushPromises()
+    expect(document.body.textContent).toContain('Troco R$')
+    document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/vendas/3/receber', {
+      sessao_caixa_id: 11, valor_recebido: '50', entrada: '40', forma_entrada_id: 1, primeiro_vencimento: '2026-12-02', autorizacao: null,
+    })
+    expect(router.currentRoute.value.name).toBe('carne')
+    expect(router.currentRoute.value.query.imprimir).toBe('1')
+  })
+
+  it('o carnê mostra uma parcela por bloco', async () => {
+    entrar()
+    vi.spyOn(api, 'get').mockResolvedValue({
+      data: {
+        loja: { nome: 'Loja Ficticia', cnpj: null, endereco: 'Rua A, 1', telefone: null }, venda: 15, data: '2026-11-02T11:00:00',
+        cliente: { id: 8, nome: 'Freguesa Ficticia', cpf_cnpj: null, endereco: 'Rua B nº 2', cidade: 'Goiânia/GO' },
+        carne: { id: 21, valor: '60.00', parcelas: [{ numero: 1, vencimento: '2026-12-02', valor: '30.00', aberto: '30.00' }, { numero: 2, vencimento: '2027-01-02', valor: '30.00', aberto: '30.00' }] },
+      },
+    })
+    const { wrapper } = await montar(CarnePagina, '/vendas/3/carne')
+    expect(api.get).toHaveBeenCalledWith('/vendas/3/carne')
+    expect(wrapper.findAll('.parcela')).toHaveLength(2)
+    expect(wrapper.text()).toContain('02/01/2027')
+    expect(wrapper.text()).toContain('2/2')
   })
 })

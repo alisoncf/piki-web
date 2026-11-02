@@ -9,7 +9,7 @@ autorizar, que fica registrado na venda.
 As funções que mudam a venda conferem a autorização antes de mexer em
 qualquer coisa: a senha errada conta tentativa e grava na hora.
 """
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, select, update
@@ -23,6 +23,8 @@ from app.dominios.clientes.modelos import Cliente
 from app.dominios.estoque import repositorio as repo_estoque
 from app.dominios.estoque import servico as estoque
 from app.dominios.produtos.modelos import Produto
+from app.dominios.receber import servico as contas
+from app.dominios.receber.modelos import ContaReceber
 from app.dominios.vendas.esquemas import Autorizacao, ItemAlteracao, ItemNovo, PedidoDesconto, PedidoRecebimento, VendaDados
 from app.dominios.vendas.modelos import (
     ABERTA, CANCELADA, DIAS_PARA_VENCER, RECEBIDA, SITUACOES, VENCIDA, ItemVenda, Venda,
@@ -31,7 +33,7 @@ from app.dominios.vendas.modelos import (
 ZERO = Decimal("0.00")
 CENTAVO = Decimal("0.01")
 CEM = Decimal(100)
-PERMISSAO_PARCELAS = "vendas.autorizar"
+PERMISSAO_PARCELAS = "vendas.autorizar"  # também o crediário acima do limite do cliente
 
 
 class ErroVenda(Exception):
@@ -325,9 +327,53 @@ def cancelar(db: Session, empresa_id: int, usuario_id: int, venda_id: int, motiv
 
 # ------------------------------------------------------------ receber
 
-def receber(db: Session, empresa_id: int, usuario_id: int, venda_id: int,
+def _moeda(valor: Decimal) -> str:
+    texto = f"{valor:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {texto}"
+
+
+def _conferir_limite(db: Session, venda: Venda, a_prazo: Decimal, permissoes: set[str], usuario: Usuario,
+                     autorizador: Usuario | None) -> None:
+    """O crediário vai até o limite disponível do cliente (o limite menos o que está em aberto em todas as lojas);
+    acima, pede a gerência."""
+    credito = contas.credito(db, venda.cliente)
+    if credito.impedimento:
+        raise DadoInvalido(credito.impedimento)
+    if a_prazo <= credito.disponivel:
+        return
+    mensagem = (f"O crediário de {_moeda(a_prazo)} passa do limite disponível do cliente "
+                f"({_moeda(max(credito.disponivel, ZERO))})")
+    if PERMISSAO_PARCELAS in permissoes:
+        venda.limite_autorizado_por = usuario
+        return
+    if autorizador is None:
+        raise PedeAutorizacao(f"{mensagem}. Peça a autorização da gerência.")
+    if PERMISSAO_PARCELAS not in acesso.permissoes_na_empresa(db, autorizador, venda.empresa_id):
+        raise PedeAutorizacao(f"{autorizador.nome} não pode autorizar o crediário acima do limite")
+    venda.limite_autorizado_por = autorizador
+
+
+def _forma_da_entrada(db: Session, venda: Venda, pedido: PedidoRecebimento) -> FormaPagamento | None:
+    if pedido.entrada <= 0:
+        return None
+    if pedido.entrada >= venda.total:
+        raise DadoInvalido("A entrada cobre a venda toda; troque a forma de pagamento")
+    if pedido.forma_entrada_id is None:
+        raise DadoInvalido("Escolha a forma de pagamento da entrada")
+    forma = db.get(FormaPagamento, pedido.forma_entrada_id)
+    if forma is None or not forma.ativo or forma.tipo == "crediario":
+        raise DadoInvalido("Forma de pagamento da entrada não encontrada")
+    return forma
+
+
+def receber(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str], venda_id: int,
             pedido: PedidoRecebimento) -> tuple[Venda, list[str]]:
-    """O caixa recebe: lança a entrada no caixa e baixa o estoque. Devolve a venda e os avisos de estoque negativo."""
+    """O caixa recebe: lança a entrada no caixa e baixa o estoque. Devolve a venda e os avisos de estoque negativo.
+
+    No crediário, a entrada (se houver) entra no caixa na forma em que foi paga, e o resto vira o carnê,
+    em parcelas iguais e sem juros.
+    """
+    autorizador = _autorizador(db, pedido.autorizacao)
     venda = _aberta(db, empresa_id, venda_id)
     if not venda.itens:
         raise DadoInvalido("A venda não tem itens")
@@ -336,8 +382,6 @@ def receber(db: Session, empresa_id: int, usuario_id: int, venda_id: int,
         raise DadoInvalido("Escolha a forma de pagamento")
     if not forma.ativo:
         raise DadoInvalido(f"A forma {forma.nome} está desativada; escolha outra")
-    if forma.tipo == "crediario":
-        raise DadoInvalido("O recebimento no crediário ainda não está pronto; escolha outra forma")
     try:
         sessao = caixa.obter_sessao(db, empresa_id, pedido.sessao_caixa_id)
     except caixa.ErroCaixa as e:
@@ -345,19 +389,45 @@ def receber(db: Session, empresa_id: int, usuario_id: int, venda_id: int,
     if sessao.situacao != ABERTO:
         raise DadoInvalido(f"O caixa {sessao.caixa.nome} está fechado")
 
+    # o que entra no caixa agora: (forma, valor)
+    lancamentos = [(forma, venda.total)]
+    venda.entrada = None
+    venda.forma_entrada = None
+    venda.limite_autorizado_por = None
+    forma_na_mao = forma
+    if forma.tipo == "crediario":
+        if venda.cliente is None:
+            raise DadoInvalido("O crediário pede o cliente cadastrado")
+        forma_entrada = _forma_da_entrada(db, venda, pedido)
+        entrada = pedido.entrada if forma_entrada else ZERO
+        a_prazo = venda.total - entrada
+        primeiro = pedido.primeiro_vencimento or contas.vencimentos(date.today(), 2, forma.intervalo)[1]
+        if primeiro < date.today():
+            raise DadoInvalido("O primeiro vencimento não pode ser antes de hoje")
+        _conferir_limite(db, venda, a_prazo, permissoes, usuario, autorizador)
+        venda.entrada = entrada
+        venda.forma_entrada = forma_entrada
+        forma_na_mao = forma_entrada
+        lancamentos = [(forma, a_prazo)] + ([(forma_entrada, entrada)] if forma_entrada else [])
+        contas.lancar_carne(db, empresa_id, venda.cliente_id, venda.id, a_prazo, venda.parcelas, primeiro,
+                             forma.intervalo, f"Venda {venda.numero} {venda.cliente.nome}", usuario.id)
+
     venda.valor_recebido = None
-    if forma.tipo == "dinheiro":
-        venda.valor_recebido = pedido.valor_recebido or venda.total
-        if venda.valor_recebido < venda.total:
-            raise DadoInvalido("O valor recebido é menor que o total da venda")
-    if venda.total > 0:
-        db.add(LancamentoCaixa(sessao_id=sessao.id, tipo="entrada", motivo="venda", forma_pagamento_id=forma.id,
-                               valor=venda.total, documento=documento(venda), usuario_id=usuario_id))
+    if forma_na_mao is not None and forma_na_mao.tipo == "dinheiro":
+        venda.valor_recebido = pedido.valor_recebido or venda.pago_na_hora
+        if venda.valor_recebido < venda.pago_na_hora:
+            raise DadoInvalido("O valor recebido é menor que o total da venda" if forma_na_mao is forma
+                               else "O valor recebido é menor que a entrada")
+    for forma_lancada, valor in lancamentos:
+        if valor > 0:
+            db.add(LancamentoCaixa(sessao_id=sessao.id, tipo="entrada", motivo="venda",
+                                   forma_pagamento_id=forma_lancada.id, valor=valor, documento=documento(venda),
+                                   usuario_id=usuario.id))
     avisos = []
     for item in venda.itens:
         try:
             movimento = estoque.movimentar(db, empresa_id, item.produto_id, "venda", -item.quantidade,
-                                           usuario_id=usuario_id, documento=documento(venda))
+                                           usuario_id=usuario.id, documento=documento(venda))
         except estoque.ErroEstoque as e:
             raise DadoInvalido(str(e))
         if movimento.saldo < 0:
@@ -365,8 +435,19 @@ def receber(db: Session, empresa_id: int, usuario_id: int, venda_id: int,
     venda.situacao = RECEBIDA
     venda.sessao_caixa_id = sessao.id
     venda.recebida_em = datetime.now()
-    venda.recebida_por_id = usuario_id
+    venda.recebida_por_id = usuario.id
     return _salvar(db, venda), avisos
+
+
+def credito(db: Session, venda: Venda) -> contas.Credito | None:
+    """O crédito do cliente, para a tela mostrar enquanto a venda no crediário está aberta."""
+    if venda.situacao != ABERTA or venda.cliente is None or venda.forma_pagamento is None             or venda.forma_pagamento.tipo != "crediario":
+        return None
+    return contas.credito(db, venda.cliente)
+
+
+def carne(db: Session, venda: Venda) -> ContaReceber | None:
+    return contas.conta_da_venda(db, venda.id)
 
 
 def disponiveis(db: Session, venda: Venda) -> dict[int, Decimal]:

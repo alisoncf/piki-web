@@ -9,6 +9,13 @@ export const rotas = [
   { path: '/empresa', name: 'escolher-empresa', component: () => import('@/paginas/EscolherEmpresaPagina.vue') },
   { path: '/senha', name: 'trocar-senha', component: () => import('@/paginas/TrocarSenhaPagina.vue') },
   {
+    // fora do layout, para imprimir só o carnê
+    path: '/vendas/:id(\\d+)/carne',
+    name: 'carne',
+    component: () => import('@/paginas/vendas/CarnePagina.vue'),
+    meta: { permissao: ['vendas.ver', 'vendas.vender', 'caixa.operar'] },
+  },
+  {
     path: '/',
     component: () => import('@/layouts/PrincipalLayout.vue'),
     children: [

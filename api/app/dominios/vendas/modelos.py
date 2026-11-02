@@ -52,6 +52,11 @@ class Venda(ComDatas, Base):
     recebida_em: Mapped[datetime | None] = mapped_column(DateTime)
     recebida_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     valor_recebido: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # o que o cliente deu, no dinheiro
+    # no crediário: o que foi pago na hora, em outra forma; o resto vira o carnê
+    entrada: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    forma_entrada_id: Mapped[int | None] = mapped_column(ForeignKey("forma_pagamento.id"))
+    # quem autorizou o crediário acima do limite disponível do cliente
+    limite_autorizado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     cancelada_em: Mapped[datetime | None] = mapped_column(DateTime)
     cancelada_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     motivo_cancelamento: Mapped[str | None] = mapped_column(String(200))
@@ -61,17 +66,24 @@ class Venda(ComDatas, Base):
     )
     vendedor: Mapped[Usuario] = relationship(foreign_keys=[vendedor_id], lazy="joined")
     cliente: Mapped[Cliente | None] = relationship(lazy="joined")
-    forma_pagamento: Mapped[FormaPagamento | None] = relationship(lazy="joined")
+    forma_pagamento: Mapped[FormaPagamento | None] = relationship(foreign_keys=[forma_pagamento_id], lazy="joined")
+    forma_entrada: Mapped[FormaPagamento | None] = relationship(foreign_keys=[forma_entrada_id], lazy="joined")
     desconto_autorizado_por: Mapped[Usuario | None] = relationship(foreign_keys=[desconto_autorizado_por_id], lazy="joined")
     parcelas_autorizadas_por: Mapped[Usuario | None] = relationship(
         foreign_keys=[parcelas_autorizadas_por_id], lazy="joined")
     sessao_caixa: Mapped[SessaoCaixa | None] = relationship(lazy="joined")
     recebida_por: Mapped[Usuario | None] = relationship(foreign_keys=[recebida_por_id], lazy="joined")
     cancelada_por: Mapped[Usuario | None] = relationship(foreign_keys=[cancelada_por_id], lazy="joined")
+    limite_autorizado_por: Mapped[Usuario | None] = relationship(foreign_keys=[limite_autorizado_por_id], lazy="joined")
+
+    @property
+    def pago_na_hora(self) -> Decimal:
+        """No crediário, só a entrada; nas outras formas, o total."""
+        return self.total if self.entrada is None else self.entrada
 
     @property
     def troco(self) -> Decimal | None:
-        return None if self.valor_recebido is None else self.valor_recebido - self.total
+        return None if self.valor_recebido is None else self.valor_recebido - self.pago_na_hora
 
 
 class ItemVenda(Base):
