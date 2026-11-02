@@ -20,6 +20,7 @@ export const MENU = [
           { titulo: 'Parentescos', icone: 'diversity_3', rota: '/cadastros/parentescos', permissao: 'clientes.ver' },
         ],
       },
+      { titulo: 'Fornecedores', icone: 'local_shipping', rota: '/cadastros/fornecedores', permissao: 'fornecedores.ver' },
       {
         titulo: 'Funcionários',
         icone: 'badge',

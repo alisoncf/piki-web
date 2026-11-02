@@ -25,9 +25,10 @@ pip install -e ".[legado]"     # driver para ler o MariaDB do VB6
 python -m etl empresas --origem "mysql+pymysql://usuario:senha@servidor:3306/requinte"
 python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
 python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
+python -m etl fornecedores --origem "mysql+pymysql://..." --empresa 01 --avisos fornecedores-01.txt
 ```
 
-O destino é o banco do `.env`. Rode uma vez para cada banco de filial, nesta ordem: empresas, funcionários (os cobradores dos setores são funcionários) e clientes. A lista de cidades do IBGE vem da migração 0008 (`alembic upgrade head`). O `--empresa` diz de qual empresa é o banco de origem.
+O destino é o banco do `.env`. Rode uma vez para cada banco de filial, nesta ordem: empresas, funcionários (os cobradores dos setores são funcionários), clientes e fornecedores. A lista de cidades do IBGE vem da migração 0008 (`alembic upgrade head`). O `--empresa` diz de qual empresa é o banco de origem.
 
 ### MariaDB local sem senha
 
@@ -68,6 +69,18 @@ Decisão D15. Lê `tab_grupocli`, `tab_tipopar` (parentescos das referências), 
 - Com dezenas de milhares de clientes, a leitura é feita em lotes de mil, com os índices de CPF e do mapa em memória: a matriz leva cerca de um minuto.
 - Os avisos (quase todos CPFs inválidos) podem passar de mil por filial: use `--avisos arquivo.txt`.
 
+### Fornecedores
+
+Decisão D22. Lê `tab_fornecedores` e `tab_telefones` (`tipo_ter = 'F'`, com o `cod_for` no `cod_cli`).
+
+- Fornecedor é juntado pelo CPF/CNPJ. Sem CPF/CNPJ válido ou com nome sem sentido, não entra; se já tinha entrado por esta loja e não veio de outra, sai.
+- A tabela não tem data de alteração: manda a loja de menor código que tem o fornecedor. As outras só preenchem o vazio e somam telefones e contatos.
+- A cidade é procurada pelo nome e pela UF, com as abreviações por extenso ("STA BARBARA DOESTE" → Santa Bárbara d'Oeste), ou pela única cidade da UF que começa assim ("SAO BERNARDO DO CAMP"). A que não for achada sai como aviso.
+- O endereço vem da `endereco_for` (com o número junto, como foi digitado) ou da `logradouro_for`.
+- `telefone_for` vira telefone comercial e `fax_for`, fax. Os números perdem o zero da operadora ("(0..19)3807-7511" → 1938077511).
+- O `contato_for` é texto livre com nome e telefone ("EBSON 9971-0002"): vira um contato. Sem nome ("FAX 15-3284-5809"), o número vai para os telefones do fornecedor.
+- O `email_for` é o e-mail do fornecedor; `codantigo_for` não é importado.
+
 ## Situação
 
 | Parte | Status |
@@ -78,5 +91,6 @@ Decisão D15. Lê `tab_grupocli`, `tab_tipopar` (parentescos das referências), 
 | Importação de empresas (`empresas.py`) | pronta, com testes |
 | Importação de funcionários e cargos (`funcionarios.py`) | pronta, com testes |
 | Importação de clientes, setores, órgãos e grupos (`clientes.py`) | pronta, com testes |
+| Importação de fornecedores (`fornecedores.py`) | pronta, com testes |
 | Importação de usuários | a fazer |
 | Demais domínios | acompanham as ondas do roteiro |

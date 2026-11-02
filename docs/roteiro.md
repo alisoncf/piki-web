@@ -70,7 +70,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 ## Onda 1 · Cadastros
 
 - [x] Clientes, setores, órgãos, grupos e parentescos (D15): API (migrações 0006 e 0007), telas (lista paginada pela API, ficha com telefones, referências e anotações, setores com cobrador por loja, órgãos, grupos, parentescos) e ETL, rodado nas cópias da matriz, Jundiaí e La Viva (80 mil clientes) — 30/10/2026
-- [ ] Fornecedores
+- [x] Fornecedores (D22): API (migração 0014), lista, ficha em página única com contatos e busca do CNPJ na BrasilAPI, e ETL rodado nas cópias da matriz, Jundiaí e La Viva (267 fornecedores) — 02/11/2026
 - [x] Funcionários e cargos: API, telas (lista, ficha, cargos) e ETL do VB6, com cadastro global, loja de lotação e telefones (migrações 0004 e 0005) — 30/10/2026
 - [x] Rodar o ETL de funcionários nos bancos da matriz (01) e da La Viva (03), em cópias locais, juntando os cadastros repetidos entre filiais (pelo CPF ou pelo nome) — 30/10/2026
 - [ ] Usuários ligados a funcionários (coluna `usuario.funcionario_id` já criada)

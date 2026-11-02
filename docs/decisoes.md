@@ -153,6 +153,19 @@ Decisão do Alison.
 - Na importação de vendas, parcelas e documentos, o cliente é procurado pelo CPF do cadastro do VB6 quando o código dele não estiver no mapa (caso dos cadastros descartados que tinham o mesmo CPF de outro).
 - Resultado em 01/11/2026, com o `requinte` atualizado: de 80.657 clientes ficaram 56.000. Saíram 921 da matriz, 1.125 da Jundiaí e 23.272 da La Viva (quase nenhum cliente de lá tem CPF). Ficaram 184 sem CPF válido, todos da matriz, por terem parcela em aberto.
 
+### D22. Cadastro de fornecedores (02/11/2026)
+
+Decisão do Alison.
+
+- O nome é "fornecedores" (e não "participantes", que é o termo do SPED). É um cadastro só para todas as lojas (D9), e serve também para transportadoras, sem marcação: os dados são os mesmos.
+- Todo fornecedor tem CPF ou CNPJ válido, que não se repete. Quem não tem fica de fora da importação; pessoa física (com CPF) é aceita.
+- O endereço é como o da empresa: CEP com busca, cidade da lista do IBGE e bairro digitado (o setor é região de cobrança de clientes).
+- A ficha tem os telefones da empresa e uma lista de contatos (nome, função, telefone e e-mail), porque o representante e o financeiro costumam ser pessoas diferentes.
+- Na ficha, a lupa do CNPJ busca na BrasilAPI (pública, sem chave) a razão social, o fantasia, o endereço, o telefone e o e-mail. Com maiúscula só nas iniciais, porque a Receita escreve tudo em maiúsculas. O que já estava preenchido só é trocado se a pessoa confirmar; se o CNPJ já é de um fornecedor, a ficha oferece abrir o cadastro dele.
+- Na importação, a `tab_fornecedores` não tem data de alteração: manda a loja de menor código que tem o fornecedor (a matriz, quando ela tem). As outras só preenchem o vazio e somam telefones e contatos.
+- A ficha é de página única com índice, como a do cliente.
+- Resultado em 02/11/2026: 267 fornecedores, a partir de 338 (matriz), 325 (Jundiaí) e 319 (La Viva) cadastros; 193 descartados por não terem CPF/CNPJ válido (ou nome). 214 ficaram com cidade; os outros têm a cidade escrita de um jeito que não deu para reconhecer.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.

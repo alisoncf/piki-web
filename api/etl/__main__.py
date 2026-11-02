@@ -3,6 +3,7 @@
     python -m etl empresas --origem "mysql+pymysql://usuario:senha@servidor:3306/requinte"
     python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
     python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
+    python -m etl fornecedores --origem "mysql+pymysql://..." --empresa 01
 
 Para um MariaDB local em que o root entra pela autenticação do Windows (sem
 senha), use o conector da MariaDB: mariadb+mariadbconnector://root@127.0.0.1:3306/requinte
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.nucleo.banco import engine
 from etl.clientes import importar_clientes
 from etl.empresas import ConflitoEmpresa, importar_empresas
+from etl.fornecedores import importar_fornecedores
 from etl.funcionarios import EmpresaNaoImportada, importar_funcionarios
 
 
@@ -46,6 +48,10 @@ def main(argv: list[str] | None = None) -> None:
     c.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     c.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     c.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
+    fo = sub.add_parser("fornecedores", help="importa fornecedores, com telefones e contatos")
+    fo.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
+    fo.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
+    fo.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
     args = p.parse_args(argv)
     # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
     sys.stdout.reconfigure(encoding="utf-8")
@@ -80,6 +86,14 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"descartados (sem CPF/CNPJ válido ou nome sem sentido): {r.descartados}, "
                       f"excluídos do banco novo: {r.excluidos}, mantidos por dívida em aberto: {r.mantidos_por_divida}, "
                       f"nomes corrigidos: {r.nomes_corrigidos}")
+                _avisos(r.avisos, args.avisos)
+            elif args.comando == "fornecedores":
+                r = importar_fornecedores(conexao, db, args.empresa)
+                print(f"fornecedores: {r.criados} novos, {r.atualizados} atualizados, "
+                      f"{r.ligados_por_documento} juntados pelo CPF/CNPJ a um cadastro que já existia")
+                print(f"telefones novos: {r.telefones}, contatos novos: {r.contatos}")
+                print(f"descartados (sem CPF/CNPJ válido ou nome sem sentido): {r.descartados}, "
+                      f"excluídos do banco novo: {r.excluidos}")
                 _avisos(r.avisos, args.avisos)
     except (ConflitoEmpresa, EmpresaNaoImportada) as erro:
         print(f"erro: {erro}", file=sys.stderr)

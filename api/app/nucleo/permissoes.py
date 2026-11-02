@@ -13,5 +13,7 @@ PERMISSOES: dict[str, str] = {
     "funcionarios.editar": "Cadastrar e alterar funcionários e cargos",
     "clientes.ver": "Consultar clientes, setores, órgãos e grupos de clientes",
     "clientes.editar": "Cadastrar e alterar clientes, setores, órgãos e grupos de clientes",
+    "fornecedores.ver": "Consultar fornecedores",
+    "fornecedores.editar": "Cadastrar e alterar fornecedores",
     "clientes.documentos": "Ver e enviar documentos dos clientes (crediário; dados pessoais protegidos pela LGPD)",
 }

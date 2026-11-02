@@ -30,6 +30,9 @@ class Configuracao(BaseSettings):
     # consulta de CEP nas fichas de cliente e funcionário
     viacep_url: str = "https://viacep.com.br/ws/{cep}/json/"
     viacep_segundos: float = 5
+    # consulta de CNPJ na BrasilAPI (pública, sem chave), para preencher a ficha do fornecedor
+    brasilapi_cnpj_url: str = "https://brasilapi.com.br/api/cnpj/v1/{cnpj}"
+    brasilapi_segundos: float = 8
     # arquivos enviados (documentos de clientes): numa pasta do servidor ou num MinIO (app/nucleo/arquivos.py)
     arquivos: Literal["pasta", "minio"] = "pasta"
     arquivos_pasta: str = str(RAIZ / "arquivos")

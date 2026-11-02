@@ -97,6 +97,24 @@ export const rotas = [
         meta: { permissao: 'funcionarios.ver' },
       },
       {
+        path: 'cadastros/fornecedores',
+        name: 'fornecedores',
+        component: () => import('@/paginas/cadastros/FornecedoresPagina.vue'),
+        meta: { permissao: 'fornecedores.ver' },
+      },
+      {
+        path: 'cadastros/fornecedores/novo',
+        name: 'fornecedor-novo',
+        component: () => import('@/paginas/cadastros/FornecedorPagina.vue'),
+        meta: { permissao: 'fornecedores.editar' },
+      },
+      {
+        path: 'cadastros/fornecedores/:id(\\d+)',
+        name: 'fornecedor',
+        component: () => import('@/paginas/cadastros/FornecedorPagina.vue'),
+        meta: { permissao: 'fornecedores.ver' },
+      },
+      {
         path: 'cadastros/cargos',
         name: 'cargos',
         component: () => import('@/paginas/cadastros/CargosPagina.vue'),
