@@ -49,3 +49,9 @@ def perfil_por_nome(db: Session, nome: str) -> Perfil | None:
 
 def listar_usuarios(db: Session) -> list[Usuario]:
     return list(db.scalars(select(Usuario).order_by(Usuario.nome)))
+
+
+def usos_do_perfil(db: Session, perfil_id: int) -> int:
+    """Quantos acessos (usuário em uma empresa) usam o perfil."""
+    return db.scalar(select(func.count()).select_from(UsuarioEmpresa).where(UsuarioEmpresa.perfil_id == perfil_id))
+

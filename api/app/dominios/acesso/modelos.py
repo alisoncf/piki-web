@@ -1,10 +1,11 @@
 """Usuários, perfis e permissões (decisões D9 e D10). As empresas ficam no domínio empresas."""
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.empresas.modelos import Empresa
+from app.dominios.funcionarios.modelos import Funcionario
 from app.nucleo.banco import Base, ComDatas
 
 
@@ -49,8 +50,16 @@ class Usuario(ComDatas, Base):
     ultima_empresa_id: Mapped[int | None] = mapped_column(ForeignKey("empresa.id", ondelete="SET NULL"))
     # funcionário que usa este login (opcional: nem todo funcionário tem login, nem todo login é de funcionário)
     funcionario_id: Mapped[int | None] = mapped_column(ForeignKey("funcionario.id", ondelete="SET NULL"), unique=True)
+    # para a recuperação de senha por e-mail, que ainda vai ser feita
+    email: Mapped[str | None] = mapped_column(String(200), unique=True)
+    # senha provisória (dada por quem cadastrou ou importada do VB6): só entra no sistema depois de trocar
+    trocar_senha: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)
+    # tentativas de login erradas seguidas; na quinta, o login fica bloqueado por um tempo
+    tentativas_erradas: Mapped[int] = mapped_column(Integer, server_default="0", default=0)
+    bloqueado_ate: Mapped[datetime | None] = mapped_column(DateTime)
 
     acessos: Mapped[list["UsuarioEmpresa"]] = relationship(back_populates="usuario", lazy="selectin")
+    funcionario: Mapped["Funcionario | None"] = relationship(lazy="joined")
 
 
 class UsuarioEmpresa(Base):

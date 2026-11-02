@@ -7,6 +7,7 @@ import { useSessaoStore } from '@/stores/sessao'
 export const rotas = [
   { path: '/login', name: 'login', component: () => import('@/paginas/LoginPagina.vue'), meta: { publica: true } },
   { path: '/empresa', name: 'escolher-empresa', component: () => import('@/paginas/EscolherEmpresaPagina.vue') },
+  { path: '/senha', name: 'trocar-senha', component: () => import('@/paginas/TrocarSenhaPagina.vue') },
   {
     path: '/',
     component: () => import('@/layouts/PrincipalLayout.vue'),
@@ -35,6 +36,36 @@ export const rotas = [
         name: 'usuarios',
         component: () => import('@/paginas/acesso/UsuariosPagina.vue'),
         meta: { permissao: 'acesso.usuarios' },
+      },
+      {
+        path: 'acesso/usuarios/novo',
+        name: 'usuario-novo',
+        component: () => import('@/paginas/acesso/UsuarioPagina.vue'),
+        meta: { permissao: 'acesso.usuarios' },
+      },
+      {
+        path: 'acesso/usuarios/:id(\\d+)',
+        name: 'usuario',
+        component: () => import('@/paginas/acesso/UsuarioPagina.vue'),
+        meta: { permissao: 'acesso.usuarios' },
+      },
+      {
+        path: 'acesso/perfis',
+        name: 'perfis',
+        component: () => import('@/paginas/acesso/PerfisPagina.vue'),
+        meta: { permissao: 'acesso.perfis' },
+      },
+      {
+        path: 'acesso/perfis/novo',
+        name: 'perfil-novo',
+        component: () => import('@/paginas/acesso/PerfilPagina.vue'),
+        meta: { permissao: 'acesso.perfis' },
+      },
+      {
+        path: 'acesso/perfis/:id(\\d+)',
+        name: 'perfil',
+        component: () => import('@/paginas/acesso/PerfilPagina.vue'),
+        meta: { permissao: 'acesso.perfis' },
       },
       {
         path: 'cadastros/clientes',
@@ -130,6 +161,10 @@ export function destino(para, sessao) {
   if (para.name === 'nao-encontrada') return true
   if (para.meta.publica) return sessao.logado ? { name: 'inicio' } : true
   if (!sessao.logado) return { name: 'login', query: para.fullPath !== '/' ? { volta: para.fullPath } : {} }
+  if (sessao.precisaTrocarSenha) {
+    return para.name === 'trocar-senha' ? true : { name: 'trocar-senha', query: para.fullPath !== '/' ? { volta: para.fullPath } : {} }
+  }
+  if (para.name === 'trocar-senha') return true
   if (sessao.precisaEscolherEmpresa) return para.name === 'escolher-empresa' ? true : { name: 'escolher-empresa' }
   if (para.meta.permissao && !sessao.pode(para.meta.permissao)) return { name: 'inicio' }
   return true

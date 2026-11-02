@@ -37,6 +37,7 @@ export const MENU = [
     filhos: [
       { titulo: 'Empresas', icone: 'store', rota: '/acesso/empresas', permissao: 'acesso.empresas' },
       { titulo: 'Usuários', icone: 'group', rota: '/acesso/usuarios', permissao: 'acesso.usuarios' },
+      { titulo: 'Perfis', icone: 'admin_panel_settings', rota: '/acesso/perfis', permissao: 'acesso.perfis' },
     ],
   },
 ]

@@ -26,9 +26,10 @@ python -m etl empresas --origem "mysql+pymysql://usuario:senha@servidor:3306/req
 python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
 python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
 python -m etl fornecedores --origem "mysql+pymysql://..." --empresa 01 --avisos fornecedores-01.txt
+python -m etl usuarios --origem "mysql+pymysql://..." --empresa 01
 ```
 
-O destino é o banco do `.env`. Rode uma vez para cada banco de filial, nesta ordem: empresas, funcionários (os cobradores dos setores são funcionários), clientes e fornecedores. A lista de cidades do IBGE vem da migração 0008 (`alembic upgrade head`). O `--empresa` diz de qual empresa é o banco de origem.
+O destino é o banco do `.env`. Rode uma vez para cada banco de filial, nesta ordem: empresas, funcionários (os cobradores dos setores são funcionários), clientes, fornecedores e usuários (depois dos funcionários). A lista de cidades do IBGE vem da migração 0008 (`alembic upgrade head`). O `--empresa` diz de qual empresa é o banco de origem.
 
 ### MariaDB local sem senha
 
@@ -81,6 +82,16 @@ Decisão D22. Lê `tab_fornecedores` e `tab_telefones` (`tipo_ter = 'F'`, com o 
 - O `contato_for` é texto livre com nome e telefone ("EBSON 9971-0002"): vira um contato. Sem nome ("FAX 15-3284-5809"), o número vai para os telefones do fornecedor.
 - O `email_for` é o e-mail do fornecedor; `codantigo_for` não é importado.
 
+### Usuários
+
+Decisão D23. Lê `tab_usuarios` com o `status_fun` da `tab_funcionarios`. Rode antes o ETL de funcionários.
+
+- Entram só os usuários ativos de funcionários ativos. O login é o apelido em minúsculas; se já for de outra pessoa, ganha um número no fim. Um login criado à mão, sem funcionário e com o mesmo apelido, é ligado ao funcionário (sem mexer na senha).
+- A mesma pessoa em várias lojas é um usuário só, com um acesso em cada loja, no perfil do nível que tinha nela (1 Operador, 2 Supervisor, 3 Gerente, 4 Gestor). Os perfis são criados sem permissões.
+- A senha do VB6 entra como provisória; manda a da loja de lotação. Senha já trocada no sistema novo não muda. Usuário sem senha no VB6 sai como aviso.
+- Na reimportação, o acesso de quem ficou inativo no VB6 é desligado, e o perfil mudado na tela continua.
+- As permissões por usuário da `tab_defusu` não são importadas.
+
 ## Situação
 
 | Parte | Status |
@@ -92,5 +103,5 @@ Decisão D22. Lê `tab_fornecedores` e `tab_telefones` (`tipo_ter = 'F'`, com o 
 | Importação de funcionários e cargos (`funcionarios.py`) | pronta, com testes |
 | Importação de clientes, setores, órgãos e grupos (`clientes.py`) | pronta, com testes |
 | Importação de fornecedores (`fornecedores.py`) | pronta, com testes |
-| Importação de usuários | a fazer |
+| Importação de usuários (`usuarios.py`) | pronta, com testes |
 | Demais domínios | acompanham as ondas do roteiro |

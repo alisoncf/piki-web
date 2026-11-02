@@ -121,7 +121,7 @@ def test_administrador_tem_todas_as_permissoes(cliente, cenario):
     usuarios = cliente.get("/acesso/usuarios", headers=_auth(token))
     assert usuarios.status_code == 200
     bia = next(u for u in usuarios.json() if u["login"] == "bia")
-    assert {(a["empresa"]["codigo"], a["perfil"]) for a in bia["acessos"]} >= {("01", "Gerente"), ("02", "Consulta")}
+    assert {(a["empresa"]["codigo"], a["perfil"]["nome"]) for a in bia["acessos"]} >= {("01", "Gerente"), ("02", "Consulta")}
 
 
 def test_acesso_retirado_vale_na_hora(cliente, banco, cenario):

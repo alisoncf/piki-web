@@ -63,6 +63,8 @@ def login_atual(
 
 def contexto(login: Annotated[Login, Depends(login_atual)]) -> Contexto:
     """Exige login e empresa escolhida, e confere se o acesso à empresa continua valendo."""
+    if login.usuario.trocar_senha:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Troque a senha provisória antes de continuar")
     if login.empresa_id is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Escolha a empresa")
     if not servico.pode_acessar(login.db, login.usuario, login.empresa_id):

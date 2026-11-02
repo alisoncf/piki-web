@@ -166,6 +166,23 @@ Decisão do Alison.
 - A ficha é de página única com índice, como a do cliente.
 - Resultado em 02/11/2026: 267 fornecedores, a partir de 338 (matriz), 325 (Jundiaí) e 319 (La Viva) cadastros; 193 descartados por não terem CPF/CNPJ válido (ou nome). 214 ficaram com cidade; os outros têm a cidade escrita de um jeito que não deu para reconhecer.
 
+### D23. Usuários, perfis e senhas (02/11/2026)
+
+Decisão do Alison.
+
+- O usuário pode ser ligado a um funcionário (no VB6 todo usuário era um funcionário). A ligação é opcional, para caber o administrador e quem é de fora, como o contador. Na ficha do usuário, o nome e o login vêm do funcionário escolhido.
+- As permissões são só por perfil, sem exceções por usuário: quem precisa de algo diferente ganha outro perfil. Os níveis do VB6 viraram os perfis Operador, Supervisor, Gerente e Gestor, criados sem permissões; elas são marcadas na tela de perfis. As marcações por usuário da `tab_defusu` não foram importadas. Os limites de desconto vão para o perfil quando chegarem as vendas.
+- O administrador mexe em tudo. Quem cuida de usuários sem ser administrador (o gerente da loja):
+  - só dá acesso à empresa em que está;
+  - só dá perfis que não tenham permissões que ele mesmo não tem (como o "não dar nível maior que o seu" do VB6);
+  - não mexe em administradores, em usuários só de outras empresas nem no próprio acesso;
+  - num perfil, não acrescenta permissões que não tem (tirar pode).
+- Quem cadastra define uma senha provisória, e o usuário é obrigado a trocar no primeiro login: até trocar, a API só aceita a troca de senha. Para quem esqueceu, o administrador ou o gerente define outra provisória. A senha tem no mínimo 8 caracteres. Depois de trocada, diferencia maiúsculas de minúsculas, mesmo a de quem veio do VB6.
+- Na quinta senha errada seguida, o login fica bloqueado por 15 minutos. O administrador ou o gerente pode desbloquear antes (a senha provisória também desbloqueia).
+- Na importação, entram só os usuários ativos de funcionários ativos, com a senha do VB6 como provisória. Vendas e outros movimentos de quem não está mais ativo continuam ligados ao funcionário.
+- O usuário ganhou e-mail, para a recuperação de senha por e-mail, que vai ser feita depois. A autenticação em dois fatores também fica para depois.
+- Resultado em 02/11/2026: 50 usuários novos (40 da matriz, 4 a mais da Jundiaí e 6 a mais da La Viva) e o administrador, que foi ligado ao funcionário dele; 74 acessos. 7 estavam sem senha no VB6 e precisam de uma provisória.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.

@@ -65,6 +65,10 @@
                 </q-item-section>
               </q-item>
               <q-separator />
+              <q-item v-close-popup clickable :to="{ name: 'trocar-senha' }">
+                <q-item-section avatar><q-icon name="key" /></q-item-section>
+                <q-item-section>Trocar senha</q-item-section>
+              </q-item>
               <q-item v-close-popup clickable @click="sair">
                 <q-item-section avatar><q-icon name="logout" /></q-item-section>
                 <q-item-section>Sair</q-item-section>

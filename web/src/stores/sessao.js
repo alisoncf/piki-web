@@ -37,6 +37,8 @@ export const useSessaoStore = defineStore('sessao', () => {
 
   const logado = computed(() => !!token.value && !!usuario.value)
   const precisaEscolherEmpresa = computed(() => logado.value && !empresa.value)
+  // senha provisória (dada por quem cadastrou ou vinda do VB6): a API só libera a troca de senha
+  const precisaTrocarSenha = computed(() => logado.value && !!usuario.value?.trocar_senha)
   const podeTrocarEmpresa = computed(() => empresas.value.length > 1)
   /** primeira letra do primeiro e do último nome, para o avatar */
   const iniciais = computed(() => {
@@ -80,6 +82,12 @@ export const useSessaoStore = defineStore('sessao', () => {
     await carregarEu()
   }
 
+  async function trocarSenha(senhaAtual, senhaNova) {
+    await api.post('/auth/senha', { senha_atual: senhaAtual, senha_nova: senhaNova })
+    usuario.value = { ...usuario.value, trocar_senha: false }
+    if (empresa.value) await carregarEu() // as permissões, que a API não mostrava antes da troca
+  }
+
   function sair() {
     token.value = null
     usuario.value = null
@@ -107,7 +115,7 @@ export const useSessaoStore = defineStore('sessao', () => {
 
   return {
     token, usuario, empresa, empresas, permissoes, ultimaEmpresaId,
-    logado, precisaEscolherEmpresa, podeTrocarEmpresa, iniciais,
-    pode, entrar, escolherEmpresa, carregarEu, sair, restaurar,
+    logado, precisaEscolherEmpresa, precisaTrocarSenha, podeTrocarEmpresa, iniciais,
+    pode, entrar, escolherEmpresa, carregarEu, trocarSenha, sair, restaurar,
   }
 })

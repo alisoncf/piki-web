@@ -4,6 +4,7 @@
     python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
     python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
     python -m etl fornecedores --origem "mysql+pymysql://..." --empresa 01
+    python -m etl usuarios --origem "mysql+pymysql://..." --empresa 01
 
 Para um MariaDB local em que o root entra pela autenticação do Windows (sem
 senha), use o conector da MariaDB: mariadb+mariadbconnector://root@127.0.0.1:3306/requinte
@@ -23,6 +24,7 @@ from etl.clientes import importar_clientes
 from etl.empresas import ConflitoEmpresa, importar_empresas
 from etl.fornecedores import importar_fornecedores
 from etl.funcionarios import EmpresaNaoImportada, importar_funcionarios
+from etl.usuarios import importar_usuarios
 
 
 def _avisos(avisos: list[str], arquivo: str | None, na_tela: int = 30) -> None:
@@ -52,6 +54,9 @@ def main(argv: list[str] | None = None) -> None:
     fo.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     fo.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     fo.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
+    u = sub.add_parser("usuarios", help="importa os usuários (depois dos funcionários), com o perfil do nível")
+    u.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
+    u.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     args = p.parse_args(argv)
     # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
     sys.stdout.reconfigure(encoding="utf-8")
@@ -87,6 +92,12 @@ def main(argv: list[str] | None = None) -> None:
                       f"excluídos do banco novo: {r.excluidos}, mantidos por dívida em aberto: {r.mantidos_por_divida}, "
                       f"nomes corrigidos: {r.nomes_corrigidos}")
                 _avisos(r.avisos, args.avisos)
+            elif args.comando == "usuarios":
+                r = importar_usuarios(conexao, db, args.empresa)
+                print(f"perfis novos: {r.perfis_criados}")
+                print(f"usuários: {r.criados} novos, {r.ligados} já existentes; acessos novos: {r.acessos_criados}, "
+                      f"acessos desligados (inativos no VB6): {r.desligados}")
+                _avisos(r.avisos, None)
             elif args.comando == "fornecedores":
                 r = importar_fornecedores(conexao, db, args.empresa)
                 print(f"fornecedores: {r.criados} novos, {r.atualizados} atualizados, "

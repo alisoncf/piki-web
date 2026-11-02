@@ -36,9 +36,11 @@ Documentos relacionados:
 - [x] Comandos de administração (`python -m app.cli`): empresas, perfis, usuários, acessos — 30/10/2026
 - [x] Banco: PostgreSQL (D12), com `docker-compose.yml` para desenvolvimento; migração 0001 e testes validados no PostgreSQL 16 — 30/10/2026
 - [ ] Ativar o isolamento por empresa no banco (*row-level security*) junto com a primeira tabela por empresa
-- [ ] Telas de administração: cadastro de usuários, perfis e acessos (API + web)
-- [ ] Troca de senha pelo próprio usuário (desliga o modo "sem diferenciar maiúsculas" das senhas importadas)
-- [ ] Limitar tentativas de login (o VB6 bloqueia na 4ª tentativa)
+- [x] Telas de administração: cadastro de usuários, perfis e acessos (API + web), com as regras do gerente da loja (D23) — 02/11/2026
+- [x] Senha provisória e troca de senha pelo próprio usuário (desliga o modo "sem diferenciar maiúsculas" das senhas importadas) — 02/11/2026
+- [x] Bloqueio do login na quinta senha errada, por 15 minutos (migração 0015) — 02/11/2026
+- [ ] Recuperação de senha por e-mail
+- [ ] Autenticação em dois fatores (pelo menos para administradores e gerentes)
 - [x] Front-end `web/` (Vue 3 + Quasar + Pinia, D13): login, escolha e troca de empresa, menu conforme as permissões, lista de usuários — 30/10/2026
 - [x] Identidade visual: marca da Requinte Enxovais, ícone do Piki, cores e fonte (D14) — 30/10/2026
 - [x] Cor de identificação por empresa: faixa, selo, menu e aba do navegador (migração 0003) — 30/10/2026
@@ -60,7 +62,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [ ] Decidir onde guardar certificado digital e CSC de cada empresa (P10)
 - [ ] Agente da filial: dump do banco local e envio por HTTPS
 - [ ] Recebimento no servidor e carga na área de chegada (`legado_fXX`)
-- [ ] ETL de usuários (com a conversão de senhas e os perfis a partir de `tab_permissoes`)
+- [x] ETL de usuários, com a conversão de senhas e os perfis a partir do nível do VB6 (D23), rodado nas três cópias — 02/11/2026
 - [x] ETL de clientes, deduplicados por CPF/CNPJ, com setores, órgãos e grupos unificados (D15) — 30/10/2026
 - [ ] ETL de produtos
 - [ ] Depois de importar vendas e contas: excluir os clientes sem CPF/CNPJ válido que não têm movimento (D15)
@@ -73,7 +75,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [x] Fornecedores (D22): API (migração 0014), lista, ficha em página única com contatos e busca do CNPJ na BrasilAPI, e ETL rodado nas cópias da matriz, Jundiaí e La Viva (267 fornecedores) — 02/11/2026
 - [x] Funcionários e cargos: API, telas (lista, ficha, cargos) e ETL do VB6, com cadastro global, loja de lotação e telefones (migrações 0004 e 0005) — 30/10/2026
 - [x] Rodar o ETL de funcionários nos bancos da matriz (01) e da La Viva (03), em cópias locais, juntando os cadastros repetidos entre filiais (pelo CPF ou pelo nome) — 30/10/2026
-- [ ] Usuários ligados a funcionários (coluna `usuario.funcionario_id` já criada)
+- [x] Usuários ligados a funcionários (D23) — 02/11/2026
 - [x] Cidades do IBGE e cobradores (D16, D17): setor escolhe a cidade numa lista e tem vários cobradores, que são funcionários e valem para todas as lojas; o cliente não tem cidade própria, usa a do setor; migrações 0008 e 0009 e ETL refeito nas três cópias — 31/10/2026
 - [x] Funcionário com setor no endereço, no lugar de bairro, cidade e UF digitados; cliente sem o campo bairro (D17, migração 0010) — 31/10/2026
 - [x] Endereço pelo CEP (ViaCEP) nas fichas de cliente e funcionário, com o setor adivinhado pelo bairro ou cadastrado na hora (D18) — 31/10/2026
