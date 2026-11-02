@@ -22,7 +22,8 @@ def _http(erro: servico.ErroFornecedor) -> HTTPException:
 
 @router.get("/fornecedores", response_model=list[FornecedorResumo])
 def listar_fornecedores(
-    ctx: Annotated[Contexto, Depends(exige("fornecedores.ver"))],
+    # quem cadastra produto escolhe os fornecedores dele
+    ctx: Annotated[Contexto, Depends(exige("fornecedores.ver", "produtos.editar"))],
     busca: Annotated[str | None, Query(description="Parte da razão social, do fantasia, de um contato ou do CNPJ")] = None,
     so_ativos: bool = False,
 ) -> list[FornecedorResumo]:

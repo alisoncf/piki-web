@@ -33,7 +33,7 @@ Cada filial é uma **empresa** (CNPJ próprio). Os dados se dividem em três esc
 | Escopo | Exemplos | Regra |
 |---|---|---|
 | Global | clientes, produtos (cadastro), fornecedores, seções, formas de pagamento | Um cadastro só, visível em todas as empresas |
-| Por empresa | estoque, preço e custo do produto, notas fiscais de entrada e saída, vendas, caixa, inventário | Cada registro pertence a uma empresa; só aparece nela |
+| Por empresa | estoque, ~~preço e custo do produto~~ (D24: são do produto), notas fiscais de entrada e saída, vendas, caixa, inventário | Cada registro pertence a uma empresa; só aparece nela |
 | Por empresa, visível em todas | contas a receber (documentos e parcelas) | O documento pertence à empresa que vendeu, mas pode ser consultado e recebido em qualquer empresa. A baixa registra em qual empresa e em qual caixa o dinheiro entrou |
 
 Na prática: o cliente pode pagar o boleto ou a parcela em qualquer loja, e o caixa de quem recebeu é que registra a entrada.
@@ -183,6 +183,24 @@ Decisão do Alison.
 - O usuário ganhou e-mail, para a recuperação de senha por e-mail, que vai ser feita depois. A autenticação em dois fatores também fica para depois.
 - Resultado em 02/11/2026: 50 usuários novos (40 da matriz, 4 a mais da Jundiaí e 6 a mais da La Viva) e o administrador, que foi ligado ao funcionário dele; 74 acessos. 7 estavam sem senha no VB6 e precisam de uma provisória.
 
+### D24. Produtos e estoque (02/11/2026)
+
+Decisão do Alison. Substitui o trecho da D9 que punha preço e custo por empresa.
+
+- **Cadastro único, mantido pela matriz.** Já é assim no VB6: as outras lojas recebem os produtos da matriz, com os mesmos códigos. O código do VB6 (`cod_pro`) continua sendo o código do produto e o código de barras interno (impresso com 8 dígitos).
+- **Preço e custo são do produto**, iguais em todas as lojas. Mudar custo, margem e preços pede a permissão `produtos.precos` (no VB6, a marcação "altera preço" do usuário).
+- **Sem grade.** Cada tamanho ou cor é um produto, com o nome completo e o seu código de barras, como as lojas trabalham hoje.
+- **Classificação:** seção › subseção, como no VB6. A **marca** (quem fabrica) é separada do **fornecedor** (de quem a loja compra). O produto pode ter vários fornecedores, cada um com o código que ele usa para o produto, para ligar o item da nota de entrada ao produto.
+- **Unidade e fração:** a marcação "aceita fração" diz se o produto pode ser vendido com quantidade quebrada (passadeira por m²).
+- **Fotos:** várias por produto; a primeira é a principal.
+- **Preço de queima** continua como um campo do produto. O preço de atacado sai (não há venda em atacado). A sugestão de preço pela margem será revista na entrada de notas.
+- **Estoque por loja**, numa tabela própria (próximo passo): quantidade, reservado (consignação) e localização. Só um estoque: o fiscal passa a ser o real. Os movimentos (venda, entrada, envio e devolução de consignação, acerto, ajuste, inventário) ficam registrados; estoque negativo é permitido, com aviso.
+- **Impostos:** NCM, CEST e origem ficam no produto; o que depende do regime de cada empresa (CST/CSOSN, CFOP, alíquota de ICMS) fica no estoque de cada loja.
+- **Transferência entre lojas** não existe: tem que ser por nota, como uma remessa (fica para o fiscal).
+- **Saldo inicial:** o estoque de cada loja vai ser montado a partir do último inventário (31/12/2025), com as notas de saída e as entradas desde então. Fica para o passo do estoque.
+- **Importação:** só do banco da matriz. Inativo o produto sem venda, compra, cadastro ou alteração no último ano (em qualquer loja). Restos de farmácia do VB6 (princípio ativo, controle, fabricante, gênero, combustível, balança) e o preço de atacado não vêm.
+- Resultado em 02/11/2026: 13.474 produtos (6.689 ativos), 11 seções, 67 subseções, 1.703 códigos de barras de fábrica, 11.609 com fornecedor. 1.379 produtos ficaram sem fornecedor porque o fornecedor do VB6 não tem CNPJ válido (Karsten, Coteminas, Buchara...).
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
@@ -203,5 +221,5 @@ Decisão do Alison.
 - **P10.** Segredos fiscais por empresa: certificado digital A1 (`.pfx` e senha) e CSC da NFC-e (id e token). No VB6 ficam em texto puro na `sped_empresa`; o ETL não os lê. Proposta: os arquivos `.pfx` ficam no servidor, fora do repositório e do banco, e senhas e tokens ficam cifrados no banco com uma chave que só existe no `.env` do servidor (ou num cofre de segredos). Decidir antes da onda 6.
 - **P11.** Token no `localStorage` é simples, mas fica exposto se algum dia o front tiver uma falha de XSS. Antes de ir para produção, avaliar trocar por cookie `HttpOnly` emitido pela API, com renovação automática.
 - **P12.** Todas as filiais usam a marca Requinte Enxovais? Se alguma tiver outra marca, o logo e as cores passam para o cadastro da empresa e o visual muda ao trocar de empresa. Em 30/10/2026: a 03 tem nome fantasia La Viva Enxovais na `sped_empresa`; falta confirmar se ela usa outra marca na loja.
-- **P9.** Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.
+- **P9.** (02/11/2026: hoje as lojas recebem os produtos da matriz por uma API na internet; D24.) Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.
 - **P13.** ~~Códigos do cliente no VB6~~. `status_cli`: 1 liberado, 2 bloqueado. `cobranca_cli`: 1 em domicílio, 2 no trabalho, 3 na loja. O tipo da referência é o parentesco (`tab_tipopar`). Resolvido na D15 em 30/10/2026.

@@ -13,6 +13,7 @@ import sys
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import app.registro_modelos  # noqa: F401  (todos os modelos, para as relações entre domínios)
 from app.dominios.acesso import repositorio as repo
 from app.dominios.acesso import servico
 from app.dominios.empresas import servico as empresas

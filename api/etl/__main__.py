@@ -5,6 +5,7 @@
     python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
     python -m etl fornecedores --origem "mysql+pymysql://..." --empresa 01
     python -m etl usuarios --origem "mysql+pymysql://..." --empresa 01
+    python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun"
 
 Para um MariaDB local em que o root entra pela autenticação do Windows (sem
 senha), use o conector da MariaDB: mariadb+mariadbconnector://root@127.0.0.1:3306/requinte
@@ -24,6 +25,7 @@ from etl.clientes import importar_clientes
 from etl.empresas import ConflitoEmpresa, importar_empresas
 from etl.fornecedores import importar_fornecedores
 from etl.funcionarios import EmpresaNaoImportada, importar_funcionarios
+from etl.produtos import importar_produtos
 from etl.usuarios import importar_usuarios
 
 
@@ -57,6 +59,12 @@ def main(argv: list[str] | None = None) -> None:
     u = sub.add_parser("usuarios", help="importa os usuários (depois dos funcionários), com o perfil do nível")
     u.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     u.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
+    pr = sub.add_parser("produtos", help="importa seções, subseções e produtos do banco da matriz (depois dos fornecedores)")
+    pr.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6 da matriz")
+    pr.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
+    pr.add_argument("--outras", nargs="*", default=[],
+                    help="bancos das outras lojas, só para ver o que vendeu ou comprou no último ano (produto ativo)")
+    pr.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
     args = p.parse_args(argv)
     # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
     sys.stdout.reconfigure(encoding="utf-8")
@@ -105,6 +113,19 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"telefones novos: {r.telefones}, contatos novos: {r.contatos}")
                 print(f"descartados (sem CPF/CNPJ válido ou nome sem sentido): {r.descartados}, "
                       f"excluídos do banco novo: {r.excluidos}")
+                _avisos(r.avisos, args.avisos)
+            elif args.comando == "produtos":
+                outras = [create_engine(url) for url in args.outras]
+                try:
+                    conexoes = [o.connect() for o in outras]
+                    r = importar_produtos(conexao, db, args.empresa, conexoes)
+                finally:
+                    for o in outras:
+                        o.dispose()
+                print(f"seções novas: {r.secoes}, subseções novas: {r.subsecoes}")
+                print(f"produtos: {r.criados} novos, {r.atualizados} atualizados; {r.ativos} ativos, {r.inativos} inativos "
+                      f"(sem venda, compra ou alteração no último ano); {r.fracionados} aceitam fração")
+                print(f"códigos de barras novos: {r.codigos_barras}, fornecedores ligados: {r.fornecedores}")
                 _avisos(r.avisos, args.avisos)
     except (ConflitoEmpresa, EmpresaNaoImportada) as erro:
         print(f"erro: {erro}", file=sys.stderr)

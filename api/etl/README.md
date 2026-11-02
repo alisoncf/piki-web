@@ -27,6 +27,7 @@ python -m etl funcionarios --origem "mysql+pymysql://..." --empresa 01
 python -m etl clientes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-01.txt
 python -m etl fornecedores --origem "mysql+pymysql://..." --empresa 01 --avisos fornecedores-01.txt
 python -m etl usuarios --origem "mysql+pymysql://..." --empresa 01
+python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun" --avisos produtos.txt
 ```
 
 O destino é o banco do `.env`. Rode uma vez para cada banco de filial, nesta ordem: empresas, funcionários (os cobradores dos setores são funcionários), clientes, fornecedores e usuários (depois dos funcionários). A lista de cidades do IBGE vem da migração 0008 (`alembic upgrade head`). O `--empresa` diz de qual empresa é o banco de origem.
@@ -92,6 +93,19 @@ Decisão D23. Lê `tab_usuarios` com o `status_fun` da `tab_funcionarios`. Rode 
 - Na reimportação, o acesso de quem ficou inativo no VB6 é desligado, e o perfil mudado na tela continua.
 - As permissões por usuário da `tab_defusu` não são importadas.
 
+### Produtos
+
+Decisão D24. Lê `tab_secoes`, `tab_subsec`, `tab_produtos` e `tab_codbarras` só do banco da matriz, que é quem mantém o cadastro. Rode antes o ETL de fornecedores da matriz. Com `--outras`, lê também as vendas e compras dos bancos das outras lojas, só para saber se o produto está ativo.
+
+- O `cod_pro` vira o código do produto; as vendas e o estoque das lojas acham o produto por ele. Seções e subseções ficam no `legado_mapa`. Nome de seção com lixo no fim ("CAMA)</item") é cortado; subseção de seção que não existe vai para DIVERSOS.
+- Custo: `cf_pro` (o da última nota), ou o `cr_pro` se estiver zerado. Preço: `pv_pro`. Margem: `lucro_pro`. Queima: `pq_pro`, se for menor que o preço. O `pa_pro` (atacado) não vem.
+- Códigos de barras de `tab_codbarras`, `ean_pro` e `codbarra_pro`, só com 8 a 14 dígitos. O igual ao próprio código não vem (o código já é o código interno); o igual ao código de outro produto também não, por ser ambíguo. Repetido em dois produtos fica no de código maior.
+- O `cod_fab` é o fornecedor (código da `tab_fornecedores`). Fornecedor descartado por falta de CNPJ sai como aviso, e o produto fica sem ele.
+- Aceita fração: `fracionado_pro = 'S'`, ou já vendido com quantidade quebrada.
+- Ativo: vendido (venda não cancelada), comprado, ou cadastrado ou alterado (`dataalt_pro`) no último ano, na matriz ou nas `--outras`.
+- Na reimportação, os dados voltam a ser os do VB6; códigos de barras e fornecedores acrescentados no sistema novo ficam.
+- Princípio ativo, controle, fabricante, gênero, combustível e balança (restos de farmácia) não são importados. O estoque fica para o ETL do estoque.
+
 ## Situação
 
 | Parte | Status |
@@ -104,4 +118,5 @@ Decisão D23. Lê `tab_usuarios` com o `status_fun` da `tab_funcionarios`. Rode 
 | Importação de clientes, setores, órgãos e grupos (`clientes.py`) | pronta, com testes |
 | Importação de fornecedores (`fornecedores.py`) | pronta, com testes |
 | Importação de usuários (`usuarios.py`) | pronta, com testes |
+| Importação de produtos, seções e subseções (`produtos.py`) | pronta, com testes |
 | Demais domínios | acompanham as ondas do roteiro |

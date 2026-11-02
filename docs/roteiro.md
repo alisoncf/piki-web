@@ -64,7 +64,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [ ] Recebimento no servidor e carga na área de chegada (`legado_fXX`)
 - [x] ETL de usuários, com a conversão de senhas e os perfis a partir do nível do VB6 (D23), rodado nas três cópias — 02/11/2026
 - [x] ETL de clientes, deduplicados por CPF/CNPJ, com setores, órgãos e grupos unificados (D15) — 30/10/2026
-- [ ] ETL de produtos
+- [x] ETL de produtos, seções e subseções, do banco da matriz (D24) — 02/11/2026
 - [ ] Depois de importar vendas e contas: excluir os clientes sem CPF/CNPJ válido que não têm movimento (D15)
 - [ ] ETL dos demais domínios, acompanhando as ondas
 - [ ] Decidir se produtos cadastrados no sistema novo voltam para os VB6 durante a transição (P9)
@@ -106,7 +106,9 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 
 ## Onda 4 · Estoque e compras
 
-- [ ] Cadastro de produtos (global) com estoque, preço e custo por empresa (D9)
+- [x] Cadastro de produtos (D24): API (migração 0016), lista paginada pela API, ficha com códigos de barras, fornecedores e fotos, seções e marcas — 02/11/2026
+- [ ] Estoque por loja (D24): quantidade, reservado, localização e impostos da empresa, com os movimentos registrados
+- [ ] Saldo inicial do estoque: inventário de 31/12/2025 + notas de saída e entradas desde então
 - [ ] Entrada de notas e compras
 - [ ] Inventário e contagens
 - [ ] Perdas, movimento interno, etiquetas

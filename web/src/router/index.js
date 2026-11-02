@@ -146,6 +146,36 @@ export const rotas = [
         meta: { permissao: 'fornecedores.ver' },
       },
       {
+        path: 'cadastros/produtos',
+        name: 'produtos',
+        component: () => import('@/paginas/cadastros/ProdutosPagina.vue'),
+        meta: { permissao: 'produtos.ver' },
+      },
+      {
+        path: 'cadastros/produtos/novo',
+        name: 'produto-novo',
+        component: () => import('@/paginas/cadastros/ProdutoPagina.vue'),
+        meta: { permissao: 'produtos.editar' },
+      },
+      {
+        path: 'cadastros/produtos/:id(\\d+)',
+        name: 'produto',
+        component: () => import('@/paginas/cadastros/ProdutoPagina.vue'),
+        meta: { permissao: 'produtos.ver' },
+      },
+      {
+        path: 'cadastros/secoes',
+        name: 'secoes',
+        component: () => import('@/paginas/cadastros/SecoesPagina.vue'),
+        meta: { permissao: 'produtos.ver' },
+      },
+      {
+        path: 'cadastros/marcas',
+        name: 'marcas',
+        component: () => import('@/paginas/cadastros/MarcasPagina.vue'),
+        meta: { permissao: 'produtos.ver' },
+      },
+      {
         path: 'cadastros/cargos',
         name: 'cargos',
         component: () => import('@/paginas/cadastros/CargosPagina.vue'),

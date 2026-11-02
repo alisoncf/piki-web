@@ -3,7 +3,7 @@
   <q-page padding>
     <div class="row items-center q-mb-md">
       <div class="piki-titulo col">{{ titulo }}</div>
-      <q-btn v-if="podeEditar" color="primary" unelevated no-caps icon="add" :label="`Novo ${item}`" @click="abrir()" />
+      <q-btn v-if="podeEditar" color="primary" unelevated no-caps icon="add" :label="`${feminino ? 'Nova' : 'Novo'} ${item}`" @click="abrir()" />
     </div>
 
     <q-table
@@ -30,7 +30,7 @@
     <q-dialog v-model="dialogo">
       <q-card class="cartao-estreito">
         <q-form @submit.prevent="salvar">
-          <q-card-section class="piki-titulo">{{ editando.id ? `Editar ${item}` : `Novo ${item}` }}</q-card-section>
+          <q-card-section class="piki-titulo">{{ editando.id ? `Editar ${item}` : `${feminino ? 'Nova' : 'Novo'} ${item}` }}</q-card-section>
           <q-card-section class="q-gutter-sm q-pt-none">
             <q-input
               v-model="editando.nome"
@@ -62,6 +62,7 @@ import { useSessaoStore } from '@/stores/sessao'
 const props = defineProps({
   titulo: { type: String, required: true },
   item: { type: String, required: true }, // "grupo", "parentesco": vai nos botões
+  feminino: { type: Boolean, default: false }, // "Nova marca"
   url: { type: String, required: true },
   permissaoEditar: { type: String, required: true },
   tamanho: { type: Number, default: 40 },

@@ -22,6 +22,15 @@ export const MENU = [
       },
       { titulo: 'Fornecedores', icone: 'local_shipping', rota: '/cadastros/fornecedores', permissao: 'fornecedores.ver' },
       {
+        titulo: 'Produtos',
+        icone: 'inventory_2',
+        filhos: [
+          { titulo: 'Produtos', icone: 'inventory_2', rota: '/cadastros/produtos', permissao: 'produtos.ver' },
+          { titulo: 'Seções', icone: 'account_tree', rota: '/cadastros/secoes', permissao: 'produtos.ver' },
+          { titulo: 'Marcas', icone: 'sell', rota: '/cadastros/marcas', permissao: 'produtos.ver' },
+        ],
+      },
+      {
         titulo: 'Funcionários',
         icone: 'badge',
         filhos: [

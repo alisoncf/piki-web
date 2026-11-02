@@ -11,14 +11,14 @@ A nova versão tem banco único (PostgreSQL) para todas as empresas do grupo. Os
 ## Antes de começar uma tarefa
 
 1. Leia `docs/roteiro.md`: onde estamos e o que vem a seguir.
-2. Leia `docs/decisoes.md`: as decisões vigentes (D1, D5, D8 a D23) e as pendências (P1...). Não contrarie uma decisão vigente sem discutir com o Alison; se ela mudar, marque a antiga como substituída e registre a nova com data.
+2. Leia `docs/decisoes.md`: as decisões vigentes (D1, D5, D8 a D24) e as pendências (P1...). Não contrarie uma decisão vigente sem discutir com o Alison; se ela mudar, marque a antiga como substituída e registre a nova com data.
 3. Para regras de negócio do VB6, consulte `docs/legado/` (inventário por tela, mapa de tabelas e schema antigo) e o código do legado.
 
 ## Regras do domínio (D9, D10)
 
 - **Empresa** = filial com CNPJ próprio. Usuários acessam uma ou várias empresas, com um **perfil** em cada uma.
-- **Cadastros globais** (clientes, produtos, fornecedores...): uma cópia só, sem empresa.
-- **Dados por empresa** (estoque, preço e custo do produto, notas, vendas, caixa): sempre com `empresa_id`, e toda consulta filtra pela empresa ativa (`ctx.empresa_id`).
+- **Cadastros globais** (clientes, produtos, fornecedores...): uma cópia só, sem empresa. Preço e custo do produto são do produto, iguais em todas as lojas (D24).
+- **Dados por empresa** (estoque, notas, vendas, caixa): sempre com `empresa_id`, e toda consulta filtra pela empresa ativa (`ctx.empresa_id`).
 - **Contas a receber**: pertencem à empresa que vendeu, mas podem ser consultadas e recebidas em qualquer empresa; a baixa registra a empresa e o caixa de quem recebeu.
 - Toda rota de negócio usa `Depends(exige("area.acao"))`. Permissão nova vai em `app/nucleo/permissoes.py`.
 

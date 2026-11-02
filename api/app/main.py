@@ -7,6 +7,7 @@ from app.dominios.empresas.rotas import router as empresas
 from app.dominios.enderecos.rotas import router as enderecos
 from app.dominios.fornecedores.rotas import router as fornecedores
 from app.dominios.funcionarios.rotas import router as funcionarios
+from app.dominios.produtos.rotas import router as produtos
 from app.dominios.sistema.rotas import router as sistema
 
 app = FastAPI(
@@ -23,3 +24,4 @@ app.include_router(cidades)
 app.include_router(clientes)
 app.include_router(enderecos)
 app.include_router(fornecedores)
+app.include_router(produtos)

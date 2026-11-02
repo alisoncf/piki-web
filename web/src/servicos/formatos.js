@@ -87,3 +87,27 @@ export function semAcentos(texto) {
 export function nomeSetor(setor) {
   return setor ? (setor.cidade ? `${setor.nome} (${setor.cidade.nome} - ${setor.cidade.uf})` : setor.nome) : ''
 }
+
+/** Valor em reais da API ("1234.5") para exibir: R$ 1.234,50. Vazio fica vazio. */
+export function formatarMoeda(valor) {
+  if (valor === null || valor === undefined || valor === '') return ''
+  return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+/** Código do produto como sai no código de barras interno: 00012345. */
+export function formatarCodigoProduto(codigo) {
+  return String(codigo ?? '').padStart(8, '0')
+}
+
+/** Origem da mercadoria na NF-e. */
+export const ORIGENS = [
+  { value: 0, label: '0 - Nacional' },
+  { value: 1, label: '1 - Estrangeira, importação direta' },
+  { value: 2, label: '2 - Estrangeira, comprada no mercado interno' },
+  { value: 3, label: '3 - Nacional, com mais de 40% de conteúdo importado' },
+  { value: 4, label: '4 - Nacional, produzida conforme processos básicos' },
+  { value: 5, label: '5 - Nacional, com até 40% de conteúdo importado' },
+  { value: 6, label: '6 - Estrangeira, importação direta, sem similar nacional' },
+  { value: 7, label: '7 - Estrangeira, mercado interno, sem similar nacional' },
+  { value: 8, label: '8 - Nacional, com mais de 70% de conteúdo importado' },
+]

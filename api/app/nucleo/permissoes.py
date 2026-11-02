@@ -16,6 +16,9 @@ PERMISSOES: dict[str, str] = {
     "clientes.documentos": "Ver e enviar documentos dos clientes (crediário; dados pessoais protegidos pela LGPD)",
     "fornecedores.ver": "Consultar fornecedores",
     "fornecedores.editar": "Cadastrar e alterar fornecedores",
+    "produtos.ver": "Consultar produtos, seções e marcas",
+    "produtos.editar": "Cadastrar e alterar produtos, seções e marcas",
+    "produtos.precos": "Alterar custo, margem e preços dos produtos",
 }
 
 # nome de cada área (a parte antes do ponto), para agrupar as permissões na tela de perfis
@@ -24,4 +27,5 @@ AREAS: dict[str, str] = {
     "funcionarios": "Funcionários",
     "clientes": "Clientes",
     "fornecedores": "Fornecedores",
+    "produtos": "Produtos",
 }
