@@ -189,8 +189,11 @@ def test_lista_vence_e_cancela(banco, cliente, cenario, loja, admin):
     assert [v["id"] for v in cliente.get("/vendas", headers=davi, params={"minhas": True}).json()["itens"]] == [primeira["id"]]
     assert cliente.post(f"/vendas/{primeira['id']}/receber", headers=davi, json={"sessao_caixa_id": loja["sessao"]}).status_code == 422
 
-    venda = cliente.post(f"/vendas/{segunda['id']}/cancelar", headers=davi, json={"motivo": "Cliente desistiu"}).json()
-    assert (venda["situacao"], venda["cancelada_por"]["nome"]) == ("cancelada", "Davi Sem Acesso")
+    r = cliente.post(f"/vendas/{segunda['id']}/cancelar", headers=admin, json={"motivo": "Cliente desistiu"})
+    assert r.status_code == 422 and "descarte" in r.json()["detail"]  # a aberta não se cancela: descarta
+    venda = cliente.post(f"/vendas/{segunda['id']}/descartar", headers=davi, json={"motivo": "Cliente desistiu"}).json()
+    assert (venda["situacao"], venda["cancelada_por"]["nome"]) == ("descartada", "Davi Sem Acesso")
+    assert cliente.get("/vendas", headers=davi, params={"situacao": "descartada"}).json()["total"] == 1
     # de outra loja não vê
     bia = _auth(cliente, "bia", cenario["e2"])
     assert cliente.get(f"/vendas/{primeira['id']}", headers=bia).status_code == 403  # sem permissão de vendas na 02
@@ -299,6 +302,8 @@ def test_cancelar_venda_recebida(banco, cliente, cenario, loja, admin):
     # o davi vende e recebe, mas não cancela a recebida
     r = cliente.post(f"{url}/cancelar", headers=loja["davi"], json={"motivo": "Cliente desistiu"})
     assert r.status_code == 403 and "vendas.cancelar" in r.json()["detail"]
+    r = cliente.post(f"{url}/descartar", headers=loja["davi"], json={"motivo": "Cliente desistiu"})
+    assert r.status_code == 422  # a efetivada não se descarta
 
     # com o caixa do recebimento aberto: os lançamentos são estornados, o estoque volta
     venda = cliente.post(f"{url}/cancelar", headers=admin, json={"motivo": "Cliente desistiu"}).json()

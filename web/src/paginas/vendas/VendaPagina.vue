@@ -6,15 +6,10 @@
       <template v-if="venda">
         <q-badge :color="CORES[venda.situacao]" class="q-mr-md">{{ SITUACOES[venda.situacao] }}</q-badge>
         <q-btn v-if="venda.entrega && (fechada || venda.situacao === 'recebida')" flat no-caps icon="local_shipping" label="Canhoto de entrega" :to="{ name: 'canhoto-entrega', params: { id: venda.id } }" />
-        <q-btn
-          v-if="((aberta || fechada) && podeVender) || (venda.situacao === 'recebida' && sessao.pode('vendas.cancelar'))"
-          flat
-          no-caps
-          color="negative"
-          icon="close"
-          label="Cancelar venda"
-          @click="cancelar"
-        />
+        <q-btn v-if="(aberta || fechada) && podeVender" flat no-caps color="grey-8" icon="delete_outline" label="Descartar" @click="descartar">
+          <q-tooltip>O cliente desistiu: a venda fica descartada, com o motivo (não gerou nada para desfazer)</q-tooltip>
+        </q-btn>
+        <q-btn v-if="venda.situacao === 'recebida' && sessao.pode('vendas.cancelar')" flat no-caps color="negative" icon="close" label="Cancelar venda" @click="cancelar" />
         <q-btn v-if="fechada && (podeVender || podeReceber)" flat no-caps icon="lock_open" label="Reabrir" class="q-ml-sm" @click="reabrir" />
         <q-btn v-if="aberta && podeVender" unelevated no-caps color="primary" icon="done_all" label="Fechar venda" class="q-ml-sm" :loading="fechando" @click="fechar" />
         <q-btn v-if="fechada && podeReceber" unelevated no-caps color="primary" icon="point_of_sale" label="Receber" class="q-ml-sm" :to="{ name: 'receber-venda', params: { id: venda.id } }" />
@@ -257,6 +252,9 @@
             </div>
             <div v-if="venda.troco !== null">Recebido {{ formatarMoeda(venda.valor_recebido) }} · troco {{ formatarMoeda(venda.troco) }}</div>
           </template>
+          <div v-if="venda.situacao === 'descartada'">
+            Descartada por {{ venda.cancelada_por?.nome }} · {{ formatarDataHora(venda.cancelada_em) }}: {{ venda.motivo_cancelamento }}
+          </div>
           <div v-if="venda.situacao === 'cancelada'">
             Cancelada por {{ venda.cancelada_por?.nome }} · {{ formatarDataHora(venda.cancelada_em) }}: {{ venda.motivo_cancelamento }}
           </div>
@@ -328,8 +326,8 @@ import { formatarCodigoProduto, formatarDataHora, formatarMoeda, formatarQuantid
 import { useCaixaDaMaquinaStore } from '@/stores/caixaDaMaquina'
 import { useSessaoStore } from '@/stores/sessao'
 
-const SITUACOES = { aberta: 'Aberta', fechada: 'Fechada', recebida: 'Recebida', cancelada: 'Cancelada', vencida: 'Vencida' }
-const CORES = { aberta: 'warning', fechada: 'primary', recebida: 'positive', cancelada: 'grey', vencida: 'grey-7' }
+const SITUACOES = { aberta: 'Aberta', fechada: 'Fechada', recebida: 'Recebida', cancelada: 'Cancelada', descartada: 'Descartada', vencida: 'Vencida' }
+const CORES = { aberta: 'warning', fechada: 'primary', recebida: 'positive', cancelada: 'negative', descartada: 'grey', vencida: 'grey-7' }
 const SEM_CONSUMIDOR = { nome: '', cpf: '', aniversario: '', telefone: '', email: '' }
 const SEM_ENTREGA = { taxa: '', cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade_id: null, ponto_referencia: '', telefone: '' }
 
@@ -601,20 +599,29 @@ function buscarClientes(texto, atualizar, cancelar) {
     .catch(() => cancelar())
 }
 
+/** O cliente desistiu da venda aberta ou fechada: fica descartada (não se apaga), com o motivo. */
+function descartar() {
+  $q.dialog({
+    title: 'Descartar venda',
+    message: 'A venda não gerou nada (caixa, estoque, carnê), então só fica marcada como descartada. Por que o cliente desistiu?',
+    prompt: { model: '', type: 'text', outlined: true, isValid: (v) => !!v.trim() },
+    cancel: { flat: true, label: 'Voltar' },
+    ok: { label: 'Descartar', color: 'grey-8' },
+  }).onOk((motivo) => enviar(() => api.post(`${url.value}/descartar`, { motivo })))
+}
+
+/** Cancela a venda efetivada: desfaz o caixa, o estoque e o carnê (a NFC-e é cancelada à parte). */
 function cancelar() {
-  const recebida = venda.value.situacao === 'recebida'
   $q.dialog({
     title: 'Cancelar venda',
-    message: recebida
-      ? 'A venda recebida é desfeita: o dinheiro sai do caixa, os produtos voltam ao estoque e o carnê deixa de ser devido. '
-        + 'A NFC-e é cancelada à parte. Por que a venda está sendo cancelada?'
-      : 'Por que a venda está sendo cancelada?',
+    message: 'A venda recebida é desfeita: o dinheiro sai do caixa, os produtos voltam ao estoque e o carnê deixa de ser devido. '
+      + 'A NFC-e é cancelada à parte. Por que a venda está sendo cancelada?',
     prompt: { model: '', type: 'text', outlined: true, isValid: (v) => !!v.trim() },
     cancel: { flat: true, label: 'Voltar' },
     ok: { label: 'Cancelar venda', color: 'negative' },
   }).onOk(async (motivo) => {
     // se o caixa do recebimento já fechou, o dinheiro sai pelo caixa deste computador
-    const caixa = recebida ? await caixaDaMaquina.sessaoAberta().catch(() => ({})) : {}
+    const caixa = await caixaDaMaquina.sessaoAberta().catch(() => ({}))
     enviar(() => api.post(`${url.value}/cancelar`, { motivo, sessao_caixa_id: caixa.sessao?.id ?? null }))
   })
 }

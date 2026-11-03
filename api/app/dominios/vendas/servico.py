@@ -33,7 +33,7 @@ from app.dominios.vendas.esquemas import (
     VendaDados,
 )
 from app.dominios.vendas.modelos import (
-    ABERTA, CANCELADA, DIAS_PARA_CANCELAR, DIAS_PARA_VENCER, FECHADA, RECEBIDA, SITUACOES, VENCIDA, Consumidor, EntregaVenda, ItemVenda,
+    ABERTA, CANCELADA, DESCARTADA, DIAS_PARA_CANCELAR, DIAS_PARA_VENCER, FECHADA, RECEBIDA, SITUACOES, VENCIDA, Consumidor, EntregaVenda, ItemVenda,
     PagamentoVenda, Venda,
 )
 from app.nucleo.textos import moeda
@@ -440,11 +440,12 @@ def buscar_cpf(db: Session, cpf: str) -> tuple[Cliente | None, Consumidor | None
             db.scalar(select(Consumidor).where(Consumidor.cpf == cpf)))
 
 
-def cancelar(db: Session, empresa_id: int, usuario_id: int, venda_id: int, motivo: str) -> Venda:
-    """A venda aberta ou fechada, que ainda não gerou nada (caixa, estoque, carnê, nota): só muda a situação.
-    O cancelamento que desfaz tudo é o da venda efetivada (cancelar_recebida)."""
+def descartar(db: Session, empresa_id: int, usuario_id: int, venda_id: int, motivo: str) -> Venda:
+    """A venda aberta ou fechada em que o cliente desistiu: não gerou nada (caixa, estoque, carnê, nota), então só
+    fica marcada, com quem, quando e por quê. Não se apaga: a numeração fica sem buraco e o descarte fica à vista.
+    O cancelamento, que desfaz tudo, é só da venda efetivada (cancelar_recebida)."""
     venda = _na_situacao(db, empresa_id, venda_id, ABERTA, FECHADA)
-    venda.situacao = CANCELADA
+    venda.situacao = DESCARTADA
     venda.cancelada_em = datetime.now()
     venda.cancelada_por_id = usuario_id
     venda.motivo_cancelamento = motivo
@@ -458,7 +459,11 @@ def cancelar_recebida(db: Session, empresa_id: int, usuario_id: int, venda_id: i
 
     O caixa: se o do recebimento ainda está aberto, os lançamentos da venda são estornados; se já fechou, sai o
     mesmo valor, em cada forma, pelo caixa aberto informado (o do computador)."""
-    venda = _na_situacao(db, empresa_id, venda_id, RECEBIDA)
+    venda = obter(db, empresa_id, venda_id)
+    if venda.situacao in (ABERTA, FECHADA):
+        raise DadoInvalido("Esta venda não foi efetivada: em vez de cancelar, descarte")
+    if venda.situacao != RECEBIDA:
+        raise DadoInvalido(f"Esta venda está {SITUACOES[venda.situacao].lower()}")
     if venda.recebida_em < datetime.now() - timedelta(days=DIAS_PARA_CANCELAR):
         raise DadoInvalido(f"A venda foi recebida há mais de {DIAS_PARA_CANCELAR} dias e não pode mais ser cancelada")
     conta = contas.conta_da_venda(db, venda.id)

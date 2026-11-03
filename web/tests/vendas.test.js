@@ -334,4 +334,22 @@ describe('vendas', () => {
     expect(post).toHaveBeenCalledWith('/vendas/3/reabrir')
     expect(router.currentRoute.value.name).toBe('vendas')
   })
+
+  it('a venda aberta é descartada, com o motivo', async () => {
+    entrar(['vendas.vender'])
+    vi.spyOn(api, 'get').mockImplementation(gets(COM_ITEM))
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...COM_ITEM, situacao: 'descartada', motivo_cancelamento: 'Achou caro' } })
+    const { wrapper } = await montar(VendaPagina, '/vendas/3')
+    expect(botao(wrapper, 'Cancelar venda')).toBeUndefined() // cancelar é só da efetivada
+    await botao(wrapper, 'Descartar').trigger('click')
+    await flushPromises()
+    const motivo = document.querySelector('.q-dialog input')
+    motivo.value = 'Achou caro'
+    motivo.dispatchEvent(new Event('input'))
+    await flushPromises()
+    ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.trim() === 'Descartar').click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/vendas/3/descartar', { motivo: 'Achou caro' })
+    expect(wrapper.text()).toContain('Descartada')
+  })
 })

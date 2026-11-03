@@ -62,10 +62,11 @@ const SITUACOES = [
   { label: 'Fechadas', value: 'fechada' },
   { label: 'Recebidas', value: 'recebida' },
   { label: 'Canceladas', value: 'cancelada' },
+  { label: 'Descartadas', value: 'descartada' },
   { label: 'Vencidas', value: 'vencida' },
   { label: 'Todas', value: null },
 ]
-const CORES = { aberta: 'warning', fechada: 'primary', recebida: 'positive', cancelada: 'grey', vencida: 'grey-7' }
+const CORES = { aberta: 'warning', fechada: 'primary', recebida: 'positive', cancelada: 'negative', descartada: 'grey', vencida: 'grey-7' }
 const nomeSituacao = (s) => SITUACOES.find((x) => x.value === s)?.label.slice(0, -1) ?? s
 
 const $q = useQuasar()

@@ -22,9 +22,11 @@ from app.nucleo.banco import Base, ComDatas
 ABERTA = "aberta"  # o vendedor está montando
 FECHADA = "fechada"  # o vendedor fechou com o cliente; espera o caixa
 RECEBIDA = "recebida"
-CANCELADA = "cancelada"
+CANCELADA = "cancelada"  # a efetivada (recebida) desfeita: estornou caixa, estoque, carnê
+DESCARTADA = "descartada"  # a aberta ou fechada em que o cliente desistiu: não gerou nada
 VENCIDA = "vencida"
-SITUACOES = {ABERTA: "Aberta", FECHADA: "Fechada", RECEBIDA: "Recebida", CANCELADA: "Cancelada", VENCIDA: "Vencida"}
+SITUACOES = {ABERTA: "Aberta", FECHADA: "Fechada", RECEBIDA: "Recebida", CANCELADA: "Cancelada",
+             DESCARTADA: "Descartada", VENCIDA: "Vencida"}
 
 DIAS_PARA_VENCER = 10
 # a venda recebida só pode ser cancelada nestes dias depois de recebida (o Alison pediu um prazo curto)
@@ -85,6 +87,7 @@ class Venda(ComDatas, Base):
     modelo_nota: Mapped[str] = mapped_column(String(2), server_default="65", default="65")  # 65 NFC-e, 55 NF-e
     # quem autorizou o crediário acima do limite disponível do cliente
     limite_autorizado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    # quem cancelou (a efetivada) ou descartou (a aberta ou fechada), quando e por quê
     cancelada_em: Mapped[datetime | None] = mapped_column(DateTime)
     cancelada_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
     motivo_cancelamento: Mapped[str | None] = mapped_column(String(200))
