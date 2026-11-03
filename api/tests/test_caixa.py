@@ -72,12 +72,21 @@ def test_abrir_lancar_e_fechar(banco, cliente, cenario, admin, operador, formas)
     url = f"/caixas/sessoes/{sessao['id']}"
     lancar = lambda dados, quem=operador: cliente.post(f"{url}/lancamentos", headers=quem, json=dados)  # noqa: E731
     assert lancar({"motivo": "suprimento", "valor": "50"}).json()["forma_pagamento"]["nome"] == "Dinheiro"
-    assert lancar({"motivo": "despesa", "valor": "12.50", "historico": "Pão"}).status_code == 201
+    # a despesa e a outra entrada levam a conta do plano de contas, do tipo certo
+    lanche = cliente.post("/plano-contas", headers=admin, json={"tipo": "despesa", "nome": "Lanches"}).json()
+    diversas = cliente.post("/plano-contas", headers=admin, json={"tipo": "receita", "nome": "Receitas diversas"}).json()
+    assert cliente.post("/plano-contas", headers=admin, json={"tipo": "despesa", "nome": "lanches"}).status_code == 409
+    assert lancar({"motivo": "despesa", "valor": "12.50", "historico": "Pão"}).status_code == 422  # sem a conta
+    r = lancar({"motivo": "despesa", "valor": "12.50", "historico": "Pão", "plano_conta_id": diversas["id"]})
+    assert r.status_code == 422 and "não é uma conta de despesa" in r.json()["detail"]
+    r = lancar({"motivo": "despesa", "valor": "12.50", "historico": "Pão", "plano_conta_id": lanche["id"]})
+    assert r.status_code == 201 and r.json()["plano_conta"]["nome"] == "Lanches"
     assert lancar({"motivo": "despesa", "valor": "1"}).status_code == 422  # sem dizer do que é
     assert lancar({"motivo": "vale", "valor": "30"}).status_code == 422  # sem funcionário
     vale = lancar({"motivo": "vale", "valor": "30", "funcionario_id": funcionario_id}).json()
     assert (vale["tipo"], vale["funcionario"]["nome"]) == ("saida", "Laura Ficticia")
-    assert lancar({"motivo": "outra_entrada", "valor": "80", "forma_pagamento_id": formas["pix"], "historico": "Acerto"}).status_code == 201
+    assert lancar({"motivo": "outra_entrada", "valor": "80", "forma_pagamento_id": formas["pix"], "historico": "Acerto",
+                   "plano_conta_id": diversas["id"]}).status_code == 201
     errado = lancar({"motivo": "sangria", "valor": "999"}).json()
     r = cliente.post(f"{url}/lancamentos/{errado['id']}/estornar", headers=operador)
     assert r.json()["estornado_por"]["nome"] == "Davi Sem Acesso"

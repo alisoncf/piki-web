@@ -108,6 +108,7 @@ class Lancamento(BaseModel):
     valor: Decimal
     historico: str | None
     funcionario: Pessoa | None
+    plano_conta: Pessoa | None = Field(default=None, description="A conta do plano de contas (id e nome)")
     documento: str | None
     usuario: Pessoa
     estornado_em: datetime | None
@@ -120,6 +121,8 @@ class LancamentoDados(BaseModel):
     forma_pagamento_id: int | None = Field(default=None, description="Vazio: dinheiro")
     historico: str | None = Field(default=None, max_length=80)
     funcionario_id: int | None = Field(default=None, description="Obrigatório no vale e na comissão")
+    plano_conta_id: int | None = Field(
+        default=None, description="Obrigatório na despesa (conta de despesa) e na outra entrada (conta de receita)")
 
     @field_validator("historico", mode="before")
     @classmethod

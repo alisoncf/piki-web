@@ -238,6 +238,12 @@ export const rotas = [
         meta: { permissao: 'receber.ver' },
       },
       {
+        path: 'financeiro/plano-contas',
+        name: 'plano-contas',
+        component: () => import('@/paginas/financeiro/PlanoContasPagina.vue'),
+        meta: { permissao: 'financeiro.plano' },
+      },
+      {
         path: 'financeiro/contas-cobranca',
         name: 'contas-cobranca',
         component: () => import('@/paginas/financeiro/ContasCobrancaPagina.vue'),

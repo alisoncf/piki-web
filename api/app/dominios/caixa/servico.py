@@ -10,6 +10,7 @@ from app.dominios.caixa.esquemas import CaixaDados, FormaDados, LancamentoDados,
 from app.dominios.caixa.modelos import (
     ABERTO, FECHADO, MOTIVOS, Caixa, ConferenciaCaixa, FormaPagamento, LancamentoCaixa, SessaoCaixa,
 )
+from app.dominios.financeiro.modelos import ContaPlano
 from app.dominios.funcionarios.modelos import Funcionario
 
 ZERO = Decimal("0.00")
@@ -157,9 +158,20 @@ def lancar(db: Session, empresa_id: int, sessao_id: int, dados: LancamentoDados,
         raise DadoInvalido("Funcionário não encontrado")
     if dados.motivo in ("despesa", "outra_entrada") and not dados.historico:
         raise DadoInvalido("Diga do que é o lançamento")
+    # a despesa vai para uma conta de despesa; a outra entrada, para uma de receita
+    tipo_conta = {"despesa": "despesa", "outra_entrada": "receita"}.get(dados.motivo)
+    if tipo_conta:
+        conta = db.get(ContaPlano, dados.plano_conta_id) if dados.plano_conta_id else None
+        if conta is None or not conta.ativo:
+            raise DadoInvalido(f"Escolha a conta de {tipo_conta} no plano de contas")
+        if conta.tipo != tipo_conta:
+            raise DadoInvalido(f"{conta.nome} não é uma conta de {tipo_conta}")
+    elif dados.plano_conta_id is not None:
+        raise DadoInvalido("Só a despesa e a outra entrada levam conta do plano de contas")
     lancamento = LancamentoCaixa(
         sessao_id=sessao.id, tipo=MOTIVOS[dados.motivo][0], motivo=dados.motivo, forma_pagamento_id=forma.id,
         valor=dados.valor, historico=dados.historico, funcionario_id=dados.funcionario_id, usuario_id=usuario_id,
+        plano_conta_id=dados.plano_conta_id,
     )
     db.add(lancamento)
     db.commit()

@@ -8,6 +8,7 @@ from app.dominios.empresas.rotas import router as empresas
 from app.dominios.enderecos.rotas import router as enderecos
 from app.dominios.entradas.rotas import router as entradas
 from app.dominios.estoque.rotas import router as estoque
+from app.dominios.financeiro.rotas import router as financeiro
 from app.dominios.fornecedores.rotas import router as fornecedores
 from app.dominios.funcionarios.rotas import router as funcionarios
 from app.dominios.produtos.rotas import router as produtos
@@ -33,5 +34,6 @@ app.include_router(produtos)
 app.include_router(estoque)
 app.include_router(entradas)
 app.include_router(caixa)
+app.include_router(financeiro)
 app.include_router(vendas)
 app.include_router(receber)

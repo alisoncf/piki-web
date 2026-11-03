@@ -86,7 +86,7 @@ Decisão D8. Pode avançar em paralelo com as ondas 1 e 2. Detalhes em [`../api/
 - [x] Cadastro repetido com nome sem sentido não manda nos dados do cliente com o mesmo CPF (D21) — 02/11/2026
 - [x] Ficha do cliente em página única com índice fixo das partes; menu lateral fixo ao rolar — 02/11/2026
 - [ ] Nomes do VB6 hoje em maiúsculas (setores, clientes...) passarem para maiúsculas só nas iniciais; os cadastros novos já são gravados assim
-- [ ] Bancos, formas de pagamento, plano de contas
+- [~] Bancos, formas de pagamento, plano de contas: formas de pagamento (D26) e plano de contas cadastrável, ligado à despesa e à outra entrada do caixa (D28, migração 0033) — 03/11/2026; faltam os bancos e as contas bancárias
 
 ## Onda 2 · Relatórios
 

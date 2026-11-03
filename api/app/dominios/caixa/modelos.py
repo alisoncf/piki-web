@@ -11,6 +11,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.acesso.modelos import Usuario
+from app.dominios.financeiro.modelos import ContaPlano
 from app.dominios.funcionarios.modelos import Funcionario
 from app.nucleo.banco import Base, ComDatas
 
@@ -123,6 +124,8 @@ class LancamentoCaixa(Base):
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # sempre positivo; o tipo diz se entra ou sai
     historico: Mapped[str | None] = mapped_column(String(80))
     funcionario_id: Mapped[int | None] = mapped_column(ForeignKey("funcionario.id"))  # do vale ou da comissão
+    # na despesa e na outra entrada: para onde foi (ou de onde veio) o dinheiro, no plano de contas
+    plano_conta_id: Mapped[int | None] = mapped_column(ForeignKey("plano_conta.id"))
     documento: Mapped[str | None] = mapped_column(String(40))  # "venda 123"
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
     # o lançamento errado não some: é estornado, com quem e quando
@@ -132,6 +135,7 @@ class LancamentoCaixa(Base):
     sessao: Mapped[SessaoCaixa] = relationship(back_populates="lancamentos")
     forma_pagamento: Mapped[FormaPagamento] = relationship(lazy="joined")
     funcionario: Mapped[Funcionario | None] = relationship(lazy="joined")
+    plano_conta: Mapped[ContaPlano | None] = relationship(lazy="joined")
     usuario: Mapped[Usuario] = relationship(foreign_keys=[usuario_id], lazy="joined")
     estornado_por: Mapped[Usuario | None] = relationship(foreign_keys=[estornado_por_id], lazy="joined")
 

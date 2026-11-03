@@ -75,7 +75,7 @@
               <q-td key="motivo" :props="props">
                 {{ props.row.descricao_motivo }}
                 <div class="text-caption text-suave">
-                  {{ [props.row.historico, props.row.funcionario?.nome, props.row.documento].filter(Boolean).join(' · ') }}
+                  {{ [props.row.plano_conta?.nome, props.row.historico, props.row.funcionario?.nome, props.row.documento].filter(Boolean).join(' · ') }}
                 </div>
               </q-td>
               <q-td key="forma" :props="props">{{ props.row.forma_pagamento.nome }}</q-td>
@@ -120,6 +120,18 @@
               :opcoes="funcionarios"
               label="Funcionário *"
               :rules="[(v) => !!v || 'Escolha o funcionário']"
+            />
+            <q-select
+              v-if="tipoDaConta"
+              v-model="novo.plano_conta_id"
+              outlined
+              :label="tipoDaConta === 'despesa' ? 'Conta de despesa *' : 'Conta de receita *'"
+              hint="Do plano de contas: para onde foi (ou de onde veio) o dinheiro"
+              :options="planoContas.filter((c) => c.tipo === tipoDaConta)"
+              option-value="id"
+              option-label="nome"
+              emit-value
+              map-options
             />
             <q-input v-model="novo.historico" outlined label="Histórico" maxlength="80" :hint="['despesa', 'outra_entrada'].includes(novo.motivo) ? 'Obrigatório: diga do que é' : ''" />
           </q-card-section>
@@ -191,6 +203,9 @@ const formas = ref([])
 const funcionarios = ref([])
 const lancando = ref(false)
 const novo = ref({})
+const planoContas = ref([])
+// a despesa vai para uma conta de despesa; a outra entrada, para uma de receita
+const tipoDaConta = computed(() => ({ despesa: 'despesa', outra_entrada: 'receita' })[novo.value.motivo] ?? null)
 const fechando = ref(false)
 const contagem = ref({})
 const observacao = ref('')
@@ -238,8 +253,15 @@ onMounted(async () => {
 
 async function novoLancamento(tipo) {
   const dinheiro = formas.value.find((f) => f.tipo === 'dinheiro')
-  novo.value = { tipo, motivo: MOTIVOS[tipo][0].value, valor: '', forma_pagamento_id: dinheiro?.id ?? null, historico: '', funcionario_id: null }
+  novo.value = { tipo, motivo: MOTIVOS[tipo][0].value, valor: '', forma_pagamento_id: dinheiro?.id ?? null, historico: '', funcionario_id: null, plano_conta_id: null }
   lancando.value = true
+  if (!planoContas.value.length) {
+    try {
+      planoContas.value = (await api.get('/plano-contas', { params: { so_ativas: true } })).data
+    } catch {
+      /* sem o plano, a despesa não sai */
+    }
+  }
   if (!funcionarios.value.length) {
     try {
       funcionarios.value = (await api.get('/funcionarios', { params: { so_ativos: true } })).data
@@ -256,6 +278,7 @@ async function lancar() {
     const { data } = await api.post(`/caixas/sessoes/${s.value.id}/lancamentos`, {
       ...dados, valor: String(dados.valor), historico: dados.historico || null,
       funcionario_id: ['vale', 'comissao'].includes(dados.motivo) ? dados.funcionario_id : null,
+      plano_conta_id: tipoDaConta.value ? dados.plano_conta_id : null,
     })
     s.value.lancamentos.push(data)
     lancando.value = false

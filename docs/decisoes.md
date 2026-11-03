@@ -327,6 +327,15 @@ Explicação do Alison. A conta de cobrança (`tab_contacob` do VB6) diz onde o 
   - O histórico do VB6 (`tab_itdocpre`) foi importado só das parcelas em aberto, como o Alison deixou simplificar: a que mudou o vencimento vira prorrogação; a que só tem o texto, anotação do contato.
 - **Cobrança em lote** (a tela "Cobrança" do VB6 fica como ações da mesma tela de contas a receber): mudar as selecionadas de conta de cobrança, e bloquear ou liberar os clientes delas (o bloqueio por atraso é à mão); cada bloqueio fica anotado na ficha do cliente. Bloquear pede `receber.cobranca` ou `clientes.editar`.
 
+### D28. Plano de contas (03/11/2026)
+
+Decisão do Alison.
+
+- O **motivo** do lançamento do caixa (entrada de troco, despesa, vale...) continua fixo no código: diz que operação é, e o sistema muda de comportamento por ele (o vale pede o funcionário, a despesa pede o histórico).
+- O **plano de contas** é outra coisa, parecida com centro de custo: diz para onde foi (despesa) ou de onde veio (receita) o dinheiro, para os relatórios. É **cadastrável**, uma lista só para todas as lojas, com contas de receita e de despesa (Financeiro › Plano de contas, permissão `financeiro.plano`). As lojas vão cadastrar as suas.
+- Não foi importado do VB6: começa com as contas que o VB6 tinha (vendas, venda de consignado, aluguel recebido, receitas diversas; água/luz/energia, aluguel, combustíveis, compra de mercadorias, pagamento de funcionários, pró-labore, gastos de chefia, juros e multas, investimentos, despesas diversas). No VB6 o campo existe no caixa, mas quase tudo está em "diversos".
+- No caixa, a **despesa** pede uma conta de despesa e a **outra entrada**, uma de receita. Os lançamentos automáticos (venda, crediário, cancelamento) são identificados pelo motivo e não pedem conta. O mesmo plano vai servir às contas a pagar e ao financeiro.
+
 ### Próximas etapas da venda (respostas do Alison, 03/11/2026)
 
 - **Troca:** é uma funcionalidade à parte e complexa; o Alison vai mostrar.

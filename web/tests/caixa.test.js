@@ -131,7 +131,7 @@ describe('caixa', () => {
   it('o vale pede o funcionário', async () => {
     entrar()
     vi.spyOn(api, 'get').mockImplementation(async (url) => ({
-      data: { '/formas-pagamento': [DINHEIRO, PIX], '/funcionarios': [{ id: 9, nome: 'Laura Ficticia' }] }[url] ?? ABERTA,
+      data: { '/formas-pagamento': [DINHEIRO, PIX], '/funcionarios': [{ id: 9, nome: 'Laura Ficticia' }], '/plano-contas': [] }[url] ?? ABERTA,
     }))
     const post = vi.spyOn(api, 'post').mockImplementation(async (_, dados) => ({ data: { ...LANCAMENTO, id: 2, ...dados, tipo: 'saida' } }))
     const { wrapper } = await montar(SessaoCaixaPagina, '/caixa/sessoes/11')
@@ -148,7 +148,33 @@ describe('caixa', () => {
     document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/caixas/sessoes/11/lancamentos', {
-      motivo: 'vale', valor: '30', forma_pagamento_id: 1, historico: null, funcionario_id: 9,
+      motivo: 'vale', valor: '30', forma_pagamento_id: 1, historico: null, funcionario_id: 9, plano_conta_id: null,
+    })
+  })
+
+  it('a despesa pede a conta de despesa do plano de contas', async () => {
+    entrar()
+    const PLANO = [{ id: 3, tipo: 'despesa', nome: 'Combustíveis', ativo: true }, { id: 4, tipo: 'receita', nome: 'Receitas diversas', ativo: true }]
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: { '/formas-pagamento': [DINHEIRO, PIX], '/funcionarios': [], '/plano-contas': PLANO }[url] ?? ABERTA,
+    }))
+    const post = vi.spyOn(api, 'post').mockImplementation(async (_, dados) => ({ data: { ...LANCAMENTO, id: 2, ...dados, tipo: 'saida' } }))
+    const { wrapper } = await montar(SessaoCaixaPagina, '/caixa/sessoes/11')
+    await wrapper.findAll('button').find((b) => b.text().includes('Saída')).trigger('click')
+    await flushPromises()
+    const selects = () => wrapper.findAllComponents({ name: 'QSelect' })
+    await selects().find((c) => c.props('label') === 'Motivo *').vm.$emit('update:modelValue', 'despesa')
+    await flushPromises()
+    const conta = selects().find((c) => c.props('label') === 'Conta de despesa *')
+    expect(conta.props('options').map((c) => c.nome)).toEqual(['Combustíveis'])
+    await conta.vm.$emit('update:modelValue', 3)
+    const campos = wrapper.findAllComponents(QInput)
+    await campos.find((c) => c.props('label') === 'Valor *').vm.$emit('update:modelValue', '50')
+    await campos.find((c) => c.props('label') === 'Histórico').vm.$emit('update:modelValue', 'Gasolina da entrega')
+    document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/caixas/sessoes/11/lancamentos', {
+      motivo: 'despesa', valor: '50', forma_pagamento_id: 1, historico: 'Gasolina da entrega', funcionario_id: null, plano_conta_id: 3,
     })
   })
 })
