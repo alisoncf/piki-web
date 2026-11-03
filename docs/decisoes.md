@@ -320,16 +320,22 @@ Explicação do Alison. A conta de cobrança (`tab_contacob` do VB6) diz onde o 
   - Na parcela (clicando na linha): o tipo e a conta de cobrança. **O que falta pagar não se edita: só muda com a baixa.**
   - No documento: o cabeçalho (histórico e número), para todas as parcelas dele.
   - Toda mudança vai para o histórico da parcela, com o que era, o que ficou, quem, quando e a anotação, como a `frmEdiLan` do VB6: prorrogação, conta e tipo de cobrança, prejuízo e documento.
+  - O histórico do VB6 (`tab_itdocpre`) foi importado só das parcelas em aberto, como o Alison deixou simplificar: a que mudou o vencimento vira prorrogação; a que só tem o texto, anotação do contato.
 - **Cobrança em lote** (a tela "Cobrança" do VB6 fica como ações da mesma tela de contas a receber): mudar as selecionadas de conta de cobrança, e bloquear ou liberar os clientes delas (o bloqueio por atraso é à mão); cada bloqueio fica anotado na ficha do cliente. Bloquear pede `receber.cobranca` ou `clientes.editar`.
 
 ### Próximas etapas da venda (respostas do Alison, 03/11/2026)
 
 - **Troca:** é uma funcionalidade à parte e complexa; o Alison vai mostrar.
 - **Cancelamento:** a venda é marcada como cancelada, e também os registros que vieram dela. O cancelamento da NFC-e não é automático: o usuário faz.
+  - Feito em 03/11/2026, com as regras do Alison: a venda **recebida** só é cancelada nos primeiros **7 dias** depois de recebida (prazo curto; o número é a confirmar) e só se **nenhuma parcela do carnê foi paga** (recebimento estornado não conta). Pede a permissão `vendas.cancelar`; a aberta ou fechada continua com quem vende.
+  - Desfaz o que veio da venda: os lançamentos do caixa são estornados se o caixa do recebimento ainda está aberto; se já fechou, sai o mesmo valor, em cada forma, pelo caixa do computador ("Cancelamento de venda"). Os produtos voltam ao estoque (movimento "Cancelamento de venda"). O carnê é marcado como cancelado e as parcelas deixam de ser devidas, com o registro no histórico de cada uma.
 - **Entrega:** sai um canhoto para fazer a entrega, no endereço que o vendedor informou; a taxa de entrega entra no caixa com a venda (já é assim).
+  - Feito em 03/11/2026: o canhoto sai pela janela de impressão logo depois de receber (ou pelo botão na venda), em duas vias (a do entregador e a que volta assinada), com o endereço, a referência, o telefone, os itens e as linhas de assinatura.
 - **Cartão presente:** existe, com um processo simples; o Alison vai mostrar.
 - **Cartão de crédito:** a venda no cartão vai para a `tab_venfin` (ligada às financeiras); o financeiro tira o extrato todo dia e baixa, dizendo em que conta entrou. A ideia é automatizar depois. Na importação das vendas é importante ter o registro, podendo simplificar. (Na matriz, nenhuma linha da `tab_venfin` aparece baixada desde 2024: falta saber onde a baixa do extrato é gravada.)
 - **Notas:** o Alison mostra a tela de notas (NF-e e NFC-e) quando for a hora da etapa 4.
+- **Crédito suspenso** (Alison, 03/11/2026): o cliente com crédito suspenso só compra à vista. É o que o sistema já faz: não compra no crediário, nem com autorização.
+- **Baixa das vendas no cartão:** o financeiro baixa numa conta bancária da empresa. O Alison ainda vai pensar melhor; fica para quando houver as contas do financeiro.
 
 ## Substituídas
 

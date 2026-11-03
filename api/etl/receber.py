@@ -20,6 +20,10 @@ Rode antes os ETLs de clientes e de usuários desta loja.
   "caixa" na matriz e "REGINALDO" nas filiais), então a conta é achada pelo
   nome, sem acentos nem maiúsculas. O 000 (GERAL) é a Geral; a PREJUIZO também
   vai para a Geral, porque o prejuízo é a marca da parcela.
+- Histórico das prorrogações (tab_itdocpre), simplificado como o Alison deixou:
+  só das parcelas que ainda estão em aberto. A que mudou o vencimento vira
+  "prorrogação" (de quando para quando); a que só tem o texto, "anotação do
+  contato". Cada uma guarda a loja e o seq_pre, e a reimportação não repete.
 - Reimportar atualiza o que falta pagar, o vencimento e o valor das parcelas já
   importadas, inclusive das que foram quitadas no VB6 depois; a parcela que já
   teve recebimento no sistema novo não é mexida (aviso).
@@ -33,7 +37,9 @@ from sqlalchemy import Connection, bindparam, select, text
 from sqlalchemy.orm import Session
 
 from app.dominios.empresas.modelos import Empresa
-from app.dominios.receber.modelos import TIPOS_COBRANCA, ContaCobranca, ContaReceber, ItemRecebimento, ParcelaReceber
+from app.dominios.receber.modelos import (
+    TIPOS_COBRANCA, ContaCobranca, ContaReceber, HistoricoParcela, ItemRecebimento, ParcelaReceber,
+)
 from app.dominios.receber.servico import conta_padrao
 from app.nucleo.legado import MapaLegado
 from app.nucleo.textos import nome_proprio
@@ -55,6 +61,11 @@ _DOCS_ABERTOS = text("""
     SELECT DISTINCT CAST(d.seq_doc AS CHAR)
       FROM tab_doc d JOIN tab_itdoc i ON i.seq_doc = d.seq_doc
      WHERE d.tipo_doc = 'R' AND d.tipo_ter = 'C' AND d.excluido_doc <> 'S' AND i.reman_itd > 0""")
+_PRORROGACOES = text("""
+    SELECT CAST(seq_pre AS CHAR) seq_pre, CAST(seq_itd AS CHAR) seq_itd, CAST(data_pre AS CHAR) data_pre,
+           CAST(hora_pre AS CHAR) hora_pre, CAST(anterior_pre AS CHAR) anterior_pre, CAST(atual_pre AS CHAR) atual_pre,
+           CAST(cod_usu AS CHAR) cod_usu, CAST(anotacao_pre AS CHAR) anotacao_pre
+      FROM tab_itdocpre WHERE seq_itd IN :seqs""").bindparams(bindparam("seqs", expanding=True))
 _DOCS = text("""
     SELECT CAST(seq_doc AS CHAR) seq_doc, CAST(num_doc AS CHAR) num_doc, CAST(cod_ter AS CHAR) cod_ter,
            valor_doc, CAST(data_doc AS CHAR) data_doc, CAST(cod_usu AS CHAR) cod_usu,
@@ -75,6 +86,7 @@ class Resultado:
     parcelas: int = 0  # novas
     atualizadas: int = 0  # parcelas já importadas que mudaram
     em_aberto: Decimal = ZERO
+    historicos: int = 0  # prorrogações e anotações do VB6 que entraram agora
     prejuizo: int = 0  # parcelas em aberto que estão no prejuízo no VB6 (marcadas agora ou antes)
     em_prejuizo: Decimal = ZERO
     parcelas_em_aberto: int = 0
@@ -152,8 +164,50 @@ def importar_receber(origem: Connection, db: Session, codigo_empresa: str) -> Re
             _importar_documento(db, empresa, doc, parcelas_por_doc.get(seq, []), clientes, usuarios,
                                 contas_importadas, parcelas_importadas, recebidas, contas_cobranca, r)
         db.flush()
+    _importar_prorrogacoes(origem, db, empresa, parcelas_importadas, usuarios, r)
     db.commit()
     return r
+
+
+def _hora(data: date, hora: object) -> datetime:
+    """A data com a hora do VB6 (hora_pre é texto, "14:35:22"); sem hora que preste, meia-noite."""
+    partes = [int(x) for x in _texto(hora).split(":")[:2] if x.strip().isdigit()]
+    try:
+        return datetime(data.year, data.month, data.day, *partes)
+    except (TypeError, ValueError):
+        return datetime(data.year, data.month, data.day)
+
+
+def _importar_prorrogacoes(origem: Connection, db: Session, empresa: Empresa, parcelas_importadas: dict[str, int],
+                           usuarios: dict[str, int], r: Resultado) -> None:
+    """O histórico de prorrogações e anotações do VB6, só das parcelas em aberto."""
+    abertas = set(db.scalars(select(ParcelaReceber.id).join(ContaReceber).where(
+        ContaReceber.empresa_id == empresa.id, ParcelaReceber.aberto > 0)))
+    seqs = sorted(seq for seq, parcela_id in parcelas_importadas.items() if parcela_id in abertas)
+    prefixo = f"{empresa.codigo}-"
+    ja = set(db.scalars(select(HistoricoParcela.legado).where(HistoricoParcela.legado.like(f"{prefixo}%"))))
+    for lote in _em_lotes(seqs):
+        for h in origem.execute(_PRORROGACOES, {"seqs": list(lote)}).mappings():
+            legado = f"{prefixo}{_texto(h['seq_pre'])}"
+            quando = _data(h["data_pre"])
+            if legado in ja or quando is None:
+                continue
+            anterior, atual = _data(h["anterior_pre"]), _data(h["atual_pre"])
+            anotacao = (_texto(h["anotacao_pre"]) or None)
+            prorrogou = anterior is not None and atual is not None and anterior != atual
+            if not prorrogou and not anotacao:
+                continue
+            db.add(HistoricoParcela(
+                parcela_id=parcelas_importadas[_texto(h["seq_itd"])],
+                mudanca="prorrogacao" if prorrogou else "anotacao",
+                de=anterior.strftime("%d/%m/%Y") if prorrogou else None,
+                para=atual.strftime("%d/%m/%Y") if prorrogou else None,
+                anotacao=anotacao[:500] if anotacao else None, data_hora=_hora(quando, h["hora_pre"]),
+                usuario_id=usuarios.get(_texto(h["cod_usu"])), legado=legado,
+            ))
+            ja.add(legado)
+            r.historicos += 1
+        db.flush()
 
 
 def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clientes: dict[str, int],

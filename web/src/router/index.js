@@ -9,6 +9,13 @@ export const rotas = [
   { path: '/empresa', name: 'escolher-empresa', component: () => import('@/paginas/EscolherEmpresaPagina.vue') },
   { path: '/senha', name: 'trocar-senha', component: () => import('@/paginas/TrocarSenhaPagina.vue') },
   {
+    // fora do layout, para imprimir só o canhoto
+    path: '/vendas/:id(\\d+)/entrega',
+    name: 'canhoto-entrega',
+    component: () => import('@/paginas/vendas/CanhotoEntregaPagina.vue'),
+    meta: { permissao: ['vendas.ver', 'vendas.vender', 'caixa.operar'] },
+  },
+  {
     // fora do layout, para imprimir só o carnê
     path: '/vendas/:id(\\d+)/carne',
     name: 'carne',

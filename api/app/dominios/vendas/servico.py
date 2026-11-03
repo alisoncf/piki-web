@@ -33,7 +33,7 @@ from app.dominios.vendas.esquemas import (
     VendaDados,
 )
 from app.dominios.vendas.modelos import (
-    ABERTA, CANCELADA, DIAS_PARA_VENCER, FECHADA, RECEBIDA, SITUACOES, VENCIDA, Consumidor, EntregaVenda, ItemVenda,
+    ABERTA, CANCELADA, DIAS_PARA_CANCELAR, DIAS_PARA_VENCER, FECHADA, RECEBIDA, SITUACOES, VENCIDA, Consumidor, EntregaVenda, ItemVenda,
     PagamentoVenda, Venda,
 )
 from app.nucleo.textos import moeda
@@ -441,10 +441,59 @@ def buscar_cpf(db: Session, cpf: str) -> tuple[Cliente | None, Consumidor | None
 
 
 def cancelar(db: Session, empresa_id: int, usuario_id: int, venda_id: int, motivo: str) -> Venda:
-    """Só a venda aberta ou fechada; a recebida é desfeita pela devolução (etapa 5)."""
+    """A venda aberta ou fechada; a recebida tem regras próprias (cancelar_recebida)."""
     venda = _na_situacao(db, empresa_id, venda_id, ABERTA, FECHADA)
     venda.situacao = CANCELADA
     venda.cancelada_em = datetime.now()
+    venda.cancelada_por_id = usuario_id
+    venda.motivo_cancelamento = motivo
+    return _salvar(db, venda)
+
+
+def cancelar_recebida(db: Session, empresa_id: int, usuario_id: int, venda_id: int, motivo: str,
+                      sessao_caixa_id: int | None) -> Venda:
+    """Cancela a venda já recebida e o que veio dela: o caixa, o estoque e o carnê. Só nos primeiros dias, e só se
+    nenhuma parcela do carnê foi paga. A NFC-e é cancelada pelo usuário, à parte.
+
+    O caixa: se o do recebimento ainda está aberto, os lançamentos da venda são estornados; se já fechou, sai o
+    mesmo valor, em cada forma, pelo caixa aberto informado (o do computador)."""
+    venda = _na_situacao(db, empresa_id, venda_id, RECEBIDA)
+    if venda.recebida_em < datetime.now() - timedelta(days=DIAS_PARA_CANCELAR):
+        raise DadoInvalido(f"A venda foi recebida há mais de {DIAS_PARA_CANCELAR} dias e não pode mais ser cancelada")
+    conta = contas.conta_da_venda(db, venda.id)
+    if conta is not None and contas.teve_pagamento(db, conta):
+        raise DadoInvalido("Esta venda já teve parcela do carnê recebida e não pode ser cancelada")
+
+    original = venda.sessao_caixa
+    lancamentos = [x for x in original.lancamentos if x.documento == documento(venda) and x.estornado_em is None]
+    agora = datetime.now()
+    if original.situacao == ABERTO:
+        for lancamento in lancamentos:
+            lancamento.estornado_em, lancamento.estornado_por_id = agora, usuario_id
+    else:
+        if sessao_caixa_id is None:
+            raise DadoInvalido(f"O {original.caixa.nome} do recebimento já foi fechado: "
+                               "informe o caixa aberto por onde o dinheiro sai")
+        try:
+            sessao = caixa.obter_sessao(db, empresa_id, sessao_caixa_id)
+        except caixa.ErroCaixa as e:
+            raise NaoEncontrado(str(e))
+        if sessao.situacao != ABERTO:
+            raise DadoInvalido(f"O caixa {sessao.caixa.nome} está fechado")
+        for lancamento in lancamentos:
+            db.add(LancamentoCaixa(sessao_id=sessao.id, tipo="saida", motivo="cancelamento_venda",
+                                   forma_pagamento_id=lancamento.forma_pagamento_id, valor=lancamento.valor,
+                                   documento=documento(venda), usuario_id=usuario_id, historico=motivo[:80]))
+    for item in venda.itens:
+        try:
+            estoque.movimentar(db, empresa_id, item.produto_id, "cancelamento_venda", item.quantidade,
+                               usuario_id=usuario_id, documento=documento(venda))
+        except estoque.ErroEstoque as e:
+            raise DadoInvalido(str(e))
+    if conta is not None:
+        contas.cancelar_conta(db, conta, usuario_id, motivo)
+    venda.situacao = CANCELADA
+    venda.cancelada_em = agora
     venda.cancelada_por_id = usuario_id
     venda.motivo_cancelamento = motivo
     return _salvar(db, venda)

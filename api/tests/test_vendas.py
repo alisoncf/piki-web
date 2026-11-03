@@ -277,3 +277,57 @@ def test_no_caixa_muda_a_forma_e_paga_em_varias(cliente, loja):
     assert (venda["situacao"], venda["troco"], venda["modelo_nota"]) == ("recebida", "10.00", "65")
     assert [(p["forma_pagamento"]["nome"], p["valor"], p["parcelas"]) for p in venda["pagamentos"]] == [
         ("Dinheiro", "40.00", 1), ("Cartão de crédito", "60.00", 3)]
+
+
+def _venda_recebida(cliente, loja, quem, quantidade="2"):
+    url = f"/vendas/{cliente.post('/vendas', headers=quem).json()['id']}"
+    cliente.post(f"{url}/itens", headers=quem, json={"produto_id": loja["produtos"]["lencol"], "quantidade": quantidade})
+    dinheiro = loja["formas"]["dinheiro"]
+    cliente.put(url, headers=quem, json={"forma_pagamento_id": dinheiro, "consumidor": {"nome": "José"}})
+    cliente.post(f"{url}/fechar", headers=quem)
+    total = cliente.get(url, headers=quem).json()["total"]
+    r = cliente.post(f"{url}/receber", headers=quem, json={
+        "sessao_caixa_id": loja["sessao"], "pagamentos": [{"forma_pagamento_id": dinheiro, "valor": total}]})
+    assert r.status_code == 200, r.text
+    return url
+
+
+def test_cancelar_venda_recebida(banco, cliente, cenario, loja, admin):
+    url = _venda_recebida(cliente, loja, admin)
+    with banco() as db:
+        assert db.query(Estoque).filter_by(empresa_id=cenario["e1"], produto_id=loja["produtos"]["lencol"]).one().quantidade == 3
+    # o davi vende e recebe, mas não cancela a recebida
+    r = cliente.post(f"{url}/cancelar", headers=loja["davi"], json={"motivo": "Cliente desistiu"})
+    assert r.status_code == 403 and "vendas.cancelar" in r.json()["detail"]
+
+    # com o caixa do recebimento aberto: os lançamentos são estornados, o estoque volta
+    venda = cliente.post(f"{url}/cancelar", headers=admin, json={"motivo": "Cliente desistiu"}).json()
+    assert (venda["situacao"], venda["motivo_cancelamento"]) == ("cancelada", "Cliente desistiu")
+    sessao = cliente.get(f"/caixas/sessoes/{loja['sessao']}", headers=admin).json()
+    assert all(x["estornado_em"] for x in sessao["lancamentos"])
+    with banco() as db:
+        assert db.query(Estoque).filter_by(empresa_id=cenario["e1"], produto_id=loja["produtos"]["lencol"]).one().quantidade == 5
+
+    # prazo curto: recebida há mais de 7 dias, não cancela
+    url = _venda_recebida(cliente, loja, admin, "1")
+    with banco() as db:
+        db.get(Venda, int(url.rsplit("/", 1)[1])).recebida_em = datetime.now() - timedelta(days=8)
+        db.commit()
+    r = cliente.post(f"{url}/cancelar", headers=admin, json={"motivo": "Atrasado"})
+    assert r.status_code == 422 and "mais de 7 dias" in r.json()["detail"]
+
+
+def test_cancelar_com_o_caixa_do_recebimento_ja_fechado(banco, cliente, cenario, loja, admin):
+    from app.dominios.caixa.modelos import FECHADO, SessaoCaixa
+    url = _venda_recebida(cliente, loja, admin, "1")
+    with banco() as db:
+        db.get(SessaoCaixa, loja["sessao"]).situacao = FECHADO
+        db.commit()
+    caixa = cliente.post("/caixas", headers=admin, json={"nome": "Cx 03"}).json()
+    nova = cliente.post(f"/caixas/{caixa['id']}/abrir", headers=admin, json={"fundo": "100"}).json()
+    r = cliente.post(f"{url}/cancelar", headers=admin, json={"motivo": "Defeito"})
+    assert r.status_code == 422 and "já foi fechado" in r.json()["detail"]
+    r = cliente.post(f"{url}/cancelar", headers=admin, json={"motivo": "Defeito", "sessao_caixa_id": nova["id"]})
+    assert r.status_code == 200, r.text
+    saidas = cliente.get(f"/caixas/sessoes/{nova['id']}", headers=admin).json()["lancamentos"]
+    assert [(x["tipo"], x["descricao_motivo"], x["valor"]) for x in saidas] == [("saida", "Cancelamento de venda", "95.00")]

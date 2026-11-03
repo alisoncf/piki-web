@@ -47,6 +47,7 @@ TIPOS = {
     "inventario": "Inventário",
     "venda": "Venda",
     "devolucao_venda": "Devolução de venda",
+    "cancelamento_venda": "Cancelamento de venda",
     "entrada": "Entrada",
     "consignacao_envio": "Envio ao representante",
     "consignacao_devolucao": "Devolução do representante",

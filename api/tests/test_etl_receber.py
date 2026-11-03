@@ -1,5 +1,5 @@
 """ETL das contas a receber de clientes (D26). Dados fictícios."""
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -16,7 +16,7 @@ from app.nucleo.legado import MapaLegado
 from etl.receber import importar_receber
 
 
-def _banco_vb6(caminho, docs, parcelas):
+def _banco_vb6(caminho, docs, parcelas, prorrogacoes=()):
     eng = create_engine(f"sqlite:///{caminho}")
     with eng.begin() as c:
         c.execute(text("""CREATE TABLE tab_doc (seq_doc TEXT, num_doc TEXT, tipo_doc TEXT, cod_ter TEXT, valor_doc REAL,
@@ -31,6 +31,10 @@ def _banco_vb6(caminho, docs, parcelas):
         for p in parcelas:
             c.execute(text("INSERT INTO tab_itdoc VALUES (:seq, :doc, :valor, :resto, :venc, :venc, :n, :prej, :cob, :tip)"),
                       {"prej": "N", "cob": "000", "tip": "2"} | p)
+        c.execute(text("""CREATE TABLE tab_itdocpre (seq_pre INTEGER, seq_itd TEXT, hora_pre TEXT, data_pre TEXT,
+            anterior_pre TEXT, atual_pre TEXT, cod_usu TEXT, anotacao_pre TEXT)"""))
+        for h in prorrogacoes:
+            c.execute(text("INSERT INTO tab_itdocpre VALUES (:seq, :itd, :hora, :data, :de, :para, '001', :anot)"), h)
     return eng
 
 
@@ -72,6 +76,13 @@ def test_importa_as_contas_de_cada_loja_mesmo_com_o_mesmo_numero(banco, lojas, t
         _parcela("0000503", "0000101", 1, 50, "2026-06-10", 50),
         _parcela("0000504", "0000102", 1, 80, "2026-06-10", 80),
         _parcela("0000505", "0000103", 1, 0, "2026-06-10"),  # tudo pago: não entra
+    ], prorrogacoes=[
+        {"seq": 1, "itd": "0000501", "hora": "14:35:22", "data": "2026-06-01", "de": "2026-06-10", "para": "2026-07-10",
+         "anot": "Pediu mais um mês"},
+        {"seq": 2, "itd": "0000501", "hora": "", "data": "2026-07-05", "de": "2026-07-10", "para": "2026-07-10",
+         "anot": "Não atendeu"},  # só a anotação do contato
+        {"seq": 3, "itd": "0000500", "hora": "", "data": "2026-06-01", "de": "2026-06-10", "para": "2026-06-20",
+         "anot": ""},  # parcela já paga: não entra
     ])
     filial = _banco_vb6(tmp_path / "f.db", [
         {"seq": "0000100", "num": "0000777", "ter": "000007", "valor": 120, "hist": "MIGR. CONS. 000087", "esp": "A", "tipo": "C"},
@@ -82,7 +93,7 @@ def test_importa_as_contas_de_cada_loja_mesmo_com_o_mesmo_numero(banco, lojas, t
 
     r = _importar(matriz, banco, "01")
     assert (r.contas, r.parcelas, r.parcelas_em_aberto, r.em_aberto, r.sem_cliente) == (1, 3, 2, Decimal("200.00"), 1)
-    assert (r.prejuizo, r.em_prejuizo) == (1, Decimal("100.00"))
+    assert (r.prejuizo, r.em_prejuizo, r.historicos) == (1, Decimal("100.00"), 2)
     assert r.fora == ["1 parcelas em aberto de representantes (50.00), que não entram aqui"]
     r = _importar(filial, banco, "02")
     assert (r.contas, r.parcelas, r.em_aberto) == (1, 2, Decimal("120.00"))
@@ -97,6 +108,11 @@ def test_importa_as_contas_de_cada_loja_mesmo_com_o_mesmo_numero(banco, lojas, t
         assert [p.conta_cobranca.nome for p in ana.parcelas] == ["Geral", "Ludmila Advogada", "Geral"]
         assert [p.tipo_cobranca for p in ana.parcelas] == ["loja", "cliente", "cliente"]
         assert contas.em_aberto(db, lojas["ana"]) == Decimal("200.00")
+        historico = contas.historico(db, ana.parcelas[1].id)
+        assert [(h.mudanca, h.de, h.para, h.anotacao) for h in historico] == [
+            ("anotacao", None, None, "Não atendeu"), ("prorrogacao", "10/06/2026", "10/07/2026", "Pediu mais um mês")]
+        assert historico[1].data_hora == datetime(2026, 6, 1, 14, 35)
+    assert _importar(matriz, banco, "01").historicos == 0  # a reimportação não repete
 
 
 def test_reimportar_acompanha_o_vb6_menos_o_que_ja_foi_recebido_aqui(banco, lojas, tmp_path):

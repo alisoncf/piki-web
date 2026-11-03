@@ -30,6 +30,7 @@ PERMISSOES: dict[str, str] = {
     "vendas.ver": "Consultar as vendas da loja",
     "vendas.vender": "Montar vendas no balcão, com desconto até o limite do perfil",
     "vendas.autorizar": "Autorizar parcelas acima do limite da forma de pagamento",
+    "vendas.cancelar": "Cancelar venda já recebida, nos primeiros dias e sem parcela paga (desfaz caixa, estoque e carnê)",
     "receber.ver": "Consultar as contas a receber de todas as lojas, com os filtros e as somas",
     "receber.cobranca": "Mudar os carnês de conta de cobrança (cobrador, advogado...) e cadastrar as contas",
     "receber.editar": "Prorrogar parcelas (também em lote) e editar o tipo de cobrança e o cabeçalho dos documentos",

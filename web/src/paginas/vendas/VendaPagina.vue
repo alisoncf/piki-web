@@ -5,7 +5,16 @@
       <div class="piki-titulo col">{{ venda ? `Venda ${venda.numero}` : 'Venda' }}</div>
       <template v-if="venda">
         <q-badge :color="CORES[venda.situacao]" class="q-mr-md">{{ SITUACOES[venda.situacao] }}</q-badge>
-        <q-btn v-if="(aberta || fechada) && podeVender" flat no-caps color="negative" icon="close" label="Cancelar venda" @click="cancelar" />
+        <q-btn v-if="venda.entrega && (fechada || venda.situacao === 'recebida')" flat no-caps icon="local_shipping" label="Canhoto de entrega" :to="{ name: 'canhoto-entrega', params: { id: venda.id } }" />
+        <q-btn
+          v-if="((aberta || fechada) && podeVender) || (venda.situacao === 'recebida' && sessao.pode('vendas.cancelar'))"
+          flat
+          no-caps
+          color="negative"
+          icon="close"
+          label="Cancelar venda"
+          @click="cancelar"
+        />
         <q-btn v-if="fechada && (podeVender || podeReceber)" flat no-caps icon="lock_open" label="Reabrir" class="q-ml-sm" @click="reabrir" />
         <q-btn v-if="aberta && podeVender" unelevated no-caps color="primary" icon="done_all" label="Fechar venda" class="q-ml-sm" :loading="fechando" @click="fechar" />
         <q-btn v-if="fechada && podeReceber" unelevated no-caps color="primary" icon="point_of_sale" label="Receber" class="q-ml-sm" :to="{ name: 'receber-venda', params: { id: venda.id } }" />
@@ -316,6 +325,7 @@ import { api, mensagemDeErro } from '@/servicos/api'
 import { usarAutorizacao } from '@/servicos/autorizacao'
 import { usarCep } from '@/servicos/cep'
 import { formatarCodigoProduto, formatarDataHora, formatarMoeda, formatarQuantidade, mascaraTelefone } from '@/servicos/formatos'
+import { useCaixaDaMaquinaStore } from '@/stores/caixaDaMaquina'
 import { useSessaoStore } from '@/stores/sessao'
 
 const SITUACOES = { aberta: 'Aberta', fechada: 'Fechada', recebida: 'Recebida', cancelada: 'Cancelada', vencida: 'Vencida' }
@@ -326,6 +336,7 @@ const SEM_ENTREGA = { taxa: '', cep: '', logradouro: '', numero: '', complemento
 const $q = useQuasar()
 const rota = useRoute()
 const sessao = useSessaoStore()
+const caixaDaMaquina = useCaixaDaMaquinaStore()
 
 const venda = ref(null)
 const carregando = ref(true)
@@ -591,13 +602,21 @@ function buscarClientes(texto, atualizar, cancelar) {
 }
 
 function cancelar() {
+  const recebida = venda.value.situacao === 'recebida'
   $q.dialog({
     title: 'Cancelar venda',
-    message: 'Por que a venda está sendo cancelada?',
+    message: recebida
+      ? 'A venda recebida é desfeita: o dinheiro sai do caixa, os produtos voltam ao estoque e o carnê deixa de ser devido. '
+        + 'A NFC-e é cancelada à parte. Por que a venda está sendo cancelada?'
+      : 'Por que a venda está sendo cancelada?',
     prompt: { model: '', type: 'text', outlined: true, isValid: (v) => !!v.trim() },
     cancel: { flat: true, label: 'Voltar' },
     ok: { label: 'Cancelar venda', color: 'negative' },
-  }).onOk((motivo) => enviar(() => api.post(`${url.value}/cancelar`, { motivo })))
+  }).onOk(async (motivo) => {
+    // se o caixa do recebimento já fechou, o dinheiro sai pelo caixa deste computador
+    const caixa = recebida ? await caixaDaMaquina.sessaoAberta().catch(() => ({})) : {}
+    enviar(() => api.post(`${url.value}/cancelar`, { motivo, sessao_caixa_id: caixa.sessao?.id ?? null }))
+  })
 }
 
 onMounted(async () => {

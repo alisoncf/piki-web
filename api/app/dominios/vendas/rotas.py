@@ -10,7 +10,7 @@ from app.dominios.vendas.esquemas import (
     Carne, ClienteDoCarne, Credito, ImpressaoCarne, Item, ItemAlteracao, ItemNovo, LojaDoCarne, PaginaVendas,
     PedidoCancelamento, PedidoDesconto, PedidoForma, PedidoRecebimento, Venda, VendaDados, VendaResumo,
 )
-from app.dominios.vendas.modelos import ABERTA, FECHADA, SITUACOES
+from app.dominios.vendas.modelos import ABERTA, FECHADA, RECEBIDA, SITUACOES
 from app.dominios.vendas.modelos import Venda as ModeloVenda
 from app.nucleo.contexto import Contexto, exige
 from app.nucleo.documentos import cpf_valido, so_digitos
@@ -163,8 +163,19 @@ def buscar_cpf(cpf: str, ctx: Vender) -> BuscaPorCpf:
 
 
 @router.post("/vendas/{venda_id}/cancelar", response_model=Venda)
-def cancelar(venda_id: int, pedido: PedidoCancelamento, ctx: Vender) -> Venda:
+def cancelar(venda_id: int, pedido: PedidoCancelamento,
+             ctx: Annotated[Contexto, Depends(exige("vendas.vender", "vendas.cancelar"))]) -> Venda:
+    """A aberta ou fechada (quem vende); a recebida, só com vendas.cancelar, nos primeiros dias e sem parcela paga:
+    desfaz o caixa, o estoque e o carnê. A NFC-e é cancelada pelo usuário, à parte."""
     try:
+        venda = servico.obter(ctx.db, ctx.empresa_id, venda_id)
+        if venda.situacao == RECEBIDA:
+            if "vendas.cancelar" not in ctx.permissoes:
+                raise HTTPException(status.HTTP_403_FORBIDDEN, "Cancelar venda já recebida pede a permissão vendas.cancelar")
+            return _venda(ctx, servico.cancelar_recebida(ctx.db, ctx.empresa_id, ctx.usuario.id, venda_id,
+                                                          pedido.motivo, pedido.sessao_caixa_id))
+        if "vendas.vender" not in ctx.permissoes:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Sem permissão para cancelar a venda")
         return _venda(ctx, servico.cancelar(ctx.db, ctx.empresa_id, ctx.usuario.id, venda_id, pedido.motivo))
     except servico.ErroVenda as e:
         raise _http(ctx, e)

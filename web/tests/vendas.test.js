@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
+import CanhotoEntregaPagina from '@/paginas/vendas/CanhotoEntregaPagina.vue'
 import CarnePagina from '@/paginas/vendas/CarnePagina.vue'
 import RecebimentoPagina from '@/paginas/vendas/RecebimentoPagina.vue'
 import VendaPagina from '@/paginas/vendas/VendaPagina.vue'
@@ -40,6 +41,7 @@ async function montar(componente, caminho) {
       { path: '/vendas', name: 'vendas', component: componente === VendasPagina ? componente : vazio },
       { path: '/vendas/:id', name: 'venda', component: componente === VendaPagina ? componente : vazio },
       { path: '/vendas/:id/carne', name: 'carne', component: componente === CarnePagina ? componente : vazio },
+      { path: '/vendas/:id/entrega', name: 'canhoto-entrega', component: componente === CanhotoEntregaPagina ? componente : vazio },
       { path: '/vendas/:id/receber', name: 'receber-venda', component: componente === RecebimentoPagina ? componente : vazio },
     ],
   })
@@ -288,5 +290,32 @@ describe('vendas', () => {
     vi.spyOn(api, 'get').mockImplementation(gets({ ...COM_ITEM, itens: [{ ...ITEM, em_queima: true }] }))
     const { wrapper } = await montar(VendaPagina, '/vendas/3')
     expect(wrapper.text()).toContain('Lençol Ficticio Queima')
+  })
+
+  it('cancela a venda recebida pelo caixa deste computador e imprime o canhoto de entrega', async () => {
+    entrar(['vendas.vender', 'vendas.cancelar', 'caixa.operar'])
+    localStorage.setItem('piki.caixa', JSON.stringify({ empresa_id: 1, id: 5, nome: 'Cx 02' }))
+    const entrega = { taxa: '15.00', cep: '74000000', logradouro: 'Rua Ficticia', numero: '10', complemento: null, bairro: 'Centro',
+      cidade: { id: 1, nome: 'Goiânia', uf: 'GO' }, ponto_referencia: 'Perto da praça', telefone: '62999990000' }
+    const recebida = { ...COM_ITEM, situacao: 'recebida', comprador: 'José', entrega, taxa_entrega: '15.00', recebida_em: '2026-11-02T11:00:00' }
+    vi.spyOn(api, 'get').mockImplementation(gets(recebida))
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...recebida, situacao: 'cancelada' } })
+    const { wrapper } = await montar(VendaPagina, '/vendas/3')
+    await botao(wrapper, 'Cancelar venda').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('o dinheiro sai do caixa')
+    const motivo = document.querySelector('.q-dialog input')
+    motivo.value = 'Desistiu'
+    motivo.dispatchEvent(new Event('input'))
+    await flushPromises()
+    ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.includes('Cancelar venda')).click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/vendas/3/cancelar', { motivo: 'Desistiu', sessao_caixa_id: 11 })
+
+    document.body.innerHTML = ''
+    const canhoto = await montar(CanhotoEntregaPagina, '/vendas/3/entrega')
+    expect(canhoto.wrapper.text()).toContain('Rua Ficticia nº 10 - Centro - Goiânia/GO - CEP 74000000')
+    expect(canhoto.wrapper.text()).toContain('Perto da praça')
+    expect(canhoto.wrapper.findAll('.via')).toHaveLength(2)
   })
 })

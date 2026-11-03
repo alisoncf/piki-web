@@ -27,6 +27,8 @@ VENCIDA = "vencida"
 SITUACOES = {ABERTA: "Aberta", FECHADA: "Fechada", RECEBIDA: "Recebida", CANCELADA: "Cancelada", VENCIDA: "Vencida"}
 
 DIAS_PARA_VENCER = 10
+# a venda recebida só pode ser cancelada nestes dias depois de recebida (o Alison pediu um prazo curto)
+DIAS_PARA_CANCELAR = 7
 
 
 class Consumidor(ComDatas, Base):

@@ -62,6 +62,7 @@ class ContaReceber(ComDatas, Base):
     usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))  # quem lançou (no VB6, pode faltar)
     origem: Mapped[str] = mapped_column(String(10), server_default="venda", default="venda")  # ver ORIGENS
     documento_legado: Mapped[str | None] = mapped_column(String(20))  # num_doc do VB6 (na venda, o num_ven)
+    cancelada_em: Mapped[datetime | None] = mapped_column(DateTime)  # a venda foi cancelada: não se deve mais nada
 
     cliente: Mapped[Cliente] = relationship(lazy="joined")
     usuario: Mapped[Usuario | None] = relationship(lazy="joined")
@@ -117,6 +118,8 @@ MUDANCAS = {
     "tipo": "Tipo de cobrança",
     "prejuizo": "Prejuízo",
     "documento": "Documento",
+    "anotacao": "Anotação do contato",
+    "cancelamento": "Cancelamento",
 }
 
 
@@ -133,6 +136,8 @@ class HistoricoParcela(Base):
     anotacao: Mapped[str | None] = mapped_column(String(500))  # na prorrogação, o que o cliente disse no contato
     data_hora: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    # o que veio do VB6 (tab_itdocpre): loja e seq_pre, para a reimportação não repetir
+    legado: Mapped[str | None] = mapped_column(String(20), unique=True)
 
     usuario: Mapped[Usuario | None] = relationship(lazy="joined")
 

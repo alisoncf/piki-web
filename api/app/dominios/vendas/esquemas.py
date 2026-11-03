@@ -149,6 +149,8 @@ class PedidoRecebimento(ComAutorizacao):
 
 class PedidoCancelamento(BaseModel):
     motivo: str = Field(min_length=1, max_length=200)
+    sessao_caixa_id: int | None = Field(
+        default=None, description="Venda recebida, com o caixa do recebimento já fechado: o caixa por onde o dinheiro sai")
 
     @field_validator("motivo", mode="before")
     @classmethod

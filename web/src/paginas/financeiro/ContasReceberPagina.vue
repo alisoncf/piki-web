@@ -231,7 +231,7 @@
             <q-list v-else dense separator>
               <q-item v-for="(h, i) in parcela.historico_lista" :key="i">
                 <q-item-section>
-                  <q-item-label>{{ MUDANCAS[h.mudanca] ?? h.mudanca }}: {{ h.de ?? '—' }} → {{ h.para ?? '—' }}</q-item-label>
+                  <q-item-label>{{ MUDANCAS[h.mudanca] ?? h.mudanca }}<template v-if="h.de || h.para">: {{ h.de ?? '—' }} → {{ h.para ?? '—' }}</template></q-item-label>
                   <q-item-label v-if="h.anotacao" caption>{{ h.anotacao }}</q-item-label>
                 </q-item-section>
                 <q-item-section side class="text-caption">{{ formatarDataHora(h.data_hora) }}<br />{{ h.usuario?.nome }}</q-item-section>
@@ -310,7 +310,10 @@ const prorrogacao = ref({ aberto: false, modo: 'data', vencimento: '', dias: '',
 const parcela = ref({ aberto: false, dados: null, historico_lista: [] })
 const podeEditar = computed(() => sessao.pode('receber.editar'))
 const podeBloquear = computed(() => sessao.pode(['receber.cobranca', 'clientes.editar']))
-const MUDANCAS = { prorrogacao: 'Prorrogação', cobranca: 'Conta de cobrança', tipo: 'Tipo de cobrança', prejuizo: 'Prejuízo', documento: 'Documento' }
+const MUDANCAS = {
+  prorrogacao: 'Prorrogação', cobranca: 'Conta de cobrança', tipo: 'Tipo de cobrança', prejuizo: 'Prejuízo', documento: 'Documento',
+  anotacao: 'Anotação do contato', cancelamento: 'Cancelamento',
+}
 const parcelas = ref([])
 const selecionadas = ref([])
 const somas = ref({ valor: 0, aberto: 0 })

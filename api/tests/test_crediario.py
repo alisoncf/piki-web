@@ -133,3 +133,28 @@ def test_vencimentos_e_divisao():
     assert contas.vencimentos(date(2026, 1, 1), 3, 15) == [date(2026, 1, 1), date(2026, 1, 16), date(2026, 1, 31)]
     assert contas.dividir(Decimal("100.00"), 3) == [Decimal("33.33"), Decimal("33.33"), Decimal("33.34")]
     assert contas.dividir(Decimal("50.00"), 1) == [Decimal("50.00")]
+
+
+def test_cancelar_venda_no_crediario_so_sem_parcela_paga(banco, cliente, loja, admin, freguesa):  # noqa: F811
+    url, _ = _venda_no_crediario(cliente, loja, freguesa["id"], 1, parcelas=2)
+    venda = cliente.post(f"{url}/receber", headers=admin, json={"sessao_caixa_id": loja["sessao"]}).json()
+    with banco() as db:
+        id_parcela = contas.conta_da_venda(db, venda["id"]).parcelas[0].id
+        assert contas.em_aberto(db, freguesa["id"]) == Decimal("300.00")  # os 200 da outra loja e esta venda
+    # paga parte da primeira parcela: a venda não pode mais ser cancelada
+    r = cliente.post("/crediario/recebimentos", headers=admin, json={
+        "sessao_caixa_id": loja["sessao"], "cliente_id": freguesa["id"],
+        "itens": [{"parcela_id": id_parcela, "valor": "10.00"}],
+        "pagamentos": [{"forma_pagamento_id": loja["formas"]["dinheiro"], "valor": "10.00"}]})
+    assert r.status_code == 201, r.text
+    recebimento = r.json()["id"]
+    r = cliente.post(f"{url}/cancelar", headers=admin, json={"motivo": "Desistiu"})
+    assert r.status_code == 422 and "já teve parcela" in r.json()["detail"]
+
+    # estornado o recebimento (foi engano), cancela: o carnê deixa de ser devido
+    cliente.post(f"/crediario/recebimentos/{recebimento}/estornar", headers=admin)
+    r = cliente.post(f"{url}/cancelar", headers=admin, json={"motivo": "Desistiu"})
+    assert r.status_code == 200, r.text
+    with banco() as db:
+        assert contas.em_aberto(db, freguesa["id"]) == Decimal("200.00")
+        assert contas.conta_da_venda(db, venda["id"]).cancelada_em is not None

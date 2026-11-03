@@ -530,3 +530,23 @@ def bloquear_clientes(db: Session, usuario_id: int, empresa_id: int, cliente_ids
             mudaram += 1
     db.commit()
     return mudaram
+
+
+def cancelar_conta(db: Session, conta: ContaReceber, usuario_id: int, motivo: str) -> None:
+    """A venda foi cancelada: o carnê deixa de ser devido. Quem chama confere que nenhuma parcela foi paga."""
+    conta.cancelada_em = datetime.now()
+    for parcela in conta.parcelas:
+        if parcela.aberto:
+            _historico(db, parcela, "cancelamento", f"falta {moeda(parcela.aberto)}", "venda cancelada", motivo,
+                       usuario_id)
+            parcela.aberto = ZERO
+
+
+def teve_pagamento(db: Session, conta: ContaReceber) -> bool:
+    """Alguma parcela do carnê já foi paga (toda ou em parte); o recebimento estornado não conta."""
+    if any(p.aberto < p.valor for p in conta.parcelas):
+        return True
+    ids = [p.id for p in conta.parcelas]
+    return bool(ids) and db.scalar(select(func.count()).select_from(ItemRecebimento).join(RecebimentoCrediario)
+                                   .where(ItemRecebimento.parcela_id.in_(ids),
+                                          RecebimentoCrediario.estornado_em.is_(None))) > 0
