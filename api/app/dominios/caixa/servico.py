@@ -97,7 +97,11 @@ def _salvar_caixa(db: Session, caixa: Caixa, dados: CaixaDados) -> Caixa:
         raise Duplicado("Já existe um caixa com este nome nesta loja")
     if not dados.ativo and caixa.id and sessao_aberta(db, caixa.id):
         raise DadoInvalido("Feche o caixa antes de desativá-lo")
-    caixa.nome, caixa.ativo = dados.nome, dados.ativo
+    if dados.serie_nfe is not None:
+        outro = db.scalar(select(Caixa).where(Caixa.empresa_id == caixa.empresa_id, Caixa.serie_nfe == dados.serie_nfe))
+        if outro is not None and outro.id != caixa.id:
+            raise Duplicado(f"A série {dados.serie_nfe} já é do caixa {outro.nome}: cada caixa tem a sua")
+    caixa.nome, caixa.ativo, caixa.serie_nfe = dados.nome, dados.ativo, dados.serie_nfe
     db.add(caixa)
     db.commit()
     db.refresh(caixa)

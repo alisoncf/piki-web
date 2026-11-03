@@ -147,5 +147,7 @@ def test_etl_formas_e_caixas(banco, cenario, tmp_path):
         assert {mapa.buscar(db, "tab_formaspag", cenario["e1"], c) for c in ("06", "13", "20")} == {crediario.id}
         caixas = {x.nome: x.ativo for x in db.scalars(select(Caixa))}
         assert caixas == {"Sem caixa": False, "Cx 02": True, "Crediário": True}
+        series = {c.nome: c.serie_nfe for c in db.scalars(select(Caixa).where(Caixa.empresa_id == cenario["e1"]))}
+        assert series["Cx 02"] == 102 and series["Sem caixa"] is None  # a série das notas, como no VB6
         assert importar_caixa(c, db, "01").formas == 0  # reimportar não duplica
     eng.dispose()

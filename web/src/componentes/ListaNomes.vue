@@ -40,6 +40,15 @@
               :maxlength="tamanho"
               :rules="[(v) => !!v?.trim() || 'Informe o nome']"
             />
+            <q-input
+              v-if="campoNumero"
+              v-model.number="editando[campoNumero.chave]"
+              outlined
+              type="number"
+              min="1"
+              :label="campoNumero.rotulo"
+              :hint="campoNumero.dica"
+            />
             <q-toggle v-model="editando.ativo" label="Ativo" />
           </q-card-section>
           <q-card-actions align="right">
@@ -66,6 +75,8 @@ const props = defineProps({
   url: { type: String, required: true },
   permissaoEditar: { type: String, required: true },
   tamanho: { type: Number, default: 40 },
+  // um número a mais no cadastro (a série das notas do caixa): { chave, rotulo, dica }
+  campoNumero: { type: Object, default: null },
 })
 
 const $q = useQuasar()
@@ -80,6 +91,7 @@ const editando = ref({})
 
 const colunas = [
   { name: 'nome', label: 'Nome', field: 'nome', align: 'left', sortable: true },
+  ...(props.campoNumero ? [{ name: 'numero', label: props.campoNumero.rotulo, field: props.campoNumero.chave, align: 'left' }] : []),
   { name: 'situacao', label: 'Situação', field: 'ativo', align: 'left' },
 ]
 
@@ -103,6 +115,7 @@ async function salvar() {
   salvando.value = true
   try {
     const { id, ...dados } = editando.value
+    if (props.campoNumero && dados[props.campoNumero.chave] === '') dados[props.campoNumero.chave] = null
     await (id ? api.put(`${props.url}/${id}`, dados) : api.post(props.url, dados))
     dialogo.value = false
     await carregar()

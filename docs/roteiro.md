@@ -127,6 +127,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 ## Onda 6 · Fiscal
 
 - [ ] ~~Comunicação com o ACBrMonitor PLUS por TCP~~ Substituída pela emissão própria na API (D29)
+- [x] Preparação das notas (D29): ambiente, certificado A1 e CSC na ficha da empresa (segredos cifrados), série por caixa e numeração continuando a do VB6 (migração 0034) — 03/11/2026
 - [ ] Emissão própria de NFC-e e NF-e na API: assinatura, transmissão, consulta, cancelamento, inutilização, carta de correção, contingência (D29)
 - [ ] Emissão de NF-e
 - [ ] Entrada de notas e SPED

@@ -82,6 +82,8 @@ class Caixa(ComDatas, Base):
     empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), index=True)
     nome: Mapped[str] = mapped_column(String(30))
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # série das notas emitidas neste caixa (NFC-e e NF-e); no VB6, 100 + o código do caixa (101 é o caixa 01)
+    serie_nfe: Mapped[int | None] = mapped_column(Integer)
 
 
 class SessaoCaixa(Base):

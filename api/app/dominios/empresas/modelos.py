@@ -1,5 +1,7 @@
 """Empresas (filiais com CNPJ próprio) e as suas imagens. No VB6: sped_empresa."""
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, LargeBinary, String, true
+from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.cidades.modelos import Cidade
@@ -38,6 +40,16 @@ class Empresa(ComDatas, Base):
     cidade_id: Mapped[int | None] = mapped_column(ForeignKey("cidade.id"), index=True)
     telefone: Mapped[str | None] = mapped_column(String(20))
     email: Mapped[str | None] = mapped_column(String(200))
+
+    # notas fiscais (D29): ambiente da SEFAZ (1 produção, 2 homologação), o certificado A1 numa pasta do
+    # servidor e o CSC da NFC-e; a senha e o token ficam cifrados (app/nucleo/segredos.py)
+    nfe_ambiente: Mapped[str] = mapped_column(String(1), server_default="2", default="2")
+    certificado_arquivo: Mapped[str | None] = mapped_column(String(100))  # nome do .pfx na pasta dos certificados
+    certificado_senha: Mapped[str | None] = mapped_column(Text)  # cifrada
+    certificado_titular: Mapped[str | None] = mapped_column(String(200))
+    certificado_validade: Mapped[datetime | None] = mapped_column(DateTime)
+    csc_id: Mapped[str | None] = mapped_column(String(10))
+    csc_token: Mapped[str | None] = mapped_column(Text)  # cifrado
 
     ativa: Mapped[bool] = mapped_column(Boolean, server_default=true(), default=True)
     # esquema de cores na tela: {"principal", "fundo", "menu"} em #rrggbb; vazio = automático pelo código

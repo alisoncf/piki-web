@@ -1,10 +1,16 @@
 """Regras do cadastro de empresas."""
+from datetime import datetime
+from pathlib import Path
+
+from cryptography.hazmat.primitives.serialization import pkcs12
 from sqlalchemy.orm import Session
 
+from app.config import configuracao
 from app.dominios.cidades.modelos import Cidade
 from app.dominios.empresas import repositorio as repo
 from app.dominios.empresas.esquemas import EmpresaDados, EmpresaNova
 from app.dominios.empresas.modelos import Empresa, ImagemEmpresa
+from app.nucleo import segredos
 from app.nucleo.documentos import cnpj_valido
 
 TIPOS_DE_IMAGEM = {"logo": "Logo dos relatórios", "qrcode": "QR code do boleto de cobrança"}
@@ -111,4 +117,60 @@ def apagar_imagem(db: Session, empresa_id: int, tipo: str) -> Empresa:
     db.delete(imagem)
     db.commit()
     db.refresh(empresa)
+    return empresa
+
+
+# ------------------------------------------------------------ notas fiscais (D29)
+
+def fiscal(empresa: Empresa) -> dict:
+    certificado = None
+    if empresa.certificado_arquivo:
+        dias = (empresa.certificado_validade - datetime.now()).days if empresa.certificado_validade else None
+        certificado = {"titular": empresa.certificado_titular, "validade": empresa.certificado_validade,
+                       "dias_para_vencer": dias}
+    return {"ambiente": empresa.nfe_ambiente, "certificado": certificado, "csc_id": empresa.csc_id,
+            "tem_csc": bool(empresa.csc_token)}
+
+
+def configurar_fiscal(db: Session, empresa_id: int, ambiente: str, csc_id: str | None, csc_token: str | None) -> Empresa:
+    empresa = obter_empresa(db, empresa_id)
+    empresa.nfe_ambiente = ambiente
+    empresa.csc_id = (csc_id or "").strip() or None
+    if csc_token and csc_token.strip():
+        empresa.csc_token = _cifrar(csc_token.strip())
+    db.commit()
+    return empresa
+
+
+def _cifrar(texto: str) -> str:
+    try:
+        return segredos.cifrar(texto)
+    except segredos.SemChave as e:
+        raise DadoInvalido(str(e))
+
+
+def gravar_certificado(db: Session, empresa_id: int, conteudo: bytes, senha: str) -> Empresa:
+    """Confere o .pfx com a senha, guarda o arquivo na pasta dos certificados (fora do banco) e a senha cifrada.
+    O certificado tem de ser do CNPJ da empresa."""
+    empresa = obter_empresa(db, empresa_id)
+    try:
+        chave, cert, _ = pkcs12.load_key_and_certificates(conteudo, senha.encode())
+    except ValueError:
+        raise DadoInvalido("Não foi possível abrir o certificado: confira o arquivo e a senha")
+    if chave is None or cert is None:
+        raise DadoInvalido("O arquivo não tem o certificado com a chave")
+    titular = cert.subject.rfc4514_string()
+    if empresa.cnpj and empresa.cnpj not in "".join(ch for ch in titular if ch.isdigit()):
+        raise DadoInvalido(f"O certificado não é do CNPJ da empresa ({titular})")
+    validade = cert.not_valid_after_utc.replace(tzinfo=None)
+    if validade < datetime.now():
+        raise DadoInvalido(f"O certificado venceu em {validade:%d/%m/%Y}")
+    senha_cifrada = _cifrar(senha)
+    pasta = Path(configuracao().certificados_pasta)
+    pasta.mkdir(parents=True, exist_ok=True)
+    nome = f"{empresa.codigo}-{empresa.cnpj or empresa.id}.pfx"
+    (pasta / nome).write_bytes(conteudo)
+    empresa.certificado_arquivo, empresa.certificado_senha = nome, senha_cifrada
+    empresa.certificado_titular, empresa.certificado_validade = titular[:200], validade
+    db.commit()
     return empresa

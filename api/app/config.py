@@ -41,6 +41,10 @@ class Configuracao(BaseSettings):
     minio_senha: str = ""
     minio_bucket: str = "piki"
     minio_https: bool = False
+    # notas fiscais (D29): a pasta dos certificados A1 (.pfx), fora do repositório e do banco, e a chave que
+    # cifra no banco a senha do certificado e o CSC da NFC-e
+    certificados_pasta: str = str(RAIZ / "certificados")
+    chave_segredos: str = ""
 
     @model_validator(mode="after")
     def _segredo(self) -> "Configuracao":

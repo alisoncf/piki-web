@@ -346,6 +346,11 @@ Decisão do Alison.
 - Quase tudo é **NFC-e** (modelo 65), de empresas pequenas; algumas **NF-e** (modelo 55) de devolução e remessa, que o VB6 já tem em telas próprias.
 - **Certificado e CSC** (P10): o certificado A1 (`.pfx`) fica numa pasta do servidor, fora do repositório e do banco; a senha do certificado e o CSC da NFC-e (id e token) ficam no cadastro de cada empresa, cifrados com uma chave que só existe no `.env` do servidor.
 - O Alison vai mostrar a tela de notas do VB6 e as de devolução e remessa antes do desenho das tabelas.
+- **Todas as lojas são do Simples Nacional e de Goiás** (Alison, 03/11/2026).
+- **Série = caixa**, como no VB6: 101 é o caixa 01, 102 o caixa 02... Cada caixa tem a sua série (as NFC-e e as NF-e emitidas nele), e duas não podem ter a mesma na loja. A numeração (o último número de cada modelo e série) continua de onde o VB6 parou: `python -m etl notas`, de novo no dia da virada; ela só sobe.
+- **Preparação feita (03/11/2026):** na ficha da empresa, o ambiente da SEFAZ (homologação ou produção), o certificado A1 (o `.pfx` é conferido com a senha e com o CNPJ da empresa, vai para a pasta `PIKI_CERTIFICADOS_PASTA` e a validade aparece na tela, em vermelho com menos de 30 dias) e o CSC (o token nunca volta da API). A chave que cifra os segredos fica no `.env` (`PIKI_CHAVE_SEGREDOS`).
+- **A tela de notas do VB6** (`frmEdiNFe`), mostrada pelo Alison: lista com empresa, número, série, modelo, venda, cliente, emissão, valor, situação, chave, XML e ambiente; filtros por data, empresa, situação, modelo, série, número, destinatário, venda e UF, com o total; ações editar, retransmitir, consultar, gerar cupom, e-mail, DANFE em PDF, DANFE externo, cancelar, excluir, atualizar retorno, inutilização, exportar, buscar externas e duplicidade.
+- **O que os dados do VB6 mostram:** na matriz, as séries 101 a 106 (uma por caixa) e séries antigas 2 a 7; a 02 usa a série 1 (a nova vai ser a 101, ou o caixa fica com a série 1: decidir na virada). Todas as notas em emissão normal (nunca em contingência). Na matriz, em 2026, 2.140 NFC-e estão na situação 1, com chave e sem protocolo (não autorizadas), contra 7.703 autorizadas. As NF-e são quase todas "Remessa de venda de mercadoria" (109 em 2025-2026), algumas vendas e duas devoluções.
 
 ### Próximas etapas da venda (respostas do Alison, 03/11/2026)
 

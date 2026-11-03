@@ -103,8 +103,11 @@ def importar_caixa(origem: Connection, db: Session, codigo_empresa: str) -> Resu
         if caixa is None:
             caixa = Caixa(empresa_id=empresa.id, nome=nome, ativo=cod != "00" and (status or "A").strip().upper() == "A")
             db.add(caixa)
-            db.flush()
             r.caixas += 1
+        # a série das notas do caixa, como no VB6: 101 é o caixa 01
+        if caixa.serie_nfe is None and cod.isdigit() and cod != "00":
+            caixa.serie_nfe = 100 + int(cod)
+        db.flush()
         mapa.gravar(db, "tab_caixas", empresa.id, cod, caixa.id)
 
     db.commit()

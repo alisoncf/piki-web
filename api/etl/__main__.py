@@ -8,6 +8,7 @@
     python -m etl caixa --origem "mysql+pymysql://..." --empresa 01
     python -m etl estoque --origem "mysql+pymysql://..." --empresa 02
     python -m etl receber --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-receber-01.txt
+    python -m etl notas --origem "mysql+pymysql://..." --empresa 01
     python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun"
 
 Para um MariaDB local em que o root entra pela autenticação do Windows (sem
@@ -31,6 +32,7 @@ from etl.empresas import ConflitoEmpresa, importar_empresas
 from etl.fornecedores import importar_fornecedores
 from etl.estoque import importar_estoque
 from etl.funcionarios import EmpresaNaoImportada, importar_funcionarios
+from etl.notas import importar_numeracao
 from etl.produtos import importar_produtos
 from etl.receber import importar_receber
 from etl.usuarios import importar_usuarios
@@ -83,6 +85,9 @@ def main(argv: list[str] | None = None) -> None:
     rc.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     rc.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     rc.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
+    nt = sub.add_parser("notas", help="a numeração das notas (último número de cada modelo e série) de uma loja")
+    nt.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
+    nt.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     args = p.parse_args(argv)
     # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
     sys.stdout.reconfigure(encoding="utf-8")
@@ -164,6 +169,11 @@ def main(argv: list[str] | None = None) -> None:
                 for linha in r.fora:
                     print(f"fora: {linha}")
                 _avisos(r.avisos, args.avisos)
+            elif args.comando == "notas":
+                r = importar_numeracao(conexao, db, args.empresa)
+                for linha in r.series:
+                    print(linha)
+                _avisos(r.avisos, None)
     except (ConflitoEmpresa, EmpresaNaoImportada) as erro:
         print(f"erro: {erro}", file=sys.stderr)
         sys.exit(1)

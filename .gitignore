@@ -32,3 +32,8 @@ Thumbs.db
 
 # bancos SQLite de desenvolvimento
 *.db
+
+# certificados digitais das empresas (D29): nunca no Git
+certificados/
+*.pfx
+*.p12

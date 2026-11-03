@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.dominios.cidades.esquemas import Cidade
@@ -84,3 +87,29 @@ class Empresa(EmpresaResumo, EmpresaDados):
 
     cidade: Cidade | None
     imagens: list[str] = Field(validation_alias="tipos_de_imagem", description="Imagens enviadas: logo, qrcode")
+
+
+class Certificado(BaseModel):
+    titular: str | None
+    validade: datetime | None
+    dias_para_vencer: int | None
+
+
+class Fiscal(BaseModel):
+    """Os dados das notas fiscais da empresa. A senha do certificado e o token do CSC nunca saem da API."""
+
+    ambiente: str = Field(description="1 produção, 2 homologação")
+    certificado: Certificado | None
+    csc_id: str | None
+    tem_csc: bool
+
+
+class FiscalDados(BaseModel):
+    ambiente: Literal["1", "2"]
+    csc_id: str | None = Field(default=None, max_length=10)
+    csc_token: str | None = Field(default=None, max_length=50, description="Só para trocar; vazio mantém o que está")
+
+
+class CertificadoDados(BaseModel):
+    arquivo: str = Field(description="O .pfx em base64")
+    senha: str = Field(min_length=1, max_length=100)

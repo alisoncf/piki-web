@@ -55,6 +55,7 @@ class TipoDeForma(BaseModel):
 class CaixaDados(BaseModel):
     nome: str = Field(min_length=1, max_length=30)
     ativo: bool = True
+    serie_nfe: int | None = Field(default=None, ge=1, le=889, description="Série das notas do caixa (101 é o caixa 01)")
 
     @field_validator("nome", mode="before")
     @classmethod

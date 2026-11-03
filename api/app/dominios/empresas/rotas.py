@@ -1,10 +1,12 @@
+import base64
+import binascii
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.dominios.empresas import repositorio as repo
 from app.dominios.empresas import servico
-from app.dominios.empresas.esquemas import Empresa, EmpresaDados, EmpresaNova
+from app.dominios.empresas.esquemas import CertificadoDados, Empresa, EmpresaDados, EmpresaNova, Fiscal, FiscalDados
 from app.nucleo.contexto import Contexto, contexto, exige
 
 router = APIRouter(tags=["empresas"])
@@ -83,3 +85,37 @@ def apagar_imagem(empresa_id: int, tipo: str, ctx: Gerenciar) -> Empresa:
         return Empresa.model_validate(servico.apagar_imagem(ctx.db, empresa_id, tipo))
     except servico.ErroEmpresa as e:
         raise _http(e)
+
+
+@router.get("/empresas/{empresa_id}/fiscal", response_model=Fiscal)
+def obter_fiscal(empresa_id: int, ctx: Gerenciar) -> Fiscal:
+    """Ambiente da SEFAZ, certificado (titular e validade) e CSC. A senha e o token nunca saem da API."""
+    try:
+        return Fiscal.model_validate(servico.fiscal(servico.obter_empresa(ctx.db, empresa_id)))
+    except servico.ErroEmpresa as e:
+        raise _http(e)
+
+
+@router.put("/empresas/{empresa_id}/fiscal", response_model=Fiscal)
+def configurar_fiscal(empresa_id: int, dados: FiscalDados, ctx: Gerenciar) -> Fiscal:
+    """O ambiente e o CSC da NFC-e; o token só é trocado quando vem preenchido (é guardado cifrado)."""
+    try:
+        empresa = servico.configurar_fiscal(ctx.db, empresa_id, dados.ambiente, dados.csc_id, dados.csc_token)
+    except servico.ErroEmpresa as e:
+        raise _http(e)
+    return Fiscal.model_validate(servico.fiscal(empresa))
+
+
+@router.put("/empresas/{empresa_id}/certificado", response_model=Fiscal)
+def gravar_certificado(empresa_id: int, dados: CertificadoDados, ctx: Gerenciar) -> Fiscal:
+    """O certificado A1 (.pfx, em base64) e a senha: conferidos, o arquivo vai para a pasta dos certificados do
+    servidor e a senha fica cifrada no banco."""
+    try:
+        conteudo = base64.b64decode(dados.arquivo, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "O arquivo do certificado não veio em base64")
+    try:
+        empresa = servico.gravar_certificado(ctx.db, empresa_id, conteudo, dados.senha)
+    except servico.ErroEmpresa as e:
+        raise _http(e)
+    return Fiscal.model_validate(servico.fiscal(empresa))

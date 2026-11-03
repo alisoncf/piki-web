@@ -127,6 +127,59 @@
         </div>
       </section>
 
+      <section v-if="!novo && notas" class="cartao q-pa-md q-mb-md">
+        <div class="formulario__secao">Notas fiscais (NFC-e e NF-e)</div>
+        <div class="row q-col-gutter-md items-start">
+          <div class="col-12 col-md-6">
+            <div class="text-weight-medium q-mb-xs">Ambiente da SEFAZ</div>
+            <q-btn-toggle
+              v-model="notas.ambiente"
+              no-caps
+              unelevated
+              toggle-color="primary"
+              :options="[{ label: 'Homologação (testes)', value: '2' }, { label: 'Produção', value: '1' }]"
+            />
+            <div class="text-weight-medium q-mt-md q-mb-xs">CSC da NFC-e</div>
+            <div class="row q-col-gutter-sm">
+              <q-input v-model="notas.csc_id" outlined dense label="Id do CSC" maxlength="10" class="col-4" />
+              <q-input
+                v-model="notas.csc_token"
+                outlined
+                dense
+                type="password"
+                autocomplete="new-password"
+                label="Token do CSC"
+                :hint="notas.tem_csc ? 'Já cadastrado; preencha só para trocar' : 'Guardado cifrado; não aparece de novo'"
+                maxlength="50"
+                class="col-8"
+              />
+            </div>
+            <q-btn flat no-caps color="primary" icon="check" label="Salvar ambiente e CSC" class="q-mt-sm" :loading="salvandoNotas" @click="salvarNotas" />
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="text-weight-medium q-mb-xs">Certificado digital A1</div>
+            <div v-if="notas.certificado" class="q-mb-sm">
+              <div class="text-caption">{{ notas.certificado.titular }}</div>
+              <q-badge :color="notas.certificado.dias_para_vencer < 30 ? 'negative' : 'positive'">
+                Vence em {{ formatarDataHora(notas.certificado.validade).slice(0, 10) }} ({{ notas.certificado.dias_para_vencer }} dias)
+              </q-badge>
+            </div>
+            <div v-else class="text-caption text-suave q-mb-sm">Nenhum certificado enviado.</div>
+            <input ref="seletorCertificado" type="file" accept=".pfx,.p12" hidden @change="escolherCertificado" />
+            <div class="row q-col-gutter-sm items-center">
+              <div class="col-12">
+                <q-btn flat no-caps icon="attach_file" :label="certificado.nome || 'Escolher o arquivo .pfx'" @click="seletorCertificado.click()" />
+              </div>
+              <q-input v-model="certificado.senha" outlined dense type="password" autocomplete="new-password" label="Senha do certificado" class="col" />
+              <div class="col-auto">
+                <q-btn unelevated no-caps color="primary" icon="upload" label="Enviar" :disable="!certificado.arquivo || !certificado.senha" :loading="enviandoCertificado" @click="enviarCertificado" />
+              </div>
+            </div>
+            <div class="text-caption text-suave q-mt-xs">O arquivo fica numa pasta do servidor; a senha, cifrada no banco.</div>
+          </div>
+        </div>
+      </section>
+
       <div class="formulario__acoes row justify-end q-gutter-sm q-mb-md">
         <q-btn flat no-caps label="Cancelar" :to="{ name: 'empresas' }" />
         <q-btn type="submit" color="primary" unelevated no-caps icon="check" label="Salvar" :loading="salvando" />
@@ -145,7 +198,7 @@ import CampoCor from '@/componentes/CampoCor.vue'
 import SelecaoCidade from '@/componentes/SelecaoCidade.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
 import { usarCep } from '@/servicos/cep'
-import { mascaraTelefone } from '@/servicos/formatos'
+import { formatarDataHora, mascaraTelefone } from '@/servicos/formatos'
 import { temaDaCor } from '@/servicos/tema'
 import { useSessaoStore } from '@/stores/sessao'
 
@@ -223,9 +276,59 @@ async function carregarImagens(tipos) {
   }
 }
 
+// notas fiscais: ambiente, CSC e certificado (D29); a senha e o token nunca voltam da API
+const notas = ref(null)
+const salvandoNotas = ref(false)
+const seletorCertificado = ref(null)
+const certificado = ref({ nome: '', arquivo: '', senha: '' })
+const enviandoCertificado = ref(false)
+
+function mostrarNotas(dados) {
+  notas.value = { ...dados, csc_id: dados.csc_id ?? '', csc_token: '' }
+}
+
+async function salvarNotas() {
+  salvandoNotas.value = true
+  try {
+    const { ambiente, csc_id, csc_token } = notas.value
+    mostrarNotas((await api.put(`/empresas/${rota.params.id}/fiscal`, { ambiente, csc_id: csc_id || null, csc_token: csc_token || null })).data)
+    $q.notify({ type: 'positive', message: 'Dados das notas salvos' })
+  } catch (e) {
+    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+  } finally {
+    salvandoNotas.value = false
+  }
+}
+
+function escolherCertificado(evento) {
+  const arquivo = evento.target.files?.[0]
+  evento.target.value = ''
+  if (!arquivo) return
+  const leitor = new FileReader()
+  leitor.onload = () => (certificado.value = { ...certificado.value, nome: arquivo.name, arquivo: String(leitor.result).split(',')[1] })
+  leitor.readAsDataURL(arquivo)
+}
+
+async function enviarCertificado() {
+  enviandoCertificado.value = true
+  try {
+    const { arquivo, senha } = certificado.value
+    mostrarNotas((await api.put(`/empresas/${rota.params.id}/certificado`, { arquivo, senha })).data)
+    certificado.value = { nome: '', arquivo: '', senha: '' }
+    $q.notify({ type: 'positive', message: 'Certificado enviado' })
+  } catch (e) {
+    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+  } finally {
+    enviandoCertificado.value = false
+  }
+}
+
 onMounted(async () => {
   try {
-    if (!novo.value) await carregarImagens(preencher((await api.get(`/empresas/${rota.params.id}`)).data))
+    if (!novo.value) {
+      await carregarImagens(preencher((await api.get(`/empresas/${rota.params.id}`)).data))
+      mostrarNotas((await api.get(`/empresas/${rota.params.id}/fiscal`)).data)
+    }
   } catch (e) {
     $q.notify({ type: 'negative', message: mensagemDeErro(e) })
   } finally {
