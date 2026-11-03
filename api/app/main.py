@@ -13,6 +13,7 @@ from app.dominios.fornecedores.rotas import router as fornecedores
 from app.dominios.funcionarios.rotas import router as funcionarios
 from app.dominios.produtos.rotas import router as produtos
 from app.dominios.receber.rotas import router as receber
+from app.dominios.fiscal.rotas import router as fiscal
 from app.dominios.sistema.rotas import router as sistema
 from app.dominios.vendas.rotas import router as vendas
 
@@ -37,3 +38,4 @@ app.include_router(caixa)
 app.include_router(financeiro)
 app.include_router(vendas)
 app.include_router(receber)
+app.include_router(fiscal)

@@ -16,6 +16,13 @@ export const rotas = [
     meta: { permissao: ['vendas.ver', 'vendas.vender', 'caixa.operar'] },
   },
   {
+    // fora do layout, para imprimir só o DANFE na bobina
+    path: '/vendas/:id(\\d+)/nfce',
+    name: 'nfce-venda',
+    component: () => import('@/paginas/notas/NfceVendaPagina.vue'),
+    meta: { permissao: ['notas.ver', 'notas.emitir', 'caixa.operar'] },
+  },
+  {
     // fora do layout, para imprimir só o carnê
     path: '/vendas/:id(\\d+)/carne',
     name: 'carne',
@@ -218,6 +225,12 @@ export const rotas = [
         name: 'receber-venda',
         component: () => import('@/paginas/vendas/RecebimentoPagina.vue'),
         meta: { permissao: 'caixa.operar' },
+      },
+      {
+        path: 'notas',
+        name: 'notas',
+        component: () => import('@/paginas/notas/NotasPagina.vue'),
+        meta: { permissao: ['notas.ver', 'notas.emitir', 'caixa.operar'] },
       },
       {
         path: 'caixa',

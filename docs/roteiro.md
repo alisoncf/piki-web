@@ -128,7 +128,9 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 
 - [ ] ~~Comunicação com o ACBrMonitor PLUS por TCP~~ Substituída pela emissão própria na API (D29)
 - [x] Preparação das notas (D29): ambiente, certificado A1 e CSC na ficha da empresa (segredos cifrados), série por caixa e numeração continuando a do VB6 (migração 0034) — 03/11/2026
-- [ ] Emissão própria de NFC-e e NF-e na API: assinatura, transmissão, consulta, cancelamento, inutilização, carta de correção, contingência (D29)
+- [~] Emissão própria de NFC-e e NF-e na API: assinatura, transmissão, consulta, cancelamento, inutilização, carta de correção, contingência (D29)
+  - [~] NFC-e da venda em homologação: montar, conferir com o XSD, assinar, transmitir, retransmitir, consultar, cancelar, DANFE de 80 mm, lista de notas (migração 0035) — 03/11/2026, falta testar com a SEFAZ de Goiás
+  - [ ] Inutilização, contingência, carta de correção
 - [ ] Emissão de NF-e
 - [ ] Entrada de notas e SPED
 - [x] ECF: não é mais usado, fora do escopo (P4, D29) — 03/11/2026
@@ -136,7 +138,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 ## Onda 7 · PDV e caixa
 
 - [x] Formato do PDV: web, imprimindo pela janela do navegador (D26); o TEF decide se vai precisar de um agente local — 02/11/2026
-- [ ] NFC-e e canhoto de retirada
+- [~] NFC-e e canhoto de retirada: a NFC-e sai depois de receber, com o DANFE na bobina (D29)
 - [ ] TEF (SiTef)
 - [x] Formas de pagamento e caixa (D26): caixas da loja, abertura com fundo de troco, entradas e saídas, fechamento com conferência cega (migração 0019); ETL das formas e caixas rodado nas três cópias — 02/11/2026
 - [x] Venda (D26): vendedor monta, caixa recebe, desconto pela forma com limite do perfil e autorização, venda aberta vence em 10 dias (migração 0020) — 02/11/2026

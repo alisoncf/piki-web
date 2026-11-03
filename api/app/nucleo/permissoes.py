@@ -36,6 +36,9 @@ PERMISSOES: dict[str, str] = {
     "receber.cobranca": "Mudar os carnês de conta de cobrança (cobrador, advogado...) e cadastrar as contas",
     "receber.editar": "Prorrogar parcelas (também em lote) e editar o tipo de cobrança e o cabeçalho dos documentos",
     "receber.prejuizo": "Pôr parcelas no prejuízo (não se espera mais receber) e tirar de lá",
+    "notas.ver": "Consultar as notas fiscais emitidas pela loja (NFC-e e NF-e) e baixar o XML",
+    "notas.emitir": "Emitir, transmitir de novo e consultar na SEFAZ as notas da loja (o caixa já emite a da venda)",
+    "notas.cancelar": "Cancelar nota autorizada na SEFAZ",
 }
 
 # nome de cada área (a parte antes do ponto), para agrupar as permissões na tela de perfis
@@ -51,4 +54,5 @@ AREAS: dict[str, str] = {
     "vendas": "Vendas",
     "receber": "Contas a receber",
     "financeiro": "Financeiro",
+    "notas": "Notas fiscais",
 }

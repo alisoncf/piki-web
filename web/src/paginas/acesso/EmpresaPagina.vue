@@ -155,6 +155,7 @@
               />
             </div>
             <q-btn flat no-caps color="primary" icon="check" label="Salvar ambiente e CSC" class="q-mt-sm" :loading="salvandoNotas" @click="salvarNotas" />
+            <q-btn flat no-caps color="primary" icon="wifi_tethering" label="Testar com a SEFAZ" class="q-mt-sm" :loading="testandoSefaz" @click="testarSefaz" />
           </div>
           <div class="col-12 col-md-6">
             <div class="text-weight-medium q-mb-xs">Certificado digital A1</div>
@@ -285,6 +286,20 @@ const enviandoCertificado = ref(false)
 
 function mostrarNotas(dados) {
   notas.value = { ...dados, csc_id: dados.csc_id ?? '', csc_token: '' }
+}
+
+// o certificado, o ambiente e a conexão: a SEFAZ responde 107 quando está em operação
+const testandoSefaz = ref(false)
+async function testarSefaz() {
+  testandoSefaz.value = true
+  try {
+    const { codigo, motivo } = (await api.post(`/empresas/${rota.params.id}/sefaz`)).data
+    $q.notify({ type: codigo === '107' ? 'positive' : 'warning', message: `SEFAZ: ${codigo} - ${motivo}`, timeout: 8000 })
+  } catch (e) {
+    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+  } finally {
+    testandoSefaz.value = false
+  }
 }
 
 async function salvarNotas() {

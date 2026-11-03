@@ -323,10 +323,11 @@ async function confirmar() {
   if (!data) return
   $q.notify({ type: 'positive', message: data.troco && Number(data.troco) ? `Venda recebida. Troco ${formatarMoeda(data.troco)}` : 'Venda recebida' })
   for (const aviso of data.avisos) $q.notify({ type: 'warning', message: aviso, timeout: 8000 })
-  if (data.carne) {
-    if (data.entrega) $q.notify({ type: 'info', message: 'Imprima também o canhoto de entrega, pela venda', timeout: 8000 })
-    roteador.push({ name: 'carne', params: { id: data.id }, query: { imprimir: 1 } })
-  } else if (data.entrega) roteador.push({ name: 'canhoto-entrega', params: { id: data.id }, query: { imprimir: 1 } })
+  if (data.carne && data.entrega) $q.notify({ type: 'info', message: 'Imprima também o canhoto de entrega, pela venda', timeout: 8000 })
+  const proximo = data.carne ? 'carne' : data.entrega ? 'canhoto-entrega' : null
+  // a NFC-e sai logo (D29); o carnê e o canhoto vêm depois, pela tela da nota
+  if (data.modelo_nota === '65') roteador.push({ name: 'nfce-venda', params: { id: data.id }, query: { emitir: 1, ...(proximo && { depois: proximo }) } })
+  else if (proximo) roteador.push({ name: proximo, params: { id: data.id }, query: { imprimir: 1 } })
   else roteador.push({ name: 'vendas' })
 }
 
