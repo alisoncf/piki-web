@@ -2,7 +2,14 @@
   <q-page padding>
     <div class="row items-center q-mb-md q-gutter-sm">
       <div class="piki-titulo col">Contas a receber</div>
+      <q-btn v-if="sessao.pode('receber.editar') && selecionadas.length" flat no-caps icon="event_repeat" label="Prorrogar" @click="abrirProrrogacao" />
       <q-btn v-if="sessao.pode('receber.cobranca') && selecionadas.length" flat no-caps icon="move_up" label="Mudar cobrança" @click="mudarCobranca" />
+      <q-btn-dropdown v-if="podeBloquear && selecionadas.length" flat no-caps icon="person_off" label="Clientes">
+        <q-list>
+          <q-item v-close-popup clickable @click="bloquearClientes(true)"><q-item-section>Bloquear os clientes selecionados</q-item-section></q-item>
+          <q-item v-close-popup clickable @click="bloquearClientes(false)"><q-item-section>Liberar os clientes selecionados</q-item-section></q-item>
+        </q-list>
+      </q-btn-dropdown>
       <template v-if="sessao.pode('receber.prejuizo') && selecionadas.length">
         <q-btn v-if="todasNoPrejuizo" flat no-caps icon="restore" label="Tirar do prejuízo" @click="tirarDoPrejuizo" />
         <q-btn v-else flat no-caps color="negative" icon="money_off" label="Pôr no prejuízo" @click="porNoPrejuizo" />
@@ -114,7 +121,9 @@
       rows-per-page-label="Por página"
       no-data-label="Nenhuma parcela com estes filtros"
       loading-label="Carregando..."
+      class="tabela-clicavel"
       @request="aoPaginar"
+      @row-click="(_, p) => abrirParcela(p)"
     >
       <template #top>
         <div class="row full-width items-center text-caption">
@@ -169,6 +178,73 @@
         </q-td>
       </template>
     </q-table>
+
+    <!-- prorrogar as selecionadas -->
+    <q-dialog v-model="prorrogacao.aberto">
+      <q-card class="cartao-estreito">
+        <q-form @submit.prevent="prorrogar">
+          <q-card-section class="piki-titulo">Prorrogar {{ selecionadas.length }} parcela{{ selecionadas.length > 1 ? 's' : '' }}</q-card-section>
+          <q-card-section class="q-gutter-sm q-pt-none">
+            <q-btn-toggle v-model="prorrogacao.modo" no-caps unelevated toggle-color="primary" :options="[{ label: 'Para a data', value: 'data' }, { label: 'Mais dias', value: 'dias' }]" />
+            <q-input v-if="prorrogacao.modo === 'data'" v-model="prorrogacao.vencimento" outlined type="date" stack-label label="Novo vencimento *" />
+            <q-input v-else v-model="prorrogacao.dias" outlined type="number" min="1" label="Dias depois do vencimento de cada uma *" />
+            <q-input v-model="prorrogacao.anotacao" outlined autogrow maxlength="500" label="Anotação do contato" hint="O que o cliente disse; fica no histórico da parcela" />
+          </q-card-section>
+          <q-card-actions align="right">
+            <q-btn v-close-popup flat no-caps label="Cancelar" />
+            <q-btn type="submit" color="primary" unelevated no-caps label="Prorrogar" :disable="prorrogacao.modo === 'data' ? !prorrogacao.vencimento : !(Number(prorrogacao.dias) > 0)" />
+          </q-card-actions>
+        </q-form>
+      </q-card>
+    </q-dialog>
+
+    <!-- a parcela: tipo e conta de cobrança, o cabeçalho do documento e o histórico -->
+    <q-dialog v-model="parcela.aberto">
+      <q-card style="width: 640px; max-width: 95vw">
+        <q-form @submit.prevent="salvarParcela">
+          <q-card-section class="piki-titulo">{{ parcela.dados?.documento }} · parcela {{ parcela.dados?.numero }}/{{ parcela.dados?.parcelas }}</q-card-section>
+          <q-card-section v-if="parcela.dados" class="q-pt-none">
+            <div class="text-caption text-suave q-mb-sm">
+              {{ parcela.dados.cliente.nome }} · vence {{ formatarDataHora(parcela.dados.vencimento) }} · valor {{ formatarMoeda(parcela.dados.valor) }} ·
+              falta {{ formatarMoeda(parcela.dados.aberto) }} (só muda com a baixa)
+            </div>
+            <div class="row q-col-gutter-sm">
+              <q-select v-model="parcela.tipo_cobranca" outlined dense clearable label="Tipo de cobrança" :options="TIPOS_COBRANCA" emit-value map-options :readonly="!podeEditar" class="col-12 col-sm-6" />
+              <q-select
+                v-model="parcela.conta_cobranca_id"
+                outlined
+                dense
+                label="Conta de cobrança"
+                :options="contasCobranca.filter((c) => c.ativo)"
+                option-value="id"
+                option-label="nome"
+                emit-value
+                map-options
+                :readonly="!podeEditar"
+                class="col-12 col-sm-6"
+              />
+              <q-input v-model="parcela.documento" outlined dense label="Número do documento" maxlength="20" :readonly="!podeEditar" class="col-12 col-sm-4" />
+              <q-input v-model="parcela.historico" outlined dense label="Histórico do documento" maxlength="80" :readonly="!podeEditar" class="col-12 col-sm-8" hint="Vale para todas as parcelas do documento" />
+            </div>
+            <div class="formulario__secao q-mt-md">Histórico da parcela</div>
+            <div v-if="!parcela.historico_lista.length" class="text-caption text-suave">Nenhuma mudança ainda.</div>
+            <q-list v-else dense separator>
+              <q-item v-for="(h, i) in parcela.historico_lista" :key="i">
+                <q-item-section>
+                  <q-item-label>{{ MUDANCAS[h.mudanca] ?? h.mudanca }}: {{ h.de ?? '—' }} → {{ h.para ?? '—' }}</q-item-label>
+                  <q-item-label v-if="h.anotacao" caption>{{ h.anotacao }}</q-item-label>
+                </q-item-section>
+                <q-item-section side class="text-caption">{{ formatarDataHora(h.data_hora) }}<br />{{ h.usuario?.nome }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-card-section>
+          <q-card-actions align="right">
+            <q-btn v-close-popup flat no-caps label="Fechar" />
+            <q-btn v-if="podeEditar" type="submit" color="primary" unelevated no-caps label="Salvar" />
+          </q-card-actions>
+        </q-form>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -230,6 +306,11 @@ const cidade = ref(null)
 const maisFiltros = ref(false)
 const listas = ref({ setores: [], orgaos: [], grupos: [] })
 const contasCobranca = ref([])
+const prorrogacao = ref({ aberto: false, modo: 'data', vencimento: '', dias: '', anotacao: '' })
+const parcela = ref({ aberto: false, dados: null, historico_lista: [] })
+const podeEditar = computed(() => sessao.pode('receber.editar'))
+const podeBloquear = computed(() => sessao.pode(['receber.cobranca', 'clientes.editar']))
+const MUDANCAS = { prorrogacao: 'Prorrogação', cobranca: 'Conta de cobrança', tipo: 'Tipo de cobrança', prejuizo: 'Prejuízo', documento: 'Documento' }
 const parcelas = ref([])
 const selecionadas = ref([])
 const somas = ref({ valor: 0, aberto: 0 })
@@ -304,6 +385,77 @@ function receberSelecionadas() {
   }
   const { cliente } = abertas[0]
   roteador.push({ name: 'receber-crediario', query: { cliente: cliente.id, nome: cliente.nome, parcelas: abertas.map((p) => p.id).join(',') } })
+}
+
+function abrirProrrogacao() {
+  prorrogacao.value = { aberto: true, modo: 'data', vencimento: '', dias: '', anotacao: '' }
+}
+
+/** Prorroga as selecionadas: para uma data só, ou tantos dias depois do vencimento de cada uma. */
+async function prorrogar() {
+  const { modo, vencimento, dias, anotacao } = prorrogacao.value
+  try {
+    const { data } = await api.post('/receber/prorrogar', {
+      parcelas: selecionadas.value.map((p) => p.id),
+      vencimento: modo === 'data' ? vencimento : null,
+      dias: modo === 'dias' ? Number(dias) : null,
+      anotacao: anotacao || null,
+    })
+    prorrogacao.value.aberto = false
+    $q.notify({ type: 'positive', message: `${data.alteradas} parcela${data.alteradas === 1 ? '' : 's'} prorrogada${data.alteradas === 1 ? '' : 's'}` })
+    selecionadas.value = []
+    carregar()
+  } catch (e) {
+    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+  }
+}
+
+async function abrirParcela(linha) {
+  const conta = contasCobranca.value.find((c) => c.nome === linha.conta_cobranca)
+  const numero = linha.numero_documento ?? ''
+  parcela.value = {
+    aberto: true, dados: linha, historico_lista: [], tipo_cobranca: linha.tipo_cobranca, conta_cobranca_id: conta?.id ?? null,
+    documento: numero, historico: linha.historico, documentoAntes: numero, historicoAntes: linha.historico,
+  }
+  try {
+    parcela.value.historico_lista = (await api.get(`/receber/parcelas/${linha.id}/historico`)).data
+  } catch (e) {
+    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+  }
+}
+
+async function salvarParcela() {
+  const p = parcela.value
+  try {
+    await api.put(`/receber/parcelas/${p.dados.id}`, { tipo_cobranca: p.tipo_cobranca, conta_cobranca_id: p.conta_cobranca_id })
+    if (p.documento !== p.documentoAntes || p.historico !== p.historicoAntes) {
+      await api.put(`/receber/documentos/${p.dados.conta_id}`, { historico: p.historico, documento: p.documento || null })
+    }
+    p.aberto = false
+    $q.notify({ type: 'positive', message: 'Parcela salva' })
+    carregar()
+  } catch (e) {
+    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+  }
+}
+
+/** Bloqueia ou libera os clientes das selecionadas, de uma vez (o bloqueio por atraso é à mão). */
+function bloquearClientes(bloquear) {
+  const clientes = [...new Set(selecionadas.value.map((p) => p.cliente.id))]
+  $q.dialog({
+    title: bloquear ? 'Bloquear clientes' : 'Liberar clientes',
+    message: `${bloquear ? 'Bloquear' : 'Liberar'} ${clientes.length} cliente${clientes.length > 1 ? 's' : ''}? Fica anotado na ficha de cada um.`,
+    cancel: { flat: true, label: 'Voltar' },
+    ok: { label: bloquear ? 'Bloquear' : 'Liberar', color: bloquear ? 'negative' : 'primary' },
+  }).onOk(async () => {
+    try {
+      const { data } = await api.post('/receber/clientes/bloqueio', { clientes, bloquear })
+      $q.notify({ type: 'positive', message: `${data.alterados} cliente${data.alterados === 1 ? '' : 's'} ${bloquear ? 'bloqueado' : 'liberado'}${data.alterados === 1 ? '' : 's'}` })
+      carregar()
+    } catch (e) {
+      $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+    }
+  })
 }
 
 /** Muda as selecionadas de conta de cobrança: entregar ao cobrador, mandar ao advogado, voltar para a Geral... */

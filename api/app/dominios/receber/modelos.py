@@ -110,6 +110,33 @@ class ParcelaReceber(Base):
         return self.prejuizo_em is not None
 
 
+# o que mudou na parcela, para o histórico (frmEdiLan do VB6)
+MUDANCAS = {
+    "prorrogacao": "Prorrogação",
+    "cobranca": "Conta de cobrança",
+    "tipo": "Tipo de cobrança",
+    "prejuizo": "Prejuízo",
+    "documento": "Documento",
+}
+
+
+class HistoricoParcela(Base):
+    """Uma mudança na parcela (ou no documento dela): o que era, o que ficou, quem e quando, e a anotação."""
+
+    __tablename__ = "conta_receber_parcela_historico"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    parcela_id: Mapped[int] = mapped_column(ForeignKey("conta_receber_parcela.id", ondelete="CASCADE"), index=True)
+    mudanca: Mapped[str] = mapped_column(String(15))  # ver MUDANCAS
+    de: Mapped[str | None] = mapped_column(String(100))
+    para: Mapped[str | None] = mapped_column(String(100))
+    anotacao: Mapped[str | None] = mapped_column(String(500))  # na prorrogação, o que o cliente disse no contato
+    data_hora: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+
+    usuario: Mapped[Usuario | None] = relationship(lazy="joined")
+
+
 class RecebimentoCrediario(Base):
     """O cliente paga parcelas no caixa (de qualquer loja): quanto de cada uma, os juros e como pagou."""
 

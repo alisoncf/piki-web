@@ -32,6 +32,7 @@ PERMISSOES: dict[str, str] = {
     "vendas.autorizar": "Autorizar parcelas acima do limite da forma de pagamento",
     "receber.ver": "Consultar as contas a receber de todas as lojas, com os filtros e as somas",
     "receber.cobranca": "Mudar os carnês de conta de cobrança (cobrador, advogado...) e cadastrar as contas",
+    "receber.editar": "Prorrogar parcelas (também em lote) e editar o tipo de cobrança e o cabeçalho dos documentos",
     "receber.prejuizo": "Pôr parcelas no prejuízo (não se espera mais receber) e tirar de lá",
 }
 

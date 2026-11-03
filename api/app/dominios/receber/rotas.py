@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dominios.receber import servico
 from app.dominios.receber.esquemas import (
-    ClienteDaParcela, ContaCobranca, ContaCobrancaDados, LinhaParcela, PedidoCobranca, PaginaParcelas, ParcelaAberta, ParcelasDoCliente, PedidoPrejuizo, Recebimento,
+    ClienteDaParcela, ContaCobranca, ContaCobrancaDados, DocumentoDados, LinhaParcela, Mudanca, ParcelaDados,
+    PedidoBloqueio, PedidoCobranca, PedidoProrrogacao, PaginaParcelas, ParcelaAberta, ParcelasDoCliente, PedidoPrejuizo, Recebimento,
     RecebimentoDados,
 )
 from app.nucleo.contexto import Contexto, exige
@@ -17,6 +18,7 @@ Operar = Annotated[Contexto, Depends(exige("caixa.operar"))]
 Consultar = Annotated[Contexto, Depends(exige("receber.ver"))]
 Prejuizo = Annotated[Contexto, Depends(exige("receber.prejuizo"))]
 Cobranca = Annotated[Contexto, Depends(exige("receber.cobranca"))]
+Editar = Annotated[Contexto, Depends(exige("receber.editar"))]
 
 _STATUS = {
     servico.NaoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -123,7 +125,8 @@ def consultar(
         dias, juros = servico.juros_sugerido(p.aberto, p.vencimento, taxa)
         setor = cliente.setor
         linhas.append(LinhaParcela(
-            id=p.id, conta_id=conta.id, documento=conta.documento, origem=conta.origem, loja=conta.empresa,
+            id=p.id, conta_id=conta.id, documento=conta.documento, numero_documento=conta.documento_legado,
+            origem=conta.origem, loja=conta.empresa,
             cliente=ClienteDaParcela(id=cliente.id, nome=cliente.nome, cpf_cnpj=cliente.cpf_cnpj,
                                      bloqueado=cliente.bloqueado, credito_suspenso=cliente.credito_suspenso),
             setor=setor.nome if setor else None,
@@ -152,7 +155,7 @@ def marcar_prejuizo(pedido: PedidoPrejuizo, ctx: Prejuizo) -> dict:
 def tirar_prejuizo(pedido: PedidoPrejuizo, ctx: Prejuizo) -> dict:
     """As parcelas voltam a ser cobradas."""
     try:
-        return {"alteradas": servico.tirar_prejuizo(ctx.db, pedido.parcelas)}
+        return {"alteradas": servico.tirar_prejuizo(ctx.db, pedido.parcelas, ctx.usuario.id)}
     except servico.ErroReceber as e:
         raise _http(ctx, e)
 
@@ -184,6 +187,57 @@ def alterar_conta_cobranca(conta_id: int, dados: ContaCobrancaDados, ctx: Cobran
 def mudar_cobranca(pedido: PedidoCobranca, ctx: Cobranca) -> dict:
     """Muda as parcelas de conta de cobrança, em lote."""
     try:
-        return {"alteradas": servico.mudar_cobranca(ctx.db, pedido.parcelas, pedido.conta_cobranca_id)}
+        return {"alteradas": servico.mudar_cobranca(ctx.db, pedido.parcelas, pedido.conta_cobranca_id, ctx.usuario.id)}
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)
+
+
+@router.post("/receber/prorrogar")
+def prorrogar(pedido: PedidoProrrogacao, ctx: Editar) -> dict:
+    """Prorroga as parcelas, em lote: para uma data, ou tantos dias depois do vencimento de cada uma."""
+    try:
+        return {"alteradas": servico.prorrogar(ctx.db, ctx.usuario.id, pedido.parcelas, pedido.vencimento, pedido.dias,
+                                               (pedido.anotacao or "").strip() or None)}
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)
+
+
+@router.put("/receber/parcelas/{parcela_id}")
+def editar_parcela(parcela_id: int, dados: ParcelaDados, ctx: Editar) -> dict:
+    """O tipo e a conta de cobrança da parcela (o que falta pagar só muda com a baixa)."""
+    try:
+        servico.editar_parcela(ctx.db, ctx.usuario.id, parcela_id, dados.tipo_cobranca, dados.conta_cobranca_id)
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)
+    return {"ok": True}
+
+
+@router.put("/receber/documentos/{conta_id}")
+def editar_documento(conta_id: int, dados: DocumentoDados, ctx: Editar) -> dict:
+    """O cabeçalho do documento (histórico e número), para todas as parcelas dele."""
+    try:
+        servico.editar_documento(ctx.db, ctx.usuario.id, conta_id, dados.historico.strip(),
+                                 (dados.documento or "").strip() or None)
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)
+    return {"ok": True}
+
+
+@router.get("/receber/parcelas/{parcela_id}/historico", response_model=list[Mudanca])
+def historico(parcela_id: int, ctx: Consultar) -> list[Mudanca]:
+    """As mudanças da parcela, da mais nova para a mais antiga: prorrogações, cobrança, tipo, prejuízo, documento."""
+    try:
+        return [Mudanca.model_validate(m) for m in servico.historico(ctx.db, parcela_id)]
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)
+
+
+@router.post("/receber/clientes/bloqueio")
+def bloquear_clientes(pedido: PedidoBloqueio,
+                      ctx: Annotated[Contexto, Depends(exige("receber.cobranca", "clientes.editar"))]) -> dict:
+    """Bloqueia ou libera, de uma vez, os clientes das parcelas selecionadas (o bloqueio por atraso é à mão)."""
+    try:
+        return {"alterados": servico.bloquear_clientes(ctx.db, ctx.usuario.id, ctx.empresa_id, pedido.clientes,
+                                                       pedido.bloquear)}
     except servico.ErroReceber as e:
         raise _http(ctx, e)

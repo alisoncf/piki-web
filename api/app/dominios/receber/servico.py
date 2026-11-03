@@ -13,10 +13,10 @@ from sqlalchemy.orm import Session
 
 from app.dominios.caixa import servico as caixa
 from app.dominios.caixa.modelos import ABERTO, FormaPagamento, LancamentoCaixa
-from app.dominios.clientes.modelos import Cliente, Setor
+from app.dominios.clientes.modelos import AnotacaoCliente, Cliente, Setor
 from app.dominios.receber.esquemas import RecebimentoDados
 from app.dominios.receber.modelos import (
-    ContaCobranca, ContaReceber, ItemRecebimento, PagamentoRecebimento, ParcelaReceber, RecebimentoCrediario,
+    TIPOS_COBRANCA, ContaCobranca, ContaReceber, HistoricoParcela, ItemRecebimento, PagamentoRecebimento, ParcelaReceber, RecebimentoCrediario,
 )
 from app.nucleo.textos import moeda
 
@@ -372,16 +372,18 @@ def marcar_prejuizo(db: Session, usuario_id: int, parcela_ids: list[int], motivo
             raise DadoInvalido(f"A parcela {parcela.conta.documento} {parcela.numero} já está paga")
         if parcela.prejuizo_em is None:
             parcela.prejuizo_em, parcela.prejuizo_por_id, parcela.prejuizo_motivo = agora, usuario_id, motivo
+            _historico(db, parcela, "prejuizo", None, "no prejuízo", motivo, usuario_id)
             mudaram += 1
     db.commit()
     return mudaram
 
 
-def tirar_prejuizo(db: Session, parcela_ids: list[int]) -> int:
+def tirar_prejuizo(db: Session, parcela_ids: list[int], usuario_id: int | None = None) -> int:
     """A parcela volta a ser cobrada (no VB6, o mesmo botão marcava e desmarcava)."""
     mudaram = 0
     for parcela in _parcelas(db, parcela_ids):
         if parcela.prejuizo_em is not None:
+            _historico(db, parcela, "prejuizo", "no prejuízo", "cobrando de novo", None, usuario_id)
             parcela.prejuizo_em = parcela.prejuizo_por_id = parcela.prejuizo_motivo = None
             mudaram += 1
     db.commit()
@@ -418,7 +420,7 @@ def salvar_conta_cobranca(db: Session, conta_id: int | None, nome: str, ativo: b
     return conta
 
 
-def mudar_cobranca(db: Session, parcela_ids: list[int], conta_cobranca_id: int) -> int:
+def mudar_cobranca(db: Session, parcela_ids: list[int], conta_cobranca_id: int, usuario_id: int | None = None) -> int:
     """Muda as parcelas de conta de cobrança, em lote (entregar ao cobrador, mandar ao advogado, voltar à loja...).
     Devolve quantas mudaram."""
     conta = db.get(ContaCobranca, conta_cobranca_id)
@@ -427,6 +429,7 @@ def mudar_cobranca(db: Session, parcela_ids: list[int], conta_cobranca_id: int) 
     mudaram = 0
     for parcela in _parcelas(db, parcela_ids):
         if parcela.conta_cobranca_id != conta.id:
+            _historico(db, parcela, "cobranca", parcela.conta_cobranca.nome, conta.nome, None, usuario_id)
             parcela.conta_cobranca = conta
             mudaram += 1
     db.commit()
@@ -436,3 +439,94 @@ def mudar_cobranca(db: Session, parcela_ids: list[int], conta_cobranca_id: int) 
 def tipo_cobranca_do_cliente(cliente: Cliente) -> str:
     """O tipo de cobrança que a venda sugere: pagamento na loja, ou cobrança no cliente (em casa ou no trabalho)."""
     return "loja" if cliente.forma_cobranca == "loja" else "cliente"
+
+
+# ------------------------------------------------------------ prorrogar e editar (financeiro)
+
+def _historico(db: Session, parcela: ParcelaReceber, mudanca: str, de: str | None, para: str | None,
+               anotacao: str | None, usuario_id: int | None) -> None:
+    db.add(HistoricoParcela(parcela_id=parcela.id, mudanca=mudanca, de=de, para=para, anotacao=anotacao,
+                            usuario_id=usuario_id))
+
+
+def _data_br(valor: date) -> str:
+    return valor.strftime("%d/%m/%Y")
+
+
+def prorrogar(db: Session, usuario_id: int, parcela_ids: list[int], vencimento: date | None, dias: int | None,
+              anotacao: str | None) -> int:
+    """Muda o vencimento das parcelas em aberto: para uma data só, ou tantos dias depois do vencimento de cada uma.
+    O vencimento inicial fica como estava, e cada prorrogação vai para o histórico. Devolve quantas mudaram."""
+    if (vencimento is None) == (dias is None):
+        raise DadoInvalido("Informe o novo vencimento ou quantos dias prorrogar")
+    mudaram = 0
+    for parcela in _parcelas(db, parcela_ids):
+        if parcela.aberto <= 0:
+            raise DadoInvalido(f"A parcela {parcela.numero} de {parcela.conta.documento} já está paga")
+        novo = vencimento or parcela.vencimento + timedelta(days=dias)
+        if novo == parcela.vencimento:
+            continue
+        _historico(db, parcela, "prorrogacao", _data_br(parcela.vencimento), _data_br(novo), anotacao, usuario_id)
+        parcela.vencimento_inicial = parcela.vencimento_inicial or parcela.vencimento
+        parcela.vencimento = novo
+        mudaram += 1
+    db.commit()
+    return mudaram
+
+
+def editar_parcela(db: Session, usuario_id: int, parcela_id: int, tipo_cobranca: str | None,
+                   conta_cobranca_id: int) -> ParcelaReceber:
+    """O tipo e a conta de cobrança da parcela. O que falta pagar não se muda aqui: só com a baixa."""
+    parcela = db.get(ParcelaReceber, parcela_id)
+    if parcela is None:
+        raise NaoEncontrado("Parcela não encontrada")
+    if tipo_cobranca != parcela.tipo_cobranca:
+        nome = lambda t: TIPOS_COBRANCA[t][0] if t else None  # noqa: E731
+        _historico(db, parcela, "tipo", nome(parcela.tipo_cobranca), nome(tipo_cobranca), None, usuario_id)
+        parcela.tipo_cobranca = tipo_cobranca
+    db.commit()
+    if conta_cobranca_id != parcela.conta_cobranca_id:
+        mudar_cobranca(db, [parcela.id], conta_cobranca_id, usuario_id)
+    db.expire_all()
+    return db.get(ParcelaReceber, parcela_id)
+
+
+def editar_documento(db: Session, usuario_id: int, conta_id: int, historico: str, documento: str | None) -> ContaReceber:
+    """O cabeçalho do documento: o histórico e o número. A mudança vai para o histórico de todas as parcelas."""
+    conta = db.get(ContaReceber, conta_id)
+    if conta is None:
+        raise NaoEncontrado("Documento não encontrado")
+    antes = f"{conta.documento_legado or ''} · {conta.historico}"
+    depois = f"{documento or ''} · {historico}"
+    if antes != depois:
+        for parcela in conta.parcelas:
+            _historico(db, parcela, "documento", antes[:100], depois[:100], None, usuario_id)
+        conta.historico, conta.documento_legado = historico, documento
+    db.commit()
+    return conta
+
+
+def historico(db: Session, parcela_id: int) -> list[HistoricoParcela]:
+    parcela = db.get(ParcelaReceber, parcela_id)
+    if parcela is None:
+        raise NaoEncontrado("Parcela não encontrada")
+    return list(db.scalars(select(HistoricoParcela).where(HistoricoParcela.parcela_id == parcela_id)
+                           .order_by(HistoricoParcela.data_hora.desc(), HistoricoParcela.id.desc())))
+
+
+def bloquear_clientes(db: Session, usuario_id: int, empresa_id: int, cliente_ids: list[int], bloquear: bool) -> int:
+    """Bloqueia (ou libera) os clientes das parcelas selecionadas, de uma vez: o bloqueio por atraso é à mão.
+    Cada mudança fica nas anotações do cliente. Devolve quantos mudaram."""
+    mudaram = 0
+    for cliente_id in set(cliente_ids):
+        cliente = db.get(Cliente, cliente_id)
+        if cliente is None:
+            raise NaoEncontrado("Cliente não encontrado")
+        if cliente.bloqueado != bloquear:
+            cliente.bloqueado = bloquear
+            db.add(AnotacaoCliente(cliente_id=cliente.id, usuario_id=usuario_id, empresa_id=empresa_id,
+                                   texto="Bloqueado pela cobrança (contas a receber)" if bloquear
+                                   else "Liberado pela cobrança (contas a receber)"))
+            mudaram += 1
+    db.commit()
+    return mudaram

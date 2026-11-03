@@ -204,4 +204,30 @@ describe('receber crediário', () => {
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/receber/cobranca', { parcelas: [31], conta_cobranca_id: 2 })
   })
+
+  it('contas a receber: prorroga as selecionadas para uma data, com a anotação', async () => {
+    useSessaoStore().permissoes = ['receber.ver', 'receber.editar']
+    const linha = {
+      id: 31, conta_id: 7, documento: '02-0000777', numero_documento: '0000777', origem: 'venda', loja: BAIRRO, conta_cobranca: 'Geral', tipo_cobranca: 'cliente',
+      cliente: { id: 8, nome: 'Ana Ficticia', cpf_cnpj: null, bloqueado: false, credito_suspenso: false }, setor: null, cidade: null,
+      historico: '', emissao: '2026-09-13', numero: 1, parcelas: 1, vencimento: '2026-10-13', vencimento_inicial: '2026-10-13',
+      valor: '300.00', aberto: '300.00', dias_atraso: 20, juros: '10.00', prejuizo: false, prejuizo_em: null, prejuizo_por: null, prejuizo_motivo: null,
+    }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: url === '/receber/contas-cobranca' ? [] : { itens: [linha], total: 1, soma_valor: '300.00', soma_aberto: '300.00', juros_ao_mes: '5.00' },
+    }))
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { alteradas: 1 } })
+    const wrapper = await montar('/financeiro/receber')
+    await wrapper.findAllComponents(QCheckbox)[1].vm.$emit('update:modelValue', true)
+    await flushPromises()
+    await wrapper.findAll('button').find((b) => b.text().includes('Prorrogar')).trigger('click')
+    await flushPromises()
+    const campo = (rotulo) => wrapper.findAllComponents(QInput).find((c) => c.props('label')?.startsWith(rotulo))
+    await campo('Novo vencimento').vm.$emit('update:modelValue', '2026-11-30')
+    await campo('Anotação do contato').vm.$emit('update:modelValue', 'Paga no dia 30')
+    await flushPromises()
+    document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/receber/prorrogar', { parcelas: [31], vencimento: '2026-11-30', dias: null, anotacao: 'Paga no dia 30' })
+  })
 })

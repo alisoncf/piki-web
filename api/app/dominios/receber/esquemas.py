@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -117,6 +118,7 @@ class LinhaParcela(BaseModel):
     id: int
     conta_id: int
     documento: str
+    numero_documento: str | None = Field(description="O número do documento, sem a loja (o do VB6)")
     origem: str
     loja: LojaResumida
     cliente: ClienteDaParcela
@@ -170,3 +172,36 @@ class ContaCobrancaDados(BaseModel):
 class PedidoCobranca(BaseModel):
     parcelas: list[int] = Field(min_length=1)
     conta_cobranca_id: int
+
+
+class PedidoProrrogacao(BaseModel):
+    parcelas: list[int] = Field(min_length=1)
+    vencimento: date | None = Field(default=None, description="O novo vencimento, igual para todas")
+    dias: int | None = Field(default=None, ge=1, le=3650, description="Ou: tantos dias depois do vencimento de cada uma")
+    anotacao: str | None = Field(default=None, max_length=500, description="O que o cliente disse no contato")
+
+
+class ParcelaDados(BaseModel):
+    tipo_cobranca: Literal["loja", "cliente", "representante", "deposito", "boleto"] | None = None
+    conta_cobranca_id: int
+
+
+class DocumentoDados(BaseModel):
+    historico: str = Field(min_length=1, max_length=80)
+    documento: str | None = Field(default=None, max_length=20, description="O número do documento")
+
+
+class Mudanca(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    mudanca: str
+    de: str | None
+    para: str | None
+    anotacao: str | None
+    data_hora: datetime
+    usuario: Pessoa | None
+
+
+class PedidoBloqueio(BaseModel):
+    clientes: list[int] = Field(min_length=1)
+    bloquear: bool

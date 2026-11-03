@@ -315,7 +315,12 @@ Explicação do Alison. A conta de cobrança (`tab_contacob` do VB6) diz onde o 
 - ETL: a conta é achada pelo nome do VB6 (sem acentos nem maiúsculas); 000 e GERAL são a Geral. A conta PREJUIZO também vai para a Geral, porque o prejuízo virou a marca da parcela (D26). Os códigos são outros em cada loja porque cada banco cadastrou as contas num momento (confirmado pelo Alison em 03/11/2026).
 - **Tipo de cobrança** (Alison, 03/11/2026): é escolha do cliente quando a venda é efetivada: pagamento na loja, cobrança no cliente, representante recebe, depósito ou boleto. Fica em cada parcela; a tela de receber a venda sugere pela ficha do cliente (pagamento na loja, ou cobrança no cliente em casa ou no trabalho) e o cliente escolhe. Lista fixa no código (a `tab_tipocob` do VB6 é a mesma nas três lojas); filtro na tela de contas a receber; o ETL traz o `cod_tip`.
 - **Comissão:** a do vendedor é calculada pela venda efetivada, sem depender do recebimento das parcelas; a comissão da `tab_tipocob` não é usada para isso. A dos representantes (consignado) fica para a onda 5.
-- **Prorrogar e editar** parcelas, e o documento inteiro, é ação importante do financeiro, às vezes em lote. É a próxima parte do contas a receber. No VB6 (`frmEdiLan`) a edição guarda o histórico das prorrogações (de quando para quando, com a anotação do contato), das mudanças de conta e de tipo de cobrança, com quem e quando.
+- **Prorrogar e editar** (regras do Alison, 03/11/2026), na tela de contas a receber, com a permissão `receber.editar`:
+  - Prorrogar muda só o vencimento; o vencimento inicial fica. Em lote, para uma data só (o "dia 30" do VB6) ou tantos dias depois do vencimento de cada uma, com a anotação do contato.
+  - Na parcela (clicando na linha): o tipo e a conta de cobrança. **O que falta pagar não se edita: só muda com a baixa.**
+  - No documento: o cabeçalho (histórico e número), para todas as parcelas dele.
+  - Toda mudança vai para o histórico da parcela, com o que era, o que ficou, quem, quando e a anotação, como a `frmEdiLan` do VB6: prorrogação, conta e tipo de cobrança, prejuízo e documento.
+- **Cobrança em lote** (a tela "Cobrança" do VB6 fica como ações da mesma tela de contas a receber): mudar as selecionadas de conta de cobrança, e bloquear ou liberar os clientes delas (o bloqueio por atraso é à mão); cada bloqueio fica anotado na ficha do cliente. Bloquear pede `receber.cobranca` ou `clientes.editar`.
 
 ### Próximas etapas da venda (respostas do Alison, 03/11/2026)
 

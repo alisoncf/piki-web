@@ -155,3 +155,51 @@ def test_contas_de_cobranca_mudanca_em_lote_e_volta_para_a_geral(cliente, loja, 
     assert r.json()["quitou"] is True
     todas = cliente.get("/receber/parcelas", headers=admin, params={"situacao": "todas"}).json()["itens"]
     assert {p["conta_cobranca"] for p in todas} == {"Geral"}
+
+
+def test_prorrogar_em_lote_editar_e_historico(cliente, loja, admin, carnes):  # noqa: F811
+    vencida, a_vencer = carnes["vencida"], carnes["a_vencer"]
+    hoje = date.today()
+    assert cliente.post("/receber/prorrogar", headers=loja["davi"], json={"parcelas": [vencida], "dias": 5}).status_code == 403
+    r = cliente.post("/receber/prorrogar", headers=admin, json={"parcelas": [vencida], "dias": 5, "vencimento": "2030-01-01"})
+    assert r.status_code == 422  # ou uma data, ou dias
+    # as duas para o dia 30, com o que o cliente disse
+    dia30 = date(hoje.year + 1, 1, 30)
+    r = cliente.post("/receber/prorrogar", headers=admin,
+                     json={"parcelas": [vencida, a_vencer], "vencimento": dia30.isoformat(), "anotacao": "Paga quando receber"})
+    assert r.json() == {"alteradas": 2}
+    linhas = {p["id"]: p for p in cliente.get("/receber/parcelas", headers=admin).json()["itens"]}
+    assert linhas[vencida]["vencimento"] == dia30.isoformat()
+    assert linhas[vencida]["vencimento_inicial"] == (hoje - timedelta(days=20)).isoformat()  # o inicial fica
+    assert linhas[vencida]["dias_atraso"] == 0
+    # mais 10 dias, cada uma a partir do seu vencimento
+    cliente.post("/receber/prorrogar", headers=admin, json={"parcelas": [vencida], "dias": 10})
+
+    # tipo e conta de cobrança da parcela; o que falta pagar não muda aqui
+    jose = cliente.post("/receber/contas-cobranca", headers=admin, json={"nome": "José Cobrador"}).json()
+    r = cliente.put(f"/receber/parcelas/{vencida}", headers=admin,
+                    json={"tipo_cobranca": "boleto", "conta_cobranca_id": jose["id"], "aberto": "1.00"})
+    assert r.status_code == 200
+    linha = cliente.get("/receber/parcelas", headers=admin, params={"tipo_cobranca": "boleto"}).json()["itens"][0]
+    assert (linha["conta_cobranca"], linha["aberto"]) == ("José Cobrador", "300.00")
+    # o cabeçalho do documento
+    r = cliente.put(f"/receber/documentos/{linha['conta_id']}", headers=admin, json={"historico": "Renegociada", "documento": "0009"})
+    assert r.status_code == 200
+
+    historico = cliente.get(f"/receber/parcelas/{vencida}/historico", headers=admin).json()
+    assert [h["mudanca"] for h in historico] == ["documento", "cobranca", "tipo", "prorrogacao", "prorrogacao"]
+    primeira, segunda = historico[4], historico[3]  # do mais novo para o mais antigo
+    assert (primeira["de"], primeira["para"], primeira["anotacao"], primeira["usuario"]["nome"]) == (
+        (hoje - timedelta(days=20)).strftime("%d/%m/%Y"), dia30.strftime("%d/%m/%Y"), "Paga quando receber", "Caio Admin")
+    assert segunda["para"] == (dia30 + timedelta(days=10)).strftime("%d/%m/%Y")
+
+
+def test_bloquear_e_liberar_clientes_em_lote(banco, cliente, loja, admin, carnes):  # noqa: F811
+    r = cliente.post("/receber/clientes/bloqueio", headers=admin, json={"clientes": [carnes["cliente"]], "bloquear": True})
+    assert r.json() == {"alterados": 1}
+    assert cliente.get("/receber/parcelas", headers=admin, params={"bloqueio": "bloqueados"}).json()["total"] == 2
+    with banco() as db:
+        cli = db.get(Cliente, carnes["cliente"])
+        assert cli.bloqueado and cli.anotacoes[0].texto == "Bloqueado pela cobrança (contas a receber)"
+    r = cliente.post("/receber/clientes/bloqueio", headers=admin, json={"clientes": [carnes["cliente"]], "bloquear": False})
+    assert r.json() == {"alterados": 1}
