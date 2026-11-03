@@ -158,7 +158,7 @@ describe('vendas', () => {
     await botao(wrapper, 'Confirmar recebimento').trigger('click')
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/vendas/3/receber', {
-      sessao_caixa_id: 11, valor_recebido: '50.00', data_base: null, modelo_nota: '65', autorizacao: null,
+      sessao_caixa_id: 11, valor_recebido: '50.00', data_base: null, tipo_cobranca: null, modelo_nota: '65', autorizacao: null,
       pagamentos: [{ forma_pagamento_id: 1, valor: '40.00', parcelas: 1 }, { forma_pagamento_id: 2, valor: '60.00', parcelas: 1 }],
     })
     expect(router.currentRoute.value.name).toBe('vendas')
@@ -202,7 +202,7 @@ describe('vendas', () => {
     await botao(wrapper, 'Confirmar recebimento').trigger('click')
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/vendas/3/receber', {
-      sessao_caixa_id: 11, valor_recebido: null, data_base: '2026-01-31', modelo_nota: '55', autorizacao: null,
+      sessao_caixa_id: 11, valor_recebido: null, data_base: '2026-01-31', tipo_cobranca: 'cliente', modelo_nota: '55', autorizacao: null,
       pagamentos: [{ forma_pagamento_id: 1, valor: '40.00', parcelas: 1 }],
     })
     expect(router.currentRoute.value.name).toBe('carne')

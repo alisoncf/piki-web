@@ -134,6 +134,7 @@ class LinhaParcela(BaseModel):
     juros: Decimal
     prejuizo: bool
     conta_cobranca: str
+    tipo_cobranca: str | None
     prejuizo_em: datetime | None
     prejuizo_por: str | None
     prejuizo_motivo: str | None

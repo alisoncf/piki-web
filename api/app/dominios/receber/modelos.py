@@ -18,6 +18,16 @@ from app.dominios.empresas.modelos import Empresa
 from app.nucleo.banco import Base, ComDatas
 
 
+# como o cliente vai pagar, escolhido por ele quando a venda é efetivada (tab_tipocob do VB6, pelo cod_tip)
+TIPOS_COBRANCA = {
+    "loja": ("Pagamento na loja", "1"),
+    "cliente": ("Cobrança no cliente", "2"),
+    "representante": ("Representante recebe", "3"),
+    "deposito": ("Depósito bancário", "4"),
+    "boleto": ("Boleto bancário", "5"),
+}
+
+
 class ContaCobranca(ComDatas, Base):
     """Onde o carnê está para ser cobrado (tab_contacob do VB6): na loja, sem estar com ninguém (a padrão, Geral),
     com um cobrador, com o advogado, num balanço... Uma lista só para todas as lojas, juntada pelo nome."""
@@ -84,6 +94,7 @@ class ParcelaReceber(Base):
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     aberto: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # o que falta pagar (reman_itd no VB6)
     conta_cobranca_id: Mapped[int] = mapped_column(ForeignKey("conta_cobranca.id"), index=True)
+    tipo_cobranca: Mapped[str | None] = mapped_column(String(15))  # ver TIPOS_COBRANCA
     # prejuízo: a parcela que não se espera mais receber (o cliente morreu, não foi achado...). Sai da lista
     # do contas a receber, mas o cliente continua devendo: se pagar um dia, recebe normalmente.
     prejuizo_em: Mapped[datetime | None] = mapped_column(DateTime)

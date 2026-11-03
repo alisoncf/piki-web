@@ -110,7 +110,7 @@ def conta_padrao(db: Session) -> ContaCobranca:
 
 def lancar_carne(db: Session, empresa_id: int, cliente_id: int, venda_id: int | None, valor: Decimal,
                  parcelas: int, primeiro_vencimento: date, intervalo: int, historico: str,
-                 usuario_id: int) -> ContaReceber:
+                 usuario_id: int, tipo_cobranca: str | None = None) -> ContaReceber:
     """Cria a conta e as parcelas; quem chama grava."""
     conta = ContaReceber(empresa_id=empresa_id, cliente_id=cliente_id, venda_id=venda_id, valor=valor,
                          historico=historico[:80], usuario_id=usuario_id)
@@ -118,7 +118,7 @@ def lancar_carne(db: Session, empresa_id: int, cliente_id: int, venda_id: int | 
     geral = conta_padrao(db)
     for numero, (vencimento, parte) in enumerate(zip(datas, dividir(valor, parcelas)), start=1):
         conta.parcelas.append(ParcelaReceber(numero=numero, vencimento=vencimento, vencimento_inicial=vencimento,
-                                             valor=parte, aberto=parte, conta_cobranca=geral))
+                                             valor=parte, aberto=parte, conta_cobranca=geral, tipo_cobranca=tipo_cobranca))
     db.add(conta)
     return conta
 
@@ -278,6 +278,7 @@ class Filtros:
     credito_suspenso: bool | None = None
     prejuizo: str = "fora"  # fora (o normal, como no VB6), so ou junto
     conta_cobranca_id: int | None = None
+    tipo_cobranca: str | None = None
 
 
 ORDENS = {
@@ -337,6 +338,8 @@ def _condicoes(f: Filtros) -> list:
         c.append(Cliente.credito_suspenso.is_(f.credito_suspenso))
     if f.conta_cobranca_id:
         c.append(ParcelaReceber.conta_cobranca_id == f.conta_cobranca_id)
+    if f.tipo_cobranca:
+        c.append(ParcelaReceber.tipo_cobranca == f.tipo_cobranca)
     if f.prejuizo == "fora":
         c.append(ParcelaReceber.prejuizo_em.is_(None))
     elif f.prejuizo == "so":
@@ -428,3 +431,8 @@ def mudar_cobranca(db: Session, parcela_ids: list[int], conta_cobranca_id: int) 
             mudaram += 1
     db.commit()
     return mudaram
+
+
+def tipo_cobranca_do_cliente(cliente: Cliente) -> str:
+    """O tipo de cobrança que a venda sugere: pagamento na loja, ou cobrança no cliente (em casa ou no trabalho)."""
+    return "loja" if cliente.forma_cobranca == "loja" else "cliente"

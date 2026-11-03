@@ -100,6 +100,8 @@ def consultar(
     bloqueio: Literal["bloqueados", "liberados"] | None = None,
     credito_suspenso: bool | None = None,
     conta_cobranca_id: Annotated[int | None, Query(description="Com quem o carnê está para cobrar")] = None,
+    tipo_cobranca: Annotated[Literal["loja", "cliente", "representante", "deposito", "boleto"] | None,
+                             Query(description="Como o cliente escolheu pagar")] = None,
     prejuizo: Annotated[Literal["fora", "so", "junto"],
                         Query(description="As que caíram no prejuízo: fora da lista (o normal), só elas ou junto")] = "fora",
     ordem: Literal["vencimento", "cliente", "documento", "valor"] = "vencimento",
@@ -111,7 +113,7 @@ def consultar(
         situacao=situacao, empresa_id=loja, cliente_id=cliente_id, busca=busca, documento=documento, origem=origem,
         historico=historico, data=data, de=de, ate=ate, valor=valor, cidade_id=cidade_id, setor_id=setor_id,
         orgao_id=orgao_id, grupo_id=grupo_id, bloqueio=bloqueio, credito_suspenso=credito_suspenso, prejuizo=prejuizo,
-        conta_cobranca_id=conta_cobranca_id,
+        conta_cobranca_id=conta_cobranca_id, tipo_cobranca=tipo_cobranca,
     )
     itens, total, soma_valor, soma_aberto = servico.consultar(ctx.db, filtros, ordem, limite, deslocamento)
     taxa = servico.juros_ao_mes(ctx.db)
@@ -129,7 +131,7 @@ def consultar(
             historico=conta.historico, emissao=conta.criado_em.date(), numero=p.numero, parcelas=len(conta.parcelas),
             vencimento=p.vencimento, vencimento_inicial=p.vencimento_inicial, valor=p.valor, aberto=p.aberto,
             dias_atraso=dias, juros=juros, prejuizo=p.prejuizo, conta_cobranca=p.conta_cobranca.nome,
-            prejuizo_em=p.prejuizo_em,
+            tipo_cobranca=p.tipo_cobranca, prejuizo_em=p.prejuizo_em,
             prejuizo_por=p.prejuizo_por.nome if p.prejuizo_por else None, prejuizo_motivo=p.prejuizo_motivo,
         ))
     return PaginaParcelas(itens=linhas, total=total, soma_valor=soma_valor, soma_aberto=soma_aberto, juros_ao_mes=taxa)

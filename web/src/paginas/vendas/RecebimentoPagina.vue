@@ -73,6 +73,17 @@
                 hint="A 1ª parcela vence um mês depois dela"
                 class="col-12 col-sm-6"
               />
+              <q-select
+                v-model="tipoCobranca"
+                outlined
+                dense
+                label="Tipo de cobrança *"
+                hint="Como o cliente vai pagar"
+                :options="TIPOS_COBRANCA"
+                emit-value
+                map-options
+                class="col-12 col-sm-6"
+              />
             </div>
             <div v-if="venda.credito" class="text-caption q-mb-sm" :class="{ 'text-negative': passaDoLimite }">
               <template v-if="venda.credito.impedimento">{{ venda.credito.impedimento }}</template>
@@ -143,7 +154,7 @@ import DialogoAutorizacao from '@/componentes/DialogoAutorizacao.vue'
 import LinhasPagamento from '@/componentes/LinhasPagamento.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
 import { usarAutorizacao } from '@/servicos/autorizacao'
-import { formatarMoeda } from '@/servicos/formatos'
+import { formatarMoeda, TIPOS_COBRANCA } from '@/servicos/formatos'
 import { centavos, completos, noDinheiro as somarDinheiro, novaLinha, somar, troco as calcularTroco } from '@/servicos/pagamentos'
 import { useCaixaDaMaquinaStore } from '@/stores/caixaDaMaquina'
 
@@ -163,6 +174,7 @@ const pagamentos = ref([])
 const valorRecebido = ref('')
 const dataBase = ref(hoje())
 const modeloNota = ref('65')
+const tipoCobranca = ref(null)
 
 const url = computed(() => `/vendas/${rota.params.id}`)
 const forma = computed(() => formaPorId(venda.value?.forma_pagamento?.id))
@@ -228,6 +240,8 @@ function pagamentosIniciais() {
     ? []
     : [{ forma_pagamento_id: forma.value.id, valor: totalVenda.value.toFixed(2), parcelas: venda.value.parcelas }]
   valorRecebido.value = ''
+  // o tipo de cobrança sugerido pela ficha do cliente; ele escolhe na hora
+  tipoCobranca.value = venda.value?.cliente?.forma_cobranca === 'loja' ? 'loja' : 'cliente'
 }
 
 function adicionar() {
@@ -275,6 +289,7 @@ async function confirmar() {
     pagamentos: pagamentos.value.map((pg) => ({ forma_pagamento_id: pg.forma_pagamento_id, valor: Number(pg.valor).toFixed(2), parcelas: pg.parcelas })),
     valor_recebido: noDinheiro.value && valorRecebido.value ? Number(valorRecebido.value).toFixed(2) : null,
     data_base: crediario.value ? dataBase.value : null,
+    tipo_cobranca: crediario.value ? tipoCobranca.value : null,
     modelo_nota: modeloNota.value,
   }
   const data = await mandar((autorizacao) => api.post(`${url.value}/receber`, { ...pedido, autorizacao }))

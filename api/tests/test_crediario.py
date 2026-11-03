@@ -95,6 +95,7 @@ def test_crediario_acima_do_limite_com_autorizacao(cliente, loja, freguesa):  # 
     # a data base pode ser outra que não hoje; a 1ª parcela vence um mês depois dela
     base = date.today() - timedelta(days=10)
     pedido["data_base"] = base.isoformat()
+    pedido["tipo_cobranca"] = "boleto"  # o cliente escolhe na hora
     r = cliente.post(f"{url}/receber", headers=davi, json=pedido | {"autorizacao": {"login": "ana", "senha": "senha-ana"}})
     assert r.status_code == 403 and "Ana Lima não pode" in r.json()["detail"]
     r = cliente.post(f"{url}/receber", headers=davi, json=pedido | {"autorizacao": {"login": "caio", "senha": "senha-caio"}})
@@ -103,6 +104,19 @@ def test_crediario_acima_do_limite_com_autorizacao(cliente, loja, freguesa):  # 
     assert (venda["limite_autorizado_por"]["nome"], venda["pagamentos"], venda["troco"]) == ("Caio Admin", [], None)
     assert [p["vencimento"] for p in venda["carne"]["parcelas"]] == [
         contas.somar_meses(base, 1).isoformat(), contas.somar_meses(base, 2).isoformat()]
+
+
+def test_tipo_de_cobranca_vem_da_ficha_do_cliente_ou_da_escolha(banco, cliente, loja, admin, freguesa):  # noqa: F811
+    url, _ = _venda_no_crediario(cliente, loja, freguesa["id"], 1)
+    r = cliente.post(f"{url}/receber", headers=admin, json={"sessao_caixa_id": loja["sessao"]})
+    assert r.status_code == 200, r.text
+    with banco() as db:
+        conta = contas.conta_da_venda(db, r.json()["id"])
+        assert {p.tipo_cobranca for p in conta.parcelas} == {"cliente"}  # a ficha diz cobrança em domicílio
+    url, _ = _venda_no_crediario(cliente, loja, freguesa["id"], 1)
+    r = cliente.post(f"{url}/receber", headers=admin, json={"sessao_caixa_id": loja["sessao"], "tipo_cobranca": "loja"})
+    filtrado = cliente.get("/receber/parcelas", headers=admin, params={"tipo_cobranca": "loja"}).json()
+    assert {p["tipo_cobranca"] for p in filtrado["itens"]} == {"loja"} and filtrado["total"] == 3
 
 
 def test_cliente_bloqueado_nao_compra_no_crediario(cliente, loja, freguesa):  # noqa: F811

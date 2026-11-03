@@ -77,6 +77,7 @@
           <q-select v-model="filtros.bloqueio" outlined dense clearable label="Cliente" :options="BLOQUEIO" emit-value map-options class="col-6 col-sm-3 col-md-2" />
           <q-select v-model="filtros.credito_suspenso" outlined dense clearable label="Crédito suspenso" :options="SIM_NAO" emit-value map-options class="col-6 col-sm-3 col-md-2" />
           <q-select v-model="filtros.prejuizo" outlined dense label="Prejuízo" :options="PREJUIZO" emit-value map-options class="col-6 col-sm-3 col-md-2" />
+          <q-select v-model="filtros.tipo_cobranca" outlined dense clearable label="Tipo de cobrança" :options="TIPOS_COBRANCA" emit-value map-options class="col-6 col-sm-3 col-md-2" />
           <template v-if="listas.setores.length">
             <selecao-busca v-model="filtros.setor_id" :opcoes="listas.setores" :rotulo="nomeSetor" dense label="Setor" class="col-12 col-sm-6 col-md-3" />
             <selecao-busca v-model="filtros.orgao_id" :opcoes="listas.orgaos" dense label="Órgão" class="col-12 col-sm-6 col-md-3" />
@@ -139,7 +140,10 @@
             </q-tooltip>
           </q-badge>
           <div class="text-caption text-suave ellipsis" style="max-width: 220px">{{ props.row.historico }}</div>
-          <div v-if="props.row.conta_cobranca !== 'Geral'" class="text-caption"><q-icon name="contact_mail" size="14px" /> {{ props.row.conta_cobranca }}</div>
+          <div v-if="props.row.conta_cobranca !== 'Geral' || props.row.tipo_cobranca" class="text-caption">
+            <template v-if="props.row.conta_cobranca !== 'Geral'"><q-icon name="contact_mail" size="14px" /> {{ props.row.conta_cobranca }}</template>
+            <span v-if="props.row.tipo_cobranca" class="text-suave"> · {{ nomeTipoCobranca(props.row.tipo_cobranca) }}</span>
+          </div>
         </q-td>
       </template>
       <template #body-cell-cliente="props">
@@ -176,7 +180,7 @@ import { useRouter } from 'vue-router'
 import SelecaoBusca from '@/componentes/SelecaoBusca.vue'
 import SelecaoCidade from '@/componentes/SelecaoCidade.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
-import { formatarDataHora, formatarDocumento, formatarMoeda, nomeSetor } from '@/servicos/formatos'
+import { formatarDataHora, formatarDocumento, formatarMoeda, nomeSetor, nomeTipoCobranca, TIPOS_COBRANCA } from '@/servicos/formatos'
 import { centavos } from '@/servicos/pagamentos'
 import { useSessaoStore } from '@/stores/sessao'
 
@@ -214,6 +218,7 @@ const VAZIOS = {
   valor: '', historico: '', cidade_id: null, bloqueio: null, credito_suspenso: null, setor_id: null, orgao_id: null, grupo_id: null,
   prejuizo: 'fora',
   conta_cobranca_id: null,
+  tipo_cobranca: null,
 }
 
 const $q = useQuasar()

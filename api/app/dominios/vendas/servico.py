@@ -564,7 +564,8 @@ def receber(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str]
         venda.data_base = base
         primeiro = contas.vencimentos(base, 2, forma.intervalo)[1]
         contas.lancar_carne(db, empresa_id, venda.cliente_id, venda.id, a_prazo, venda.parcelas, primeiro,
-                             forma.intervalo, f"Venda {venda.numero} {venda.cliente.nome}", usuario.id)
+                             forma.intervalo, f"Venda {venda.numero} {venda.cliente.nome}", usuario.id,
+                             pedido.tipo_cobranca or contas.tipo_cobranca_do_cliente(venda.cliente))
         lancamentos.append((forma, a_prazo))
     elif pago < venda.total:
         raise DadoInvalido(f"Falta lançar {moeda(venda.total - pago)}")

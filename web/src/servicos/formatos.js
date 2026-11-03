@@ -50,6 +50,19 @@ export const FORMAS_COBRANCA = [
   { value: 'loja', label: 'Pagamento na loja' },
 ]
 
+// como o cliente vai pagar o crediário, escolhido ao efetivar a venda (TIPOS_COBRANCA em receber/modelos.py)
+export const TIPOS_COBRANCA = [
+  { value: 'loja', label: 'Pagamento na loja' },
+  { value: 'cliente', label: 'Cobrança no cliente' },
+  { value: 'representante', label: 'Representante recebe' },
+  { value: 'deposito', label: 'Depósito bancário' },
+  { value: 'boleto', label: 'Boleto bancário' },
+]
+
+export function nomeTipoCobranca(tipo) {
+  return TIPOS_COBRANCA.find((t) => t.value === tipo)?.label ?? ''
+}
+
 // tipos de documento do crediário (mesmos códigos da API, TIPOS_DE_DOCUMENTO em clientes/servico.py)
 export const TIPOS_DOCUMENTO = [
   { value: 'identidade', label: 'Identidade (RG ou CNH)' },

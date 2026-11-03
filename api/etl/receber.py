@@ -33,7 +33,7 @@ from sqlalchemy import Connection, bindparam, select, text
 from sqlalchemy.orm import Session
 
 from app.dominios.empresas.modelos import Empresa
-from app.dominios.receber.modelos import ContaCobranca, ContaReceber, ItemRecebimento, ParcelaReceber
+from app.dominios.receber.modelos import TIPOS_COBRANCA, ContaCobranca, ContaReceber, ItemRecebimento, ParcelaReceber
 from app.dominios.receber.servico import conta_padrao
 from app.nucleo.legado import MapaLegado
 from app.nucleo.textos import nome_proprio
@@ -41,6 +41,7 @@ from etl.funcionarios import EmpresaNaoImportada
 
 ZERO = Decimal("0.00")
 LOTE = 500
+_TIPOS = {codigo: tipo for tipo, (_, codigo) in TIPOS_COBRANCA.items()}  # cod_tip do VB6 → tipo de cobrança
 _ORIGENS = {"V": "venda", "A": "acerto"}
 _TERCEIROS = {"R": "representantes", "U": "funcionários"}
 
@@ -62,7 +63,7 @@ _DOCS = text("""
 _PARCELAS = text("""
     SELECT CAST(i.seq_itd AS CHAR) seq_itd, CAST(i.seq_doc AS CHAR) seq_doc, i.parcela_itd, i.valor_itd, i.reman_itd,
            CAST(i.venc_itd AS CHAR) venc_itd, CAST(i.vencini_itd AS CHAR) vencini_itd,
-           CAST(i.prejuizo_itd AS CHAR) prejuizo_itd, CAST(i.cod_cob AS CHAR) cod_cob, CAST(c.nome_cob AS CHAR) nome_cob
+           CAST(i.prejuizo_itd AS CHAR) prejuizo_itd, CAST(i.cod_cob AS CHAR) cod_cob, CAST(i.cod_tip AS CHAR) cod_tip, CAST(c.nome_cob AS CHAR) nome_cob
       FROM tab_itdoc i LEFT JOIN tab_contacob c ON c.cod_cob = i.cod_cob
      WHERE i.seq_doc IN :seqs ORDER BY i.seq_doc, i.parcela_itd, i.venc_itd, i.seq_itd
 """).bindparams(bindparam("seqs", expanding=True))
@@ -210,12 +211,13 @@ def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clie
             r.prejuizo += 1
             r.em_prejuizo += aberto
         cobranca = contas_cobranca.da(p)
+        tipo = _TIPOS.get(_texto(p["cod_tip"]))
         parcela_id = parcelas_importadas.get(seq_itd)
         parcela = db.get(ParcelaReceber, parcela_id) if parcela_id else None
         if parcela is None:
             parcela = ParcelaReceber(numero=ordem if renumerar else int(p["parcela_itd"]), vencimento=vencimento,
                                      vencimento_inicial=_data(p["vencini_itd"]) or vencimento, valor=valor, aberto=aberto,
-                                     conta_cobranca_id=cobranca)
+                                     conta_cobranca_id=cobranca, tipo_cobranca=tipo)
             conta.parcelas.append(parcela)
             db.flush()
             db.add(MapaLegado(tabela="tab_itdoc", empresa_id=empresa.id, codigo=seq_itd, novo_id=parcela.id))
@@ -226,14 +228,14 @@ def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clie
             _marcar_prejuizo(parcela, prejuizo)
             inicial = _data(p["vencini_itd"]) or parcela.vencimento_inicial
             if (parcela.vencimento, parcela.vencimento_inicial, parcela.valor, parcela.aberto,
-                    parcela.conta_cobranca_id) == (vencimento, inicial, valor, aberto, cobranca):
+                    parcela.conta_cobranca_id, parcela.tipo_cobranca) == (vencimento, inicial, valor, aberto, cobranca, tipo):
                 continue
             if parcela.id in recebidas:
                 r.avisos.append(f"documento {num_doc}, parcela {parcela.numero}: já recebida no sistema novo; "
                                 "a mudança do VB6 não foi aplicada")
                 continue
             parcela.vencimento, parcela.vencimento_inicial, parcela.valor, parcela.aberto = vencimento, inicial, valor, aberto
-            parcela.conta_cobranca_id = cobranca
+            parcela.conta_cobranca_id, parcela.tipo_cobranca = cobranca, tipo
             r.atualizadas += 1
     conta.valor = sum((p.valor for p in conta.parcelas), ZERO)
 

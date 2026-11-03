@@ -104,7 +104,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 - [x] Prejuízo da parcela (D26): pôr e tirar com o motivo, fora da lista, conta no limite; ETL pela marca e pela conta de cobrança PREJUIZO (migração 0027) — 03/11/2026
 - [x] Contas de cobrança (D27): cadastro, filtro, mudança em lote, volta para a Geral depois da baixa e aviso de cliente quitado; ETL pelo nome (migração 0028) — 03/11/2026
 - [ ] Cheques
-- [~] Cobrança e carnês: contas de cobrança feitas (D27); falta o tipo de cobrança e a comissão
+- [~] Cobrança e carnês: contas de cobrança e tipo de cobrança (escolhido na venda) feitos (D27, migrações 0028 e 0029) — 03/11/2026; faltam prorrogar e editar parcelas e documentos, também em lote
 - [ ] Testes comparando os resultados do sistema novo com os do VB6
 
 ## Onda 4 · Estoque e compras

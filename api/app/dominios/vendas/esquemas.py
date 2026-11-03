@@ -142,6 +142,8 @@ class PedidoRecebimento(ComAutorizacao):
     valor_recebido: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2,
                                            description="No dinheiro, o que o cliente deu (para o troco)")
     data_base: date | None = Field(default=None, description="Crediário: de onde contam os vencimentos; sem ela, hoje")
+    tipo_cobranca: Literal["loja", "cliente", "representante", "deposito", "boleto"] | None = Field(
+        default=None, description="Crediário: como o cliente vai pagar; sem ele, o da ficha do cliente")
     modelo_nota: Literal["65", "55"] = Field(default="65", description="65 NFC-e, 55 NF-e")
 
 
@@ -184,6 +186,7 @@ class ClienteResumido(BaseModel):
     nome: str
     cpf_cnpj: str | None
     bloqueado: bool
+    forma_cobranca: str | None = None  # domicilio, trabalho ou loja: sugere o tipo de cobrança do crediário
     cep: str | None = None
     logradouro: str | None = None
     numero: str | None = None
