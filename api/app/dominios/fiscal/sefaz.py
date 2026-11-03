@@ -17,6 +17,7 @@ DENEGADAS = {"110", "301", "302", "303"}
 DUPLICIDADE = "204"  # já autorizada antes: a resposta da primeira vez se perdeu
 EM_PROCESSAMENTO = "105"
 EVENTO_REGISTRADO = {"135", "136", "155"}
+INUTILIZACAO_HOMOLOGADA = "102"
 SERVICO_EM_OPERACAO = "107"
 
 
@@ -135,3 +136,9 @@ class Sefaz:
         ret = r.retEvento[0]
         info = ret.infEvento
         return Retorno(str(info.cStat), info.xMotivo, info.nProt, _data(info.dhRegEvento), _trecho(resposta, "retEvento"))
+
+    def inutilizar(self, cnpj: str, modelo: str, serie: int, inicial: int, final: int, justificativa: str) -> Retorno:
+        pedido = self._cliente.inutilizacao(cnpj, modelo, str(serie), str(inicial), str(final), justificativa)
+        resposta = self._chamar(self._cliente.envia_inutilizacao, pedido)
+        info = resposta.resposta.infInut
+        return Retorno(str(info.cStat), info.xMotivo, info.nProt, _data(info.dhRecbto), _trecho(resposta, "retInutNFe"))

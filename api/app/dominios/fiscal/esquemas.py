@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -33,6 +34,47 @@ class Nota(BaseModel):
     cancelada_por: UsuarioResumido | None
     justificativa_cancelamento: str | None
     protocolo_cancelamento: str | None
+
+
+class Serie(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    modelo: str
+    serie: int
+    ultimo: int
+
+
+class Faixa(BaseModel):
+    inicial: int
+    final: int
+
+
+class Lacunas(BaseModel):
+    faixas: list[Faixa]
+    pendentes: list[int] = Field(description="Notas sem resposta da SEFAZ no meio da série: consultar antes")
+
+
+class InutilizacaoDados(BaseModel):
+    modelo: Literal["65", "55"] = "65"
+    serie: int = Field(ge=0, le=999)
+    inicial: int = Field(ge=1, le=999999999)
+    final: int = Field(ge=1, le=999999999)
+    justificativa: str = Field(min_length=15, max_length=255)
+
+
+class Inutilizacao(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ambiente: str
+    modelo: str
+    serie: int
+    inicial: int
+    final: int
+    justificativa: str
+    protocolo: str | None
+    homologada_em: datetime | None
+    feita_por: UsuarioResumido
 
 
 class RetornoSefaz(BaseModel):

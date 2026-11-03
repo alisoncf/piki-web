@@ -32,7 +32,7 @@
           </div>
         </template>
         <div class="row q-gutter-sm q-mt-md">
-          <q-btn v-if="podeTransmitir" unelevated no-caps color="primary" icon="send" :label="nota ? 'Transmitir de novo' : 'Emitir a NFC-e'" @click="emitir" />
+          <q-btn v-if="podeTransmitir" unelevated no-caps color="primary" icon="send" :label="nota && nota.situacao !== 'inutilizada' ? 'Transmitir de novo' : 'Emitir a NFC-e'" @click="emitir" />
           <q-btn v-if="nota?.situacao === 'pendente'" flat no-caps color="primary" icon="travel_explore" label="Consultar na SEFAZ" @click="consultar" />
           <q-btn v-if="danfe" unelevated no-caps color="primary" icon="print" label="Imprimir" @click="imprimir" />
           <q-btn v-if="depois" flat no-caps color="primary" icon="arrow_forward" :label="depois.rotulo" :to="depois.rota" />
@@ -102,8 +102,8 @@ import { useRoute } from 'vue-router'
 import { api, mensagemDeErro } from '@/servicos/api'
 import { formatarCnpj, formatarDataHora, formatarDocumento, formatarQuantidade } from '@/servicos/formatos'
 
-const NOME = { pendente: 'Pendente', rejeitada: 'Rejeitada', autorizada: 'Autorizada', cancelada: 'Cancelada', denegada: 'Denegada' }
-const COR = { pendente: 'orange', rejeitada: 'negative', autorizada: 'positive', cancelada: 'grey', denegada: 'negative' }
+const NOME = { pendente: 'Pendente', rejeitada: 'Rejeitada', autorizada: 'Autorizada', cancelada: 'Cancelada', denegada: 'Denegada', inutilizada: 'Inutilizada' }
+const COR = { pendente: 'orange', rejeitada: 'negative', autorizada: 'positive', cancelada: 'grey', denegada: 'negative', inutilizada: 'grey' }
 const PAGAMENTOS = {
   '01': 'Dinheiro', '03': 'Cartão de crédito', '04': 'Cartão de débito', '05': 'Crédito loja', '16': 'Depósito bancário',
   '17': 'PIX', '90': 'Sem pagamento',
@@ -118,7 +118,7 @@ const carregado = ref(false)
 const trabalhando = ref('')
 const erro = ref('')
 
-const podeTransmitir = computed(() => !nota.value || ['pendente', 'rejeitada'].includes(nota.value.situacao))
+const podeTransmitir = computed(() => !nota.value || ['pendente', 'rejeitada', 'inutilizada'].includes(nota.value.situacao))
 const depois = computed(() => {
   const nome = rota.query.depois
   return PROXIMOS[nome] ? { rotulo: PROXIMOS[nome], rota: { name: nome, params: { id: rota.params.id }, query: { imprimir: 1 } } } : null

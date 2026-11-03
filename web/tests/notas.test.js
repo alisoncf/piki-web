@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
+import InutilizarNumerosPagina from '@/paginas/notas/InutilizarNumerosPagina.vue'
 import NfceVendaPagina from '@/paginas/notas/NfceVendaPagina.vue'
 import NotasPagina from '@/paginas/notas/NotasPagina.vue'
 import { api } from '@/servicos/api'
@@ -37,6 +38,7 @@ async function montar(componente, caminho) {
       { path: '/notas', name: 'notas', component: componente === NotasPagina ? componente : vazio },
       { path: '/vendas/:id/nfce', name: 'nfce-venda', component: componente === NfceVendaPagina ? componente : vazio },
       { path: '/vendas/:id/carne', name: 'carne', component: vazio },
+      { path: '/notas/inutilizar', name: 'inutilizar-numeros', component: componente === InutilizarNumerosPagina ? componente : vazio },
     ],
   })
   await router.push(caminho)
@@ -118,5 +120,34 @@ describe('notas fiscais', () => {
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/notas/8/cancelar', { justificativa: 'Cliente desistiu da compra' })
     expect(wrapper.text()).toContain('Cancelada')
+  })
+
+  it('busca as lacunas da série e inutiliza a faixa escolhida', async () => {
+    entrar(['notas.inutilizar'])
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: {
+        '/notas/series': [{ modelo: '65', serie: 101, ultimo: 8 }],
+        '/notas/inutilizacoes': [],
+        '/notas/lacunas': { faixas: [{ inicial: 2, final: 3 }, { inicial: 7, final: 8 }], pendentes: [5] },
+      }[url],
+    }))
+    const feita = { id: 1, ambiente: '2', modelo: '65', serie: 101, inicial: 2, final: 3, justificativa: 'Notas rejeitadas e largadas', protocolo: '152260000000777', homologada_em: '2026-11-03T11:00:00', feita_por: { id: 1, nome: 'Caio' } }
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: feita })
+    const { wrapper } = await montar(InutilizarNumerosPagina, '/notas/inutilizar')
+    await botao(wrapper, 'Buscar lacunas').trigger('click')
+    await flushPromises()
+    expect(api.get).toHaveBeenCalledWith('/notas/lacunas', { params: { modelo: '65', serie: 101, desde: expect.any(String) } })
+    expect(wrapper.text()).toContain('Consulte-as antes')
+    await wrapper.findAll('.q-item').find((i) => i.text().includes('Do 2 ao 3')).trigger('click')
+    const justificativa = wrapper.findAllComponents({ name: 'QInput' }).find((c) => c.props('label')?.startsWith('Justificativa'))
+    await justificativa.vm.$emit('update:modelValue', 'Notas rejeitadas e largadas')
+    await flushPromises()
+    await botao(wrapper, 'Inutilizar').trigger('click')
+    await flushPromises()
+    const ok = [...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.includes('Inutilizar'))
+    ok.click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/notas/inutilizacoes', { modelo: '65', serie: 101, inicial: 2, final: 3, justificativa: 'Notas rejeitadas e largadas' })
+    expect(wrapper.text()).toContain('152260000000777')
   })
 })

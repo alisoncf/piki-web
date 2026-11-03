@@ -19,13 +19,14 @@ AMBIENTES = {"1": "Produção", "2": "Homologação"}
 
 # situação da nota: pendente (enviada sem resposta, ou a resposta se perdeu: consultar ou retransmitir),
 # rejeitada (a SEFAZ recusou: corrigir e transmitir de novo, com o mesmo número), autorizada,
-# cancelada, denegada
+# cancelada, denegada, inutilizada (a rejeitada cujo número foi inutilizado; a venda, se precisar, ganha outro)
 PENDENTE = "pendente"
 REJEITADA = "rejeitada"
 AUTORIZADA = "autorizada"
 CANCELADA = "cancelada"
 DENEGADA = "denegada"
-SITUACOES = (PENDENTE, REJEITADA, AUTORIZADA, CANCELADA, DENEGADA)
+INUTILIZADA = "inutilizada"
+SITUACOES = (PENDENTE, REJEITADA, AUTORIZADA, CANCELADA, DENEGADA, INUTILIZADA)
 
 
 class NumeracaoNota(ComDatas, Base):
@@ -54,7 +55,7 @@ class NotaFiscal(ComDatas, Base):
     numero: Mapped[int] = mapped_column(Integer)
     codigo_numerico: Mapped[str] = mapped_column(String(8))  # o cNF, que entra na chave
     chave: Mapped[str] = mapped_column(String(44), index=True)
-    situacao: Mapped[str] = mapped_column(String(10), default=PENDENTE, index=True)
+    situacao: Mapped[str] = mapped_column(String(12), default=PENDENTE, index=True)
     venda_id: Mapped[int | None] = mapped_column(ForeignKey("venda.id"), index=True)
     emitida_em: Mapped[datetime] = mapped_column(DateTime)
     emitida_por_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
@@ -74,3 +75,24 @@ class NotaFiscal(ComDatas, Base):
 
     emitida_por: Mapped[Usuario] = relationship(foreign_keys=[emitida_por_id], lazy="joined")
     cancelada_por: Mapped[Usuario | None] = relationship(foreign_keys=[cancelada_por_id], lazy="joined")
+
+
+class InutilizacaoNota(ComDatas, Base):
+    """Uma faixa de números que não vai ser usada (as lacunas da série), homologada pela SEFAZ."""
+
+    __tablename__ = "nota_inutilizacao"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), index=True)
+    ambiente: Mapped[str] = mapped_column(String(1))
+    modelo: Mapped[str] = mapped_column(String(2))
+    serie: Mapped[int] = mapped_column(Integer)
+    inicial: Mapped[int] = mapped_column(Integer)
+    final: Mapped[int] = mapped_column(Integer)
+    justificativa: Mapped[str] = mapped_column(String(255))
+    protocolo: Mapped[str | None] = mapped_column(String(15))
+    homologada_em: Mapped[datetime | None] = mapped_column(DateTime)
+    feita_por_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
+    xml: Mapped[str | None] = deferred(mapped_column(Text))  # o retInutNFe
+
+    feita_por: Mapped[Usuario] = relationship(lazy="joined")

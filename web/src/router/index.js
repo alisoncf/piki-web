@@ -227,6 +227,12 @@ export const rotas = [
         meta: { permissao: 'caixa.operar' },
       },
       {
+        path: 'notas/inutilizar',
+        name: 'inutilizar-numeros',
+        component: () => import('@/paginas/notas/InutilizarNumerosPagina.vue'),
+        meta: { permissao: 'notas.inutilizar' },
+      },
+      {
         path: 'notas',
         name: 'notas',
         component: () => import('@/paginas/notas/NotasPagina.vue'),

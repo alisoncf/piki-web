@@ -3,6 +3,7 @@
   <q-page padding>
     <div class="row items-center q-mb-md">
       <div class="piki-titulo col">Notas fiscais</div>
+      <q-btn v-if="sessao.pode('notas.inutilizar')" flat no-caps color="primary" icon="block" label="Inutilizar números" :to="{ name: 'inutilizar-numeros' }" />
     </div>
 
     <div class="row q-col-gutter-sm q-mb-md items-center">
@@ -36,7 +37,7 @@
         <q-td :props="props" class="text-right">
           <q-btn v-if="props.row.venda_id" flat dense no-caps icon="receipt" label="DANFE" :to="{ name: 'nfce-venda', params: { id: props.row.venda_id } }" />
           <q-btn flat dense no-caps icon="download" label="XML" @click="baixarXml(props.row)" />
-          <q-btn v-if="podeEmitir && props.row.situacao !== 'cancelada'" flat dense no-caps icon="travel_explore" label="Consultar" @click="consultar(props.row)" />
+          <q-btn v-if="podeEmitir && !['cancelada', 'inutilizada'].includes(props.row.situacao)" flat dense no-caps icon="travel_explore" label="Consultar" @click="consultar(props.row)" />
           <q-btn v-if="podeCancelar && props.row.situacao === 'autorizada'" flat dense no-caps color="negative" icon="block" label="Cancelar" @click="cancelar(props.row)" />
         </q-td>
       </template>
@@ -52,8 +53,8 @@ import { api, mensagemDeErro } from '@/servicos/api'
 import { formatarDataHora, formatarMoeda } from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
 
-const NOME = { pendente: 'Pendente', rejeitada: 'Rejeitada', autorizada: 'Autorizada', cancelada: 'Cancelada', denegada: 'Denegada' }
-const COR = { pendente: 'orange', rejeitada: 'negative', autorizada: 'positive', cancelada: 'grey', denegada: 'negative' }
+const NOME = { pendente: 'Pendente', rejeitada: 'Rejeitada', autorizada: 'Autorizada', cancelada: 'Cancelada', denegada: 'Denegada', inutilizada: 'Inutilizada' }
+const COR = { pendente: 'orange', rejeitada: 'negative', autorizada: 'positive', cancelada: 'grey', denegada: 'negative', inutilizada: 'grey' }
 const SITUACOES = Object.entries(NOME).map(([value, label]) => ({ value, label }))
 
 const $q = useQuasar()

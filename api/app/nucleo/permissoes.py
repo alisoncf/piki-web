@@ -39,6 +39,7 @@ PERMISSOES: dict[str, str] = {
     "notas.ver": "Consultar as notas fiscais emitidas pela loja (NFC-e e NF-e) e baixar o XML",
     "notas.emitir": "Emitir, transmitir de novo e consultar na SEFAZ as notas da loja (o caixa já emite a da venda)",
     "notas.cancelar": "Cancelar nota autorizada na SEFAZ",
+    "notas.inutilizar": "Inutilizar na SEFAZ os números pulados das séries da loja",
 }
 
 # nome de cada área (a parte antes do ponto), para agrupar as permissões na tela de perfis

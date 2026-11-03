@@ -31,7 +31,7 @@ class SefazFalsa:
     """Responde o que o teste mandar; guarda o que recebeu."""
 
     def __init__(self):
-        self.enviados, self.consultas, self.cancelamentos = [], [], []
+        self.enviados, self.consultas, self.cancelamentos, self.inutilizacoes = [], [], [], []
         self.resposta = "100"  # ou "204", "778", "fora"
         self.consulta = "100"
 
@@ -60,6 +60,11 @@ class SefazFalsa:
         if self.consulta == "217":
             return sefaz.Retorno("217", "Rejeicao: NF-e nao consta na base de dados da SEFAZ")
         return self._protocolo(chave, "100", "Autorizado o uso da NF-e")
+
+    def inutilizar(self, cnpj, modelo, serie, inicial, final, justificativa):
+        self.inutilizacoes.append((cnpj, modelo, serie, inicial, final, justificativa))
+        return sefaz.Retorno("102", "Inutilizacao de numero homologado", "152260000000777", datetime(2026, 11, 3, 11),
+                             f'<retInutNFe xmlns="{nfce.NS}" versao="4.00"/>')
 
     def cancelar(self, chave, protocolo, justificativa, cnpj):
         self.cancelamentos.append((chave, protocolo, justificativa, cnpj))
@@ -265,3 +270,51 @@ def test_status_da_sefaz(cliente, loja, falsa):
     r = cliente.post(f"/empresas/{loja['empresa']}/sefaz", headers=loja["admin"])
     assert r.json() == {"codigo": "107", "motivo": "Servico em Operacao"}
     assert cliente.post(f"/empresas/{loja['empresa']}/sefaz", headers=loja["davi"]).status_code == 403
+
+
+def test_inutiliza_as_lacunas_da_serie(banco, cliente, loja, falsa):
+    """Notas 1 a 6 da série 101: a 2 e a 3 rejeitadas e largadas, a 5 pendente; a 7 e a 8 reservadas e não usadas."""
+    _com_ncm(banco, loja)
+    situacoes = {1: "autorizada", 2: "rejeitada", 3: "rejeitada", 4: "cancelada", 5: "pendente", 6: "autorizada"}
+    with banco() as db:
+        for numero, situacao in situacoes.items():
+            db.add(NotaFiscal(empresa_id=loja["empresa"], ambiente="2", modelo="65", serie=101, numero=numero,
+                              codigo_numerico="12345678", chave=f"{numero:044d}", situacao=situacao,
+                              emitida_em=datetime(2026, 11, 3, 9), emitida_por_id=1, valor=Decimal("10.00"), xml="<NFe/>"))
+        db.add(NumeracaoNota(empresa_id=loja["empresa"], ambiente="2", modelo="65", serie=101, ultimo=8))
+        db.commit()
+    admin = loja["admin"]
+    assert cliente.get("/notas/series", headers=admin).json() == [{"modelo": "65", "serie": 101, "ultimo": 8}]
+    r = cliente.get("/notas/lacunas", headers=admin, params={"serie": 101, "desde": "2026-11-01"})
+    assert r.json() == {"faixas": [{"inicial": 2, "final": 3}, {"inicial": 7, "final": 8}], "pendentes": [5]}
+    assert cliente.get("/notas/lacunas", headers=loja["davi"], params={"serie": 101, "desde": "2026-11-01"}).status_code == 403
+
+    pedido = {"serie": 101, "inicial": 2, "final": 3, "justificativa": "Notas rejeitadas e nao reenviadas"}
+    for faixa, erro in [((4, 5), "nota cancelada"), ((5, 5), "consulte-a na SEFAZ"), ((8, 9), "só chegou ao número 8")]:
+        r = cliente.post("/notas/inutilizacoes", headers=admin, json=pedido | {"inicial": faixa[0], "final": faixa[1]})
+        assert r.status_code == 422 and erro in r.json()["detail"], r.text
+    assert falsa.inutilizacoes == []
+
+    r = cliente.post("/notas/inutilizacoes", headers=admin, json=pedido)
+    assert r.status_code == 201, r.text
+    assert (r.json()["protocolo"], r.json()["feita_por"]["nome"]) == ("152260000000777", "Caio Admin")
+    assert falsa.inutilizacoes == [(CNPJ, "65", 101, 2, 3, "Notas rejeitadas e nao reenviadas")]
+    with banco() as db:
+        assert {n.numero: n.situacao for n in db.query(NotaFiscal).filter(NotaFiscal.numero.in_([2, 3]))} == {
+            2: "inutilizada", 3: "inutilizada"}
+    r = cliente.get("/notas/lacunas", headers=admin, params={"serie": 101, "desde": "2026-11-01"})
+    assert r.json()["faixas"] == [{"inicial": 7, "final": 8}]
+    assert cliente.post("/notas/inutilizacoes", headers=admin, json=pedido).status_code == 422  # já inutilizada
+    assert [i["inicial"] for i in cliente.get("/notas/inutilizacoes", headers=admin).json()] == [2]
+
+
+    # a venda cuja nota rejeitada teve o número inutilizado ganha outro número
+    url = _venda(cliente, loja, loja["davi"])
+    falsa.resposta = "778"
+    rejeitada = cliente.post(f"{url}/nfce", headers=loja["davi"]).json()
+    assert (rejeitada["numero"], rejeitada["situacao"]) == (9, "rejeitada")
+    r = cliente.post("/notas/inutilizacoes", headers=admin, json=pedido | {"inicial": 7, "final": 9})
+    assert r.status_code == 201, r.text
+    falsa.resposta = "100"
+    nova = cliente.post(f"{url}/nfce", headers=loja["davi"]).json()
+    assert (nova["numero"], nova["situacao"]) == (10, "autorizada") and nova["id"] != rejeitada["id"]

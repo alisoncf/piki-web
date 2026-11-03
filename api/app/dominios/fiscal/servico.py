@@ -10,7 +10,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import configuracao
@@ -20,7 +20,7 @@ from app.dominios.empresas.modelos import Empresa
 from app.dominios.estoque.modelos import Estoque
 from app.dominios.fiscal import nfce, sefaz
 from app.dominios.fiscal.modelos import (
-    AUTORIZADA, CANCELADA, DENEGADA, PENDENTE, REJEITADA, NotaFiscal, NumeracaoNota,
+    AUTORIZADA, CANCELADA, DENEGADA, INUTILIZADA, PENDENTE, REJEITADA, InutilizacaoNota, NotaFiscal, NumeracaoNota,
 )
 from app.dominios.vendas.modelos import Venda
 from app.nucleo import segredos
@@ -243,7 +243,7 @@ def emitir_nfce(db: Session, empresa_id: int, usuario: Usuario, venda_id: int) -
     if nota is not None and nota.situacao == PENDENTE and nota.ambiente == empresa.nfe_ambiente:
         assinado = nota.xml  # o mesmo XML: se a SEFAZ já autorizou, responde duplicidade
     else:
-        nova = nota is None or nota.situacao == CANCELADA or nota.ambiente != empresa.nfe_ambiente
+        nova = nota is None or nota.situacao in (CANCELADA, INUTILIZADA) or nota.ambiente != empresa.nfe_ambiente
         if nova:
             caixa = venda.sessao_caixa.caixa if venda.sessao_caixa else None
             if caixa is None or not caixa.serie_nfe:
@@ -323,6 +323,101 @@ def cancelar(db: Session, empresa_id: int, usuario: Usuario, nota_id: int, justi
         return nota
     db.commit()
     raise DadoInvalido(f"A SEFAZ não cancelou: {retorno.codigo} - {retorno.motivo}")
+
+
+# --- inutilização: os números da série que não vão ser usados ---
+
+@dataclass
+class Lacunas:
+    faixas: list[tuple[int, int]]  # de, até
+    pendentes: list[int]  # notas sem resposta da SEFAZ no meio: consultar antes de inutilizar
+
+
+def series(db: Session, empresa_id: int, ambiente: str) -> list[NumeracaoNota]:
+    return [n for n in numeracoes(db, empresa_id) if n.ambiente == ambiente]
+
+
+def _numeracao(db: Session, empresa_id: int, ambiente: str, modelo: str, serie: int) -> NumeracaoNota | None:
+    return db.scalar(select(NumeracaoNota).where(
+        NumeracaoNota.empresa_id == empresa_id, NumeracaoNota.ambiente == ambiente,
+        NumeracaoNota.modelo == modelo, NumeracaoNota.serie == serie))
+
+
+def _da_serie(modelo_classe, empresa_id: int, ambiente: str, modelo: str, serie: int):
+    return (modelo_classe.empresa_id == empresa_id, modelo_classe.ambiente == ambiente,
+            modelo_classe.modelo == modelo, modelo_classe.serie == serie)
+
+
+def lacunas(db: Session, empresa_id: int, ambiente: str, modelo: str, serie: int, desde: date) -> Lacunas:
+    """Como no VB6 (frmInutilizarNFe): os números pulados na série, da primeira nota emitida desde a data até o último
+    número reservado. Contam como usados os das notas autorizadas, canceladas, denegadas e pendentes, e os já
+    inutilizados; os das rejeitadas (nunca autorizadas) são lacuna."""
+    numeracao = _numeracao(db, empresa_id, ambiente, modelo, serie)
+    inicio = db.scalar(select(func.min(NotaFiscal.numero)).where(
+        *_da_serie(NotaFiscal, empresa_id, ambiente, modelo, serie),
+        NotaFiscal.emitida_em >= datetime.combine(desde, time.min)))
+    if numeracao is None or inicio is None:
+        return Lacunas([], [])
+    notas = db.execute(select(NotaFiscal.numero, NotaFiscal.situacao).where(
+        *_da_serie(NotaFiscal, empresa_id, ambiente, modelo, serie), NotaFiscal.numero >= inicio)).all()
+    usados = {numero for numero, situacao in notas if situacao not in (REJEITADA, INUTILIZADA)}
+    for faixa in db.scalars(select(InutilizacaoNota).where(
+            *_da_serie(InutilizacaoNota, empresa_id, ambiente, modelo, serie), InutilizacaoNota.final >= inicio)):
+        usados.update(range(faixa.inicial, faixa.final + 1))
+    faixas, aberta = [], None
+    for numero in range(inicio, numeracao.ultimo + 2):  # o +2 fecha a última faixa
+        livre = numero <= numeracao.ultimo and numero not in usados
+        if livre and aberta is None:
+            aberta = numero
+        elif not livre and aberta is not None:
+            faixas.append((aberta, numero - 1))
+            aberta = None
+    pendentes = sorted(numero for numero, situacao in notas if situacao == PENDENTE)
+    return Lacunas(faixas, pendentes)
+
+
+def inutilizacoes(db: Session, empresa_id: int, limite: int = 100) -> list[InutilizacaoNota]:
+    return list(db.scalars(select(InutilizacaoNota).where(InutilizacaoNota.empresa_id == empresa_id)
+                           .order_by(InutilizacaoNota.id.desc()).limit(limite)))
+
+
+def inutilizar(db: Session, empresa_id: int, usuario: Usuario, modelo: str, serie: int, inicial: int, final: int,
+               justificativa: str) -> InutilizacaoNota:
+    """Pede à SEFAZ a inutilização da faixa. Só números já reservados e sem nota que valha (autorizada, cancelada,
+    denegada ou pendente); as rejeitadas da faixa ficam inutilizadas."""
+    empresa = db.get(Empresa, empresa_id)
+    ambiente = empresa.nfe_ambiente
+    justificativa = " ".join(justificativa.split())
+    if not 15 <= len(justificativa) <= 255:
+        raise DadoInvalido("A justificativa da inutilização precisa ter de 15 a 255 letras")
+    if not 1 <= inicial <= final:
+        raise DadoInvalido("A faixa vai do número inicial até o final")
+    numeracao = _numeracao(db, empresa_id, ambiente, modelo, serie)
+    if numeracao is None or final > numeracao.ultimo:
+        raise DadoInvalido(f"A série {serie} só chegou ao número {numeracao.ultimo if numeracao else 0}: "
+                           "não se inutiliza número que ainda vai ser usado")
+    na_faixa = list(db.scalars(select(NotaFiscal).where(
+        *_da_serie(NotaFiscal, empresa_id, ambiente, modelo, serie), NotaFiscal.numero.between(inicial, final))))
+    usadas = [n for n in na_faixa if n.situacao not in (REJEITADA, INUTILIZADA)]
+    if usadas:
+        n = usadas[0]
+        raise DadoInvalido(f"O número {n.numero} é de uma nota {n.situacao}" +
+                           (": consulte-a na SEFAZ antes" if n.situacao == PENDENTE else ""))
+    if db.scalar(select(InutilizacaoNota.id).where(
+            *_da_serie(InutilizacaoNota, empresa_id, ambiente, modelo, serie),
+            InutilizacaoNota.inicial <= final, InutilizacaoNota.final >= inicial).limit(1)):
+        raise DadoInvalido("Parte desta faixa já foi inutilizada")
+    retorno = _chamar(conectar(empresa).inutilizar, empresa.cnpj, modelo, serie, inicial, final, justificativa)
+    if retorno.codigo != sefaz.INUTILIZACAO_HOMOLOGADA:
+        raise DadoInvalido(f"A SEFAZ não inutilizou: {retorno.codigo} - {retorno.motivo}")
+    feita = InutilizacaoNota(empresa_id=empresa_id, ambiente=ambiente, modelo=modelo, serie=serie, inicial=inicial,
+                             final=final, justificativa=justificativa, protocolo=retorno.protocolo,
+                             homologada_em=retorno.recebido_em, feita_por=usuario, xml=retorno.xml_protocolo)
+    db.add(feita)
+    for nota in na_faixa:
+        nota.situacao = INUTILIZADA
+    db.commit()
+    return feita
 
 
 @dataclass

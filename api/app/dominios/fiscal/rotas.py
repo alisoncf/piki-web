@@ -3,8 +3,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
+from app.dominios.empresas.modelos import Empresa
 from app.dominios.fiscal import nfce, servico
-from app.dominios.fiscal.esquemas import CancelamentoDados, Danfe, Nota, RetornoSefaz
+from app.dominios.fiscal.esquemas import (
+    CancelamentoDados, Danfe, Faixa, Inutilizacao, InutilizacaoDados, Lacunas, Nota, RetornoSefaz, Serie,
+)
 from app.dominios.fiscal.modelos import SITUACOES
 from app.nucleo.contexto import Contexto, exige
 
@@ -14,6 +17,7 @@ Ver = Annotated[Contexto, Depends(exige("notas.ver", "notas.emitir", "caixa.oper
 # o caixa emite a NFC-e da venda que recebeu
 Emitir = Annotated[Contexto, Depends(exige("notas.emitir", "caixa.operar"))]
 Cancelar = Annotated[Contexto, Depends(exige("notas.cancelar"))]
+Inutilizar = Annotated[Contexto, Depends(exige("notas.inutilizar"))]
 
 _STATUS = {
     servico.NaoEncontrada: status.HTTP_404_NOT_FOUND,
@@ -63,6 +67,39 @@ def listar(ctx: Ver, inicio: date | None = None, fim: date | None = None, situac
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Situação desconhecida")
     filtros = servico.Filtros(inicio, fim, situacao, numero, serie)
     return [Nota.model_validate(n) for n in servico.listar(ctx.db, ctx.empresa_id, filtros)]
+
+
+def _ambiente(ctx: Contexto) -> str:
+    return ctx.db.get(Empresa, ctx.empresa_id).nfe_ambiente
+
+
+@router.get("/notas/series", response_model=list[Serie])
+def series(ctx: Inutilizar) -> list[Serie]:
+    """As séries da loja no ambiente atual, com o último número reservado."""
+    return [Serie.model_validate(n) for n in servico.series(ctx.db, ctx.empresa_id, _ambiente(ctx))]
+
+
+@router.get("/notas/lacunas", response_model=Lacunas)
+def lacunas(ctx: Inutilizar, serie: int, desde: date, modelo: str = "65") -> Lacunas:
+    """Os números pulados da série, da primeira nota emitida desde a data até o último reservado (como no VB6)."""
+    achadas = servico.lacunas(ctx.db, ctx.empresa_id, _ambiente(ctx), modelo, serie, desde)
+    return Lacunas(faixas=[Faixa(inicial=i, final=f) for i, f in achadas.faixas], pendentes=achadas.pendentes)
+
+
+@router.get("/notas/inutilizacoes", response_model=list[Inutilizacao])
+def inutilizacoes(ctx: Inutilizar) -> list[Inutilizacao]:
+    return [Inutilizacao.model_validate(i) for i in servico.inutilizacoes(ctx.db, ctx.empresa_id)]
+
+
+@router.post("/notas/inutilizacoes", response_model=Inutilizacao, status_code=status.HTTP_201_CREATED)
+def inutilizar(dados: InutilizacaoDados, ctx: Inutilizar) -> Inutilizacao:
+    """Pede à SEFAZ a inutilização da faixa de números."""
+    try:
+        feita = servico.inutilizar(ctx.db, ctx.empresa_id, ctx.usuario, dados.modelo, dados.serie, dados.inicial,
+                                   dados.final, dados.justificativa)
+    except servico.ErroNota as e:
+        raise _http(ctx, e)
+    return Inutilizacao.model_validate(feita)
 
 
 def _obter(ctx: Contexto, nota_id: int):

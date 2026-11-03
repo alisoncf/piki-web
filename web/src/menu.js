@@ -46,6 +46,7 @@ export const MENU = [
     filhos: [
       { titulo: 'Vendas', icone: 'shopping_bag', rota: '/vendas', permissao: ['vendas.ver', 'vendas.vender', 'caixa.operar'] },
       { titulo: 'Notas fiscais', icone: 'receipt_long', rota: '/notas', permissao: ['notas.ver', 'notas.emitir', 'caixa.operar'] },
+      { titulo: 'Inutilizar números', icone: 'block', rota: '/notas/inutilizar', permissao: 'notas.inutilizar' },
     ],
   },
   {

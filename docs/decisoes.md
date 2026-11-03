@@ -362,7 +362,9 @@ Decisão do Alison.
   - O cancelamento da nota é separado do da venda (como o Alison pediu); o prazo é o da SEFAZ, que recusa fora dele.
   - O **token do CSC aparece na ficha da empresa** (Alison, 03/11/2026); no banco continua cifrado. A senha do certificado continua sem voltar da API.
   - **A confirmar nos primeiros testes em homologação:** o endereço do QR Code e da consulta de Goiás e a versão do QR Code (a 3, sem CSC, já está no leiaute); se Goiás exige o grupo do responsável técnico (`infRespTec`).
-  - Falta: inutilização, carta de correção (só NF-e), contingência, a NF-e (modelo 55) e a tela de notas completa como a do VB6.
+  - **Inutilização** (03/11/2026), como a do VB6 (`frmInutilizarNFe`): escolhe a série e a data, a tela busca os números pulados (da primeira nota emitida desde a data até o último número reservado) e a faixa escolhida vai para a SEFAZ com a justificativa. Contam como usados os números das notas autorizadas, canceladas, denegadas e pendentes, e os já inutilizados; os das rejeitadas são lacuna, e elas ficam "inutilizadas" (a venda, se ainda precisar de nota, ganha outro número). A pendente no meio da série aparece como aviso: consultar antes. Não se inutiliza número ainda não reservado. Fica registrado com o protocolo, quem e quando (migração 0036). Permissão `notas.inutilizar`. (No VB6, a gravação do pedido perdia o modelo e a série.)
+  - **Contingência:** o VB6 não tem; vai ser funcionalidade nova.
+  - Falta: carta de correção (só NF-e), contingência, a NF-e (modelo 55) e a tela de notas completa como a do VB6.
 
 ### Próximas etapas da venda (respostas do Alison, 03/11/2026)
 
