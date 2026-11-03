@@ -43,6 +43,7 @@ async function montar(componente, caminho) {
       { path: '/vendas/:id/carne', name: 'carne', component: componente === CarnePagina ? componente : vazio },
       { path: '/vendas/:id/entrega', name: 'canhoto-entrega', component: componente === CanhotoEntregaPagina ? componente : vazio },
       { path: '/vendas/:id/receber', name: 'receber-venda', component: componente === RecebimentoPagina ? componente : vazio },
+      { path: '/vendas/:id/nfce', name: 'nfce-venda', component: vazio },
     ],
   })
   await router.push(caminho)
@@ -290,6 +291,15 @@ describe('vendas', () => {
     vi.spyOn(api, 'get').mockImplementation(gets({ ...COM_ITEM, itens: [{ ...ITEM, em_queima: true }] }))
     const { wrapper } = await montar(VendaPagina, '/vendas/3')
     expect(wrapper.text()).toContain('Lençol Ficticio Queima')
+  })
+
+  it('a venda recebida sem NFC-e: o botão leva à tela da nota, que emite', async () => {
+    entrar(['caixa.operar'])
+    vi.spyOn(api, 'get').mockImplementation(gets({ ...COM_ITEM, situacao: 'recebida', modelo_nota: '65' }))
+    const { wrapper, router } = await montar(VendaPagina, '/vendas/3')
+    await wrapper.findAll('a').find((a) => a.text().includes('NFC-e')).trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('nfce-venda')
   })
 
   it('cancela a venda recebida pelo caixa deste computador e imprime o canhoto de entrega', async () => {

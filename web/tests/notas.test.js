@@ -87,6 +87,19 @@ describe('notas fiscais', () => {
     expect(botao(wrapper, 'Imprimir o carnê')).toBeDefined()
   })
 
+  it('aberta pela venda, sem nota: não emite sozinha, só no botão', async () => {
+    entrar(['caixa.operar'])
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url === '/vendas/3/nfce' ? null : DANFE }))
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: NOTA })
+    const { wrapper } = await montar(NfceVendaPagina, '/vendas/3/nfce')
+    expect(post).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('A venda ainda não tem NFC-e')
+    await botao(wrapper, 'Emitir a NFC-e').trigger('click')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/vendas/3/nfce')
+    expect(wrapper.text()).toContain('Autorizada')
+  })
+
   it('a rejeitada mostra o motivo e transmite de novo', async () => {
     entrar(['caixa.operar'])
     const rejeitada = { ...NOTA, situacao: 'rejeitada', codigo_retorno: '778', motivo_retorno: 'Rejeicao: NCM inexistente', protocolo: null }
