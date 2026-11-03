@@ -73,6 +73,7 @@
                 {{ p.documento }}
                 <q-badge v-if="p.origem !== 'venda'" outline color="grey-7" class="q-ml-xs">{{ p.origem === 'acerto' ? 'Acerto' : 'Avulsa' }}</q-badge>
                 <q-badge v-if="p.prejuizo" color="negative" class="q-ml-xs">Prejuízo</q-badge>
+                <div v-if="p.conta_cobranca !== 'Geral'" class="text-caption text-suave">com {{ p.conta_cobranca }}</div>
               </td>
               <td>{{ p.numero }}/{{ p.parcelas }}</td>
               <td>
@@ -107,6 +108,12 @@
               <span>{{ pago < total ? 'Falta lançar' : 'Lançado a mais' }}</span><span>{{ formatarMoeda(Math.abs(total - pago)) }}</span>
             </div>
             <div v-if="troco > 0" class="row justify-between text-weight-medium"><span>Troco</span><span>{{ formatarMoeda(troco) }}</span></div>
+            <q-checkbox
+              v-if="marcadas.some((p) => p.conta_cobranca !== 'Geral')"
+              v-model="voltarParaGeral"
+              label="Devolver os carnês para a Geral (a loja)"
+              class="q-mt-sm"
+            />
             <q-btn
               unelevated
               no-caps
@@ -159,6 +166,7 @@ const formas = ref([])
 const clientes = ref([])
 const clienteId = ref(null)
 const valorADistribuir = ref('')
+const voltarParaGeral = ref(false)
 const parcelas = ref([])
 const jurosAoMes = ref('0')
 const pagamentos = ref([])
@@ -243,12 +251,17 @@ async function confirmar() {
     const { data } = await api.post('/crediario/recebimentos', {
       sessao_caixa_id: sessaoCaixa.value.id,
       cliente_id: clienteId.value,
+      voltar_para_geral: voltarParaGeral.value,
       itens: marcadas.value.map((p) => ({ parcela_id: p.id, valor: Number(p.pagar).toFixed(2), juros: Number(p.juros || 0).toFixed(2) })),
       pagamentos: pagamentos.value.map((pg) => ({ forma_pagamento_id: pg.forma_pagamento_id, valor: Number(pg.valor).toFixed(2) })),
       valor_recebido: noDinheiro.value && valorRecebido.value ? Number(valorRecebido.value).toFixed(2) : null,
     })
     ultimo.value = data
     $q.notify({ type: 'positive', message: data.troco && Number(data.troco) ? `Recebido. Troco ${formatarMoeda(data.troco)}` : 'Recebido' })
+    if (data.quitou) {
+      $q.notify({ type: 'info', message: 'Este cliente quitou todos os débitos. Repasse ao vendedor responsável.', timeout: 10000 })
+    }
+    voltarParaGeral.value = false
     await carregarParcelas()
   } catch (e) {
     $q.notify({ type: 'negative', message: mensagemDeErro(e) })

@@ -254,13 +254,14 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - Pedido do Alison: a tela do VB6 (`frmEditaMov`, "Movimentações") filtra as parcelas, e a lista que sai é o que se baixa. Menu Financeiro › Contas a receber, com a permissão `receber.ver`; mostra as parcelas de todas as lojas (D9).
 - Filtros que já existem: em aberto, já pagas ou todas; cliente (nome ou CPF); documento (01-0000777 ou só o número); loja; espécie (venda, acerto de consignação, avulsa); data de vencimento, de vencimento inicial (o de antes das prorrogações) ou de emissão, de/até; valor exato do que falta; histórico; cidade, setor, órgão e grupo do cliente; cliente bloqueado ou liberado; crédito suspenso. Ordena por vencimento, cliente, documento ou valor. Mostra quantas são, o valor e o que falta da consulta toda, e a soma das selecionadas.
 - **Baixar:** as selecionadas, de um cliente só (como na baixa do VB6), vão para a tela "Receber crediário" já marcadas. Lá dá para **distribuir um valor**: o que o cliente trouxe paga as parcelas da mais antiga para a mais nova, e os juros sugeridos somam à parte (como o "Distribuir" do VB6).
-- Ficam para depois, esperando o Alison: conta de cobrança e tipo de cobrança (filtros, mudança em lote para a cobrança, volta para a "Geral" depois da baixa), desconto na baixa com limite por usuário, baixa para o financeiro (conta bancária) em vez do caixa, boleto, SPC, prorrogação, editar e criar parcela, excluir documento, histórico de baixas da parcela, recibo, exportar e imprimir a lista, representantes e funcionários.
+- Desconto na baixa (Alison, 03/11/2026): é só nos juros, e os juros já são só sugeridos (o caixa muda). Não há desconto no valor da parcela.
+- Ficam para depois: tipo de cobrança, baixa para o financeiro (conta bancária) em vez do caixa, boleto, SPC, prorrogação, editar e criar parcela, excluir documento, histórico de baixas da parcela, recibo, exportar e imprimir a lista, representantes e funcionários.
 
 **Prejuízo (03/11/2026)**
 - Explicação do Alison: o prejuízo marca a parcela que não se vai mais receber (o cliente morreu, não foi achado, a cobrança tentou de todo jeito e desistiu). Ela deve ser esquecida como algo que se pode receber.
 - A parcela guarda quando caiu no prejuízo, quem pôs e o motivo (obrigatório). Pôr e tirar pede a permissão `receber.prejuizo` (no VB6 era a de excluir documento, com senha); vale para várias selecionadas de uma vez.
 - Sai da lista do contas a receber e das somas, como no VB6; o filtro "Prejuízo" mostra só elas, ou junto com as outras.
-- O cliente continua devendo: se pagar um dia, a parcela aparece (marcada) na tela de receber e é recebida normalmente. Também continua contando no limite do crediário, como no VB6, e a venda mostra quanto do em aberto está no prejuízo. (A confirmar com o Alison.)
+- O cliente continua devendo: se pagar um dia, a parcela aparece (marcada) na tela de receber e é recebida normalmente. Também continua contando no limite do crediário, como no VB6, e a venda mostra quanto do em aberto está no prejuízo. Confirmado pelo Alison em 03/11/2026; o cliente que atrasa um tempo é bloqueado, mas à mão (não há bloqueio automático).
 - No VB6 a marca `prejuizo_itd` quase não foi usada (8 parcelas na matriz). O prejuízo de verdade é a conta de cobrança chamada PREJUIZO (na matriz, 14.269 parcelas, R$ 1,21 milhão; na 03, 717; na 02, 38). O ETL trata as duas como prejuízo, com o motivo dizendo de onde veio; a reimportação só marca, e tirar é pela tela.
 
 **Importação das contas a receber do VB6 (02/11/2026)**
@@ -303,6 +304,24 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - Abre com o fundo de troco e fecha com conferência cega: quem fecha informa o que contou em dinheiro e em cada forma que teve lançamento, sem ver o esperado; a diferença aparece depois de fechar. Quem tem `caixa.conferir` vê o saldo esperado e os fechamentos.
 - Lançamentos avulsos de entrada e saída: troco (entrada e retirada), despesa, vale de funcionário e comissão de cobrador. O controle dos vales por funcionário fica para depois. Lançamento errado é estornado (continua na lista, com quem estornou).
 - Permissões: `caixa.operar`, `caixa.conferir` e `caixa.configurar`.
+
+### D27. Contas de cobrança (03/11/2026)
+
+Explicação do Alison. A conta de cobrança (`tab_contacob` do VB6) diz onde o carnê está para ser cobrado: a **Geral** é a padrão, quando está na loja e não foi entregue a ninguém; as outras são os cobradores, o advogado e os balanços (que marcam que o carnê está num processo).
+
+- É diferente do cobrador do setor (D17), que continua sendo funcionário: a conta de cobrança é uma lista própria, uma só para todas as lojas, juntada pelo nome (o mesmo código é outra conta em cada loja no VB6). Toda parcela está numa conta; o carnê novo nasce na Geral.
+- Na tela de contas a receber: filtro por conta de cobrança, a conta na lista (quando não é a Geral) e **Mudar cobrança**, em lote, para as selecionadas. Cadastro em Financeiro › Contas de cobrança (a Geral não pode ser desativada). Mudar e cadastrar pedem a permissão `receber.cobranca`.
+- Depois da baixa, como no VB6: o caixa pode devolver os carnês recebidos para a Geral, e a tela avisa quando o cliente quitou todos os débitos, para repassar ao vendedor.
+- ETL: a conta é achada pelo nome do VB6 (sem acentos nem maiúsculas); 000 e GERAL são a Geral. A conta PREJUIZO também vai para a Geral, porque o prejuízo virou a marca da parcela (D26).
+
+### Próximas etapas da venda (respostas do Alison, 03/11/2026)
+
+- **Troca:** é uma funcionalidade à parte e complexa; o Alison vai mostrar.
+- **Cancelamento:** a venda é marcada como cancelada, e também os registros que vieram dela. O cancelamento da NFC-e não é automático: o usuário faz.
+- **Entrega:** sai um canhoto para fazer a entrega, no endereço que o vendedor informou; a taxa de entrega entra no caixa com a venda (já é assim).
+- **Cartão presente:** existe, com um processo simples; o Alison vai mostrar.
+- **Cartão de crédito:** a venda no cartão vai para a `tab_venfin` (ligada às financeiras); o financeiro tira o extrato todo dia e baixa, dizendo em que conta entrou. A ideia é automatizar depois. Na importação das vendas é importante ter o registro, podendo simplificar. (Na matriz, nenhuma linha da `tab_venfin` aparece baixada desde 2024: falta saber onde a baixa do extrato é gravada.)
+- **Notas:** o Alison mostra a tela de notas (NF-e e NFC-e) quando for a hora da etapa 4.
 
 ## Substituídas
 

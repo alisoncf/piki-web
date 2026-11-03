@@ -16,10 +16,15 @@ Rode antes os ETLs de clientes e de usuários desta loja.
   usada) ou, quase sempre, indo para uma conta de cobrança chamada "PREJUIZO".
   As duas viram o prejuízo da parcela aqui, com o motivo dizendo de onde veio.
   A reimportação só marca; tirar do prejuízo é pela tela.
+- Conta de cobrança (D27): o código da tab_contacob é de cada loja (o 033 é
+  "caixa" na matriz e "REGINALDO" nas filiais), então a conta é achada pelo
+  nome, sem acentos nem maiúsculas. O 000 (GERAL) é a Geral; a PREJUIZO também
+  vai para a Geral, porque o prejuízo é a marca da parcela.
 - Reimportar atualiza o que falta pagar, o vencimento e o valor das parcelas já
   importadas, inclusive das que foram quitadas no VB6 depois; a parcela que já
   teve recebimento no sistema novo não é mexida (aviso).
 """
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
@@ -28,8 +33,10 @@ from sqlalchemy import Connection, bindparam, select, text
 from sqlalchemy.orm import Session
 
 from app.dominios.empresas.modelos import Empresa
-from app.dominios.receber.modelos import ContaReceber, ItemRecebimento, ParcelaReceber
+from app.dominios.receber.modelos import ContaCobranca, ContaReceber, ItemRecebimento, ParcelaReceber
+from app.dominios.receber.servico import conta_padrao
 from app.nucleo.legado import MapaLegado
+from app.nucleo.textos import nome_proprio
 from etl.funcionarios import EmpresaNaoImportada
 
 ZERO = Decimal("0.00")
@@ -55,7 +62,7 @@ _DOCS = text("""
 _PARCELAS = text("""
     SELECT CAST(i.seq_itd AS CHAR) seq_itd, CAST(i.seq_doc AS CHAR) seq_doc, i.parcela_itd, i.valor_itd, i.reman_itd,
            CAST(i.venc_itd AS CHAR) venc_itd, CAST(i.vencini_itd AS CHAR) vencini_itd,
-           CAST(i.prejuizo_itd AS CHAR) prejuizo_itd, CAST(c.nome_cob AS CHAR) nome_cob
+           CAST(i.prejuizo_itd AS CHAR) prejuizo_itd, CAST(i.cod_cob AS CHAR) cod_cob, CAST(c.nome_cob AS CHAR) nome_cob
       FROM tab_itdoc i LEFT JOIN tab_contacob c ON c.cod_cob = i.cod_cob
      WHERE i.seq_doc IN :seqs ORDER BY i.seq_doc, i.parcela_itd, i.venc_itd, i.seq_itd
 """).bindparams(bindparam("seqs", expanding=True))
@@ -124,6 +131,7 @@ def importar_receber(origem: Connection, db: Session, codigo_empresa: str) -> Re
     usuarios = _mapa(db, "tab_usuarios", empresa.id)
     contas_importadas = _mapa(db, "tab_doc", empresa.id)
     parcelas_importadas = _mapa(db, "tab_itdoc", empresa.id)
+    contas_cobranca = _ContasCobranca(db)
     # parcelas que já tiveram recebimento no sistema novo: o VB6 não manda mais nelas
     recebidas = set(db.scalars(select(ItemRecebimento.parcela_id).distinct()))
 
@@ -141,7 +149,7 @@ def importar_receber(origem: Connection, db: Session, codigo_empresa: str) -> Re
                     r.avisos.append(f"documento {seq}: sumiu do VB6; a conta {contas_importadas[seq]} ficou como estava")
                 continue
             _importar_documento(db, empresa, doc, parcelas_por_doc.get(seq, []), clientes, usuarios,
-                                contas_importadas, parcelas_importadas, recebidas, r)
+                                contas_importadas, parcelas_importadas, recebidas, contas_cobranca, r)
         db.flush()
     db.commit()
     return r
@@ -149,7 +157,8 @@ def importar_receber(origem: Connection, db: Session, codigo_empresa: str) -> Re
 
 def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clientes: dict[str, int],
                         usuarios: dict[str, int], contas_importadas: dict[str, int],
-                        parcelas_importadas: dict[str, int], recebidas: set[int], r: Resultado) -> None:
+                        parcelas_importadas: dict[str, int], recebidas: set[int],
+                        contas_cobranca: "_ContasCobranca", r: Resultado) -> None:
     seq = doc["seq_doc"].strip()
     num_doc = _texto(doc["num_doc"]) or seq
     if not parcelas:
@@ -200,11 +209,13 @@ def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clie
         if prejuizo:
             r.prejuizo += 1
             r.em_prejuizo += aberto
+        cobranca = contas_cobranca.da(p)
         parcela_id = parcelas_importadas.get(seq_itd)
         parcela = db.get(ParcelaReceber, parcela_id) if parcela_id else None
         if parcela is None:
             parcela = ParcelaReceber(numero=ordem if renumerar else int(p["parcela_itd"]), vencimento=vencimento,
-                                     vencimento_inicial=_data(p["vencini_itd"]) or vencimento, valor=valor, aberto=aberto)
+                                     vencimento_inicial=_data(p["vencini_itd"]) or vencimento, valor=valor, aberto=aberto,
+                                     conta_cobranca_id=cobranca)
             conta.parcelas.append(parcela)
             db.flush()
             db.add(MapaLegado(tabela="tab_itdoc", empresa_id=empresa.id, codigo=seq_itd, novo_id=parcela.id))
@@ -214,14 +225,15 @@ def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clie
         else:
             _marcar_prejuizo(parcela, prejuizo)
             inicial = _data(p["vencini_itd"]) or parcela.vencimento_inicial
-            if (parcela.vencimento, parcela.vencimento_inicial, parcela.valor, parcela.aberto) == (
-                    vencimento, inicial, valor, aberto):
+            if (parcela.vencimento, parcela.vencimento_inicial, parcela.valor, parcela.aberto,
+                    parcela.conta_cobranca_id) == (vencimento, inicial, valor, aberto, cobranca):
                 continue
             if parcela.id in recebidas:
                 r.avisos.append(f"documento {num_doc}, parcela {parcela.numero}: já recebida no sistema novo; "
                                 "a mudança do VB6 não foi aplicada")
                 continue
             parcela.vencimento, parcela.vencimento_inicial, parcela.valor, parcela.aberto = vencimento, inicial, valor, aberto
+            parcela.conta_cobranca_id = cobranca
             r.atualizadas += 1
     conta.valor = sum((p.valor for p in conta.parcelas), ZERO)
 
@@ -239,3 +251,29 @@ def _motivo_prejuizo(parcela) -> str | None:
 def _marcar_prejuizo(parcela: ParcelaReceber, motivo: str | None) -> None:
     if motivo and parcela.prejuizo_em is None:
         parcela.prejuizo_em, parcela.prejuizo_motivo = datetime.now(), motivo
+
+
+def _chave(nome: str) -> str:
+    sem_acentos = unicodedata.normalize("NFD", nome).encode("ascii", "ignore").decode()
+    return " ".join(sem_acentos.lower().split())
+
+
+class _ContasCobranca:
+    """A conta de cobrança nova de cada parcela, achada pelo nome da conta do VB6 (criada se ainda não existe)."""
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.geral = conta_padrao(db).id
+        self.por_nome = {_chave(c.nome): c.id for c in db.scalars(select(ContaCobranca))}
+
+    def da(self, parcela) -> int:
+        nome = _texto(parcela["nome_cob"])
+        if _texto(parcela["cod_cob"]) in ("", "000") or not nome or "PREJU" in nome.upper() or _chave(nome) == "geral":
+            return self.geral
+        chave = _chave(nome)
+        if chave not in self.por_nome:
+            conta = ContaCobranca(nome=(nome_proprio(nome) or nome)[:40], padrao=False, ativo=True)
+            self.db.add(conta)
+            self.db.flush()
+            self.por_nome[chave] = conta.id
+        return self.por_nome[chave]

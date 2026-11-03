@@ -62,6 +62,7 @@ export const MENU = [
     icone: 'account_balance',
     filhos: [
       { titulo: 'Contas a receber', icone: 'request_quote', rota: '/financeiro/receber', permissao: 'receber.ver' },
+      { titulo: 'Contas de cobrança', icone: 'contact_mail', rota: '/financeiro/contas-cobranca', permissao: ['receber.ver', 'receber.cobranca'] },
     ],
   },
   {

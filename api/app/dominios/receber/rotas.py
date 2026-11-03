@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dominios.receber import servico
 from app.dominios.receber.esquemas import (
-    ClienteDaParcela, LinhaParcela, PaginaParcelas, ParcelaAberta, ParcelasDoCliente, PedidoPrejuizo, Recebimento,
+    ClienteDaParcela, ContaCobranca, ContaCobrancaDados, LinhaParcela, PedidoCobranca, PaginaParcelas, ParcelaAberta, ParcelasDoCliente, PedidoPrejuizo, Recebimento,
     RecebimentoDados,
 )
 from app.nucleo.contexto import Contexto, exige
@@ -16,6 +16,7 @@ router = APIRouter(tags=["crediário"])
 Operar = Annotated[Contexto, Depends(exige("caixa.operar"))]
 Consultar = Annotated[Contexto, Depends(exige("receber.ver"))]
 Prejuizo = Annotated[Contexto, Depends(exige("receber.prejuizo"))]
+Cobranca = Annotated[Contexto, Depends(exige("receber.cobranca"))]
 
 _STATUS = {
     servico.NaoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -44,7 +45,7 @@ def parcelas(cliente_id: int, ctx: Operar) -> ParcelasDoCliente:
             id=p.id, conta_id=conta.id, loja=conta.empresa, venda=conta.venda.numero if conta.venda else None,
             documento=conta.documento, origem=conta.origem,
             numero=p.numero, parcelas=len(conta.parcelas), vencimento=p.vencimento, valor=p.valor, aberto=p.aberto,
-            dias_atraso=dias, juros=juros, prejuizo=p.prejuizo,
+            dias_atraso=dias, juros=juros, prejuizo=p.prejuizo, conta_cobranca=p.conta_cobranca.nome,
         ))
     return ParcelasDoCliente(juros_ao_mes=taxa, parcelas=resposta)
 
@@ -53,9 +54,12 @@ def parcelas(cliente_id: int, ctx: Operar) -> ParcelasDoCliente:
 def receber(dados: RecebimentoDados, ctx: Operar) -> Recebimento:
     """O caixa recebe parcelas (toda ou parte de cada uma, com os juros que cobrar), em uma ou mais formas."""
     try:
-        return Recebimento.model_validate(servico.receber(ctx.db, ctx.empresa_id, ctx.usuario.id, dados))
+        recebimento = servico.receber(ctx.db, ctx.empresa_id, ctx.usuario.id, dados)
     except servico.ErroReceber as e:
         raise _http(ctx, e)
+    resposta = Recebimento.model_validate(recebimento)
+    resposta.quitou = servico.em_aberto(ctx.db, dados.cliente_id) == 0  # o VB6 avisa para repassar ao vendedor
+    return resposta
 
 
 @router.get("/crediario/recebimentos/{recebimento_id}", response_model=Recebimento)
@@ -95,6 +99,7 @@ def consultar(
     grupo_id: int | None = None,
     bloqueio: Literal["bloqueados", "liberados"] | None = None,
     credito_suspenso: bool | None = None,
+    conta_cobranca_id: Annotated[int | None, Query(description="Com quem o carnê está para cobrar")] = None,
     prejuizo: Annotated[Literal["fora", "so", "junto"],
                         Query(description="As que caíram no prejuízo: fora da lista (o normal), só elas ou junto")] = "fora",
     ordem: Literal["vencimento", "cliente", "documento", "valor"] = "vencimento",
@@ -106,6 +111,7 @@ def consultar(
         situacao=situacao, empresa_id=loja, cliente_id=cliente_id, busca=busca, documento=documento, origem=origem,
         historico=historico, data=data, de=de, ate=ate, valor=valor, cidade_id=cidade_id, setor_id=setor_id,
         orgao_id=orgao_id, grupo_id=grupo_id, bloqueio=bloqueio, credito_suspenso=credito_suspenso, prejuizo=prejuizo,
+        conta_cobranca_id=conta_cobranca_id,
     )
     itens, total, soma_valor, soma_aberto = servico.consultar(ctx.db, filtros, ordem, limite, deslocamento)
     taxa = servico.juros_ao_mes(ctx.db)
@@ -122,7 +128,8 @@ def consultar(
             cidade=f"{setor.cidade.nome}/{setor.cidade.uf}" if setor and setor.cidade else None,
             historico=conta.historico, emissao=conta.criado_em.date(), numero=p.numero, parcelas=len(conta.parcelas),
             vencimento=p.vencimento, vencimento_inicial=p.vencimento_inicial, valor=p.valor, aberto=p.aberto,
-            dias_atraso=dias, juros=juros, prejuizo=p.prejuizo, prejuizo_em=p.prejuizo_em,
+            dias_atraso=dias, juros=juros, prejuizo=p.prejuizo, conta_cobranca=p.conta_cobranca.nome,
+            prejuizo_em=p.prejuizo_em,
             prejuizo_por=p.prejuizo_por.nome if p.prejuizo_por else None, prejuizo_motivo=p.prejuizo_motivo,
         ))
     return PaginaParcelas(itens=linhas, total=total, soma_valor=soma_valor, soma_aberto=soma_aberto, juros_ao_mes=taxa)
@@ -144,5 +151,37 @@ def tirar_prejuizo(pedido: PedidoPrejuizo, ctx: Prejuizo) -> dict:
     """As parcelas voltam a ser cobradas."""
     try:
         return {"alteradas": servico.tirar_prejuizo(ctx.db, pedido.parcelas)}
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)
+
+
+@router.get("/receber/contas-cobranca", response_model=list[ContaCobranca])
+def listar_contas_cobranca(ctx: Annotated[Contexto, Depends(exige("receber.ver", "receber.cobranca", "caixa.operar"))]
+                           ) -> list[ContaCobranca]:
+    """Onde os carnês podem estar para cobrar: a Geral (na loja) primeiro."""
+    return [ContaCobranca.model_validate(c) for c in servico.listar_contas_cobranca(ctx.db)]
+
+
+@router.post("/receber/contas-cobranca", response_model=ContaCobranca, status_code=status.HTTP_201_CREATED)
+def criar_conta_cobranca(dados: ContaCobrancaDados, ctx: Cobranca) -> ContaCobranca:
+    try:
+        return ContaCobranca.model_validate(servico.salvar_conta_cobranca(ctx.db, None, dados.nome.strip(), dados.ativo))
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)
+
+
+@router.put("/receber/contas-cobranca/{conta_id}", response_model=ContaCobranca)
+def alterar_conta_cobranca(conta_id: int, dados: ContaCobrancaDados, ctx: Cobranca) -> ContaCobranca:
+    try:
+        return ContaCobranca.model_validate(servico.salvar_conta_cobranca(ctx.db, conta_id, dados.nome.strip(), dados.ativo))
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)
+
+
+@router.post("/receber/cobranca")
+def mudar_cobranca(pedido: PedidoCobranca, ctx: Cobranca) -> dict:
+    """Muda as parcelas de conta de cobrança, em lote."""
+    try:
+        return {"alteradas": servico.mudar_cobranca(ctx.db, pedido.parcelas, pedido.conta_cobranca_id)}
     except servico.ErroReceber as e:
         raise _http(ctx, e)

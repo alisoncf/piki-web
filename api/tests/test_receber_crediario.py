@@ -125,3 +125,33 @@ def test_prejuizo_tira_da_lista_mas_o_cliente_continua_devendo(cliente, loja, ad
 
     assert cliente.post("/receber/prejuizo/tirar", headers=admin, json={"parcelas": [vencida]}).json() == {"alteradas": 1}
     assert consulta()["total"] == 2
+
+
+def test_contas_de_cobranca_mudanca_em_lote_e_volta_para_a_geral(cliente, loja, admin, carnes):  # noqa: F811
+    contas = cliente.get("/receber/contas-cobranca", headers=admin).json()
+    assert [(c["nome"], c["padrao"]) for c in contas] == [("Geral", True)]
+    jose = cliente.post("/receber/contas-cobranca", headers=admin, json={"nome": "José Cobrador"}).json()
+    assert cliente.post("/receber/contas-cobranca", headers=admin, json={"nome": "josé cobrador"}).status_code == 422
+    geral = contas[0]["id"]
+    assert cliente.put(f"/receber/contas-cobranca/{geral}", headers=admin, json={"nome": "Geral", "ativo": False}).status_code == 422
+
+    # as duas parcelas vão para o cobrador, de uma vez
+    parcelas = [carnes["vencida"], carnes["a_vencer"]]
+    assert cliente.post("/receber/cobranca", headers=loja["davi"],
+                        json={"parcelas": parcelas, "conta_cobranca_id": jose["id"]}).status_code == 403  # receber.cobranca
+    r = cliente.post("/receber/cobranca", headers=admin, json={"parcelas": parcelas, "conta_cobranca_id": jose["id"]})
+    assert r.json() == {"alteradas": 2}
+    lista = cliente.get("/receber/parcelas", headers=admin, params={"conta_cobranca_id": jose["id"]}).json()
+    assert [p["conta_cobranca"] for p in lista["itens"]] == ["José Cobrador", "José Cobrador"]
+
+    # o cliente pagou tudo; os carnês voltam para a Geral e o recebimento avisa que quitou
+    f = loja["formas"]
+    r = cliente.post("/crediario/recebimentos", headers=loja["davi"], json={
+        "sessao_caixa_id": loja["sessao"], "cliente_id": carnes["cliente"], "voltar_para_geral": True,
+        "itens": [{"parcela_id": carnes["vencida"], "valor": "300.00"}, {"parcela_id": carnes["a_vencer"], "valor": "100.00"}],
+        "pagamentos": [{"forma_pagamento_id": f["dinheiro"], "valor": "400.00"}],
+    })
+    assert r.status_code == 201, r.text
+    assert r.json()["quitou"] is True
+    todas = cliente.get("/receber/parcelas", headers=admin, params={"situacao": "todas"}).json()["itens"]
+    assert {p["conta_cobranca"] for p in todas} == {"Geral"}

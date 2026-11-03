@@ -24,7 +24,7 @@ def _banco_vb6(caminho, docs, parcelas):
         c.execute(text("""CREATE TABLE tab_itdoc (seq_itd TEXT, seq_doc TEXT, valor_itd REAL, reman_itd REAL,
             vencini_itd TEXT, venc_itd TEXT, parcela_itd INTEGER, prejuizo_itd TEXT DEFAULT 'N', cod_cob TEXT DEFAULT '000')"""))
         c.execute(text("CREATE TABLE tab_contacob (cod_cob TEXT, nome_cob TEXT)"))
-        c.execute(text("INSERT INTO tab_contacob VALUES ('000', 'GERAL'), ('023', 'PREJUIZO')"))
+        c.execute(text("INSERT INTO tab_contacob VALUES ('000', 'GERAL'), ('023', 'PREJUIZO'), ('029', 'LUDMILA ADVOGADA')"))
         for d in docs:
             c.execute(text("INSERT INTO tab_doc VALUES (:seq, :num, 'R', :ter, :valor, '2026-05-10', '001', 'N', :hist, :esp, :tipo)"), d)
         for p in parcelas:
@@ -66,7 +66,7 @@ def test_importa_as_contas_de_cada_loja_mesmo_com_o_mesmo_numero(banco, lojas, t
         {"seq": "0000103", "num": "0000780", "ter": "000005", "valor": 100, "hist": "QUITADA", "esp": "V", "tipo": "C"},
     ], [
         _parcela("0000500", "0000100", 1, 0, "2026-06-10"),  # paga: entra para o carnê continuar "2 de 3"
-        _parcela("0000501", "0000100", 2, 100, "2026-07-10"),
+        _parcela("0000501", "0000100", 2, 100, "2026-07-10") | {"cob": "029"},  # com a advogada
         _parcela("0000502", "0000100", 3, 100, "2026-08-10") | {"cob": "023"},  # na conta de cobrança PREJUIZO
         _parcela("0000503", "0000101", 1, 50, "2026-06-10", 50),
         _parcela("0000504", "0000102", 1, 80, "2026-06-10", 80),
@@ -93,6 +93,7 @@ def test_importa_as_contas_de_cada_loja_mesmo_com_o_mesmo_numero(banco, lojas, t
         assert (bia.documento, bia.origem) == ("02-0000777", "acerto")  # mesmo número, outra loja, outra conta
         assert [(p.numero, p.aberto) for p in ana.parcelas] == [(1, 0), (2, 100), (3, 100)]
         assert [p.prejuizo_motivo for p in ana.parcelas] == [None, None, "No VB6: conta de cobrança PREJUIZO"]
+        assert [p.conta_cobranca.nome for p in ana.parcelas] == ["Geral", "Ludmila Advogada", "Geral"]
         assert contas.em_aberto(db, lojas["ana"]) == Decimal("200.00")
 
 

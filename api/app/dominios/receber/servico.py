@@ -16,7 +16,7 @@ from app.dominios.caixa.modelos import ABERTO, FormaPagamento, LancamentoCaixa
 from app.dominios.clientes.modelos import Cliente, Setor
 from app.dominios.receber.esquemas import RecebimentoDados
 from app.dominios.receber.modelos import (
-    ContaReceber, ItemRecebimento, PagamentoRecebimento, ParcelaReceber, RecebimentoCrediario,
+    ContaCobranca, ContaReceber, ItemRecebimento, PagamentoRecebimento, ParcelaReceber, RecebimentoCrediario,
 )
 from app.nucleo.textos import moeda
 
@@ -95,6 +95,19 @@ def dividir(valor: Decimal, parcelas: int) -> list[Decimal]:
     return [parcela] * (parcelas - 1) + [valor - parcela * (parcelas - 1)]
 
 
+GERAL = "Geral"
+
+
+def conta_padrao(db: Session) -> ContaCobranca:
+    """A conta de cobrança padrão (Geral): o carnê está na loja, sem estar com ninguém."""
+    conta = db.scalar(select(ContaCobranca).where(ContaCobranca.padrao.is_(True)))
+    if conta is None:
+        conta = ContaCobranca(nome=GERAL, padrao=True, ativo=True)
+        db.add(conta)
+        db.flush()
+    return conta
+
+
 def lancar_carne(db: Session, empresa_id: int, cliente_id: int, venda_id: int | None, valor: Decimal,
                  parcelas: int, primeiro_vencimento: date, intervalo: int, historico: str,
                  usuario_id: int) -> ContaReceber:
@@ -102,9 +115,10 @@ def lancar_carne(db: Session, empresa_id: int, cliente_id: int, venda_id: int | 
     conta = ContaReceber(empresa_id=empresa_id, cliente_id=cliente_id, venda_id=venda_id, valor=valor,
                          historico=historico[:80], usuario_id=usuario_id)
     datas = vencimentos(primeiro_vencimento, parcelas, intervalo)
+    geral = conta_padrao(db)
     for numero, (vencimento, parte) in enumerate(zip(datas, dividir(valor, parcelas)), start=1):
         conta.parcelas.append(ParcelaReceber(numero=numero, vencimento=vencimento, vencimento_inicial=vencimento,
-                                             valor=parte, aberto=parte))
+                                             valor=parte, aberto=parte, conta_cobranca=geral))
     db.add(conta)
     return conta
 
@@ -193,6 +207,11 @@ def receber(db: Session, empresa_id: int, usuario_id: int, dados: RecebimentoDad
         if recebimento.valor_recebido < no_dinheiro:
             raise DadoInvalido(f"O valor que o cliente deu é menor que os {moeda(no_dinheiro)} no dinheiro")
 
+    if dados.voltar_para_geral:
+        geral = conta_padrao(db)
+        for conta in {item.parcela.conta for item in recebimento.itens}:
+            for parcela in conta.parcelas:
+                parcela.conta_cobranca = geral
     db.add(recebimento)
     db.flush()
     for pagamento in recebimento.pagamentos:
@@ -258,6 +277,7 @@ class Filtros:
     bloqueio: str | None = None  # bloqueados ou liberados
     credito_suspenso: bool | None = None
     prejuizo: str = "fora"  # fora (o normal, como no VB6), so ou junto
+    conta_cobranca_id: int | None = None
 
 
 ORDENS = {
@@ -315,6 +335,8 @@ def _condicoes(f: Filtros) -> list:
         c.append(Cliente.bloqueado.is_(False))
     if f.credito_suspenso is not None:
         c.append(Cliente.credito_suspenso.is_(f.credito_suspenso))
+    if f.conta_cobranca_id:
+        c.append(ParcelaReceber.conta_cobranca_id == f.conta_cobranca_id)
     if f.prejuizo == "fora":
         c.append(ParcelaReceber.prejuizo_em.is_(None))
     elif f.prejuizo == "so":
@@ -368,3 +390,41 @@ def _parcelas(db: Session, parcela_ids: list[int]) -> list[ParcelaReceber]:
     if len(parcelas) != len(set(parcela_ids)):
         raise NaoEncontrado("Parcela não encontrada")
     return parcelas
+
+
+# ------------------------------------------------------------ contas de cobrança
+
+def listar_contas_cobranca(db: Session) -> list[ContaCobranca]:
+    conta_padrao(db)
+    return list(db.scalars(select(ContaCobranca).order_by(ContaCobranca.padrao.desc(), ContaCobranca.nome)))
+
+
+def salvar_conta_cobranca(db: Session, conta_id: int | None, nome: str, ativo: bool) -> ContaCobranca:
+    conta = db.get(ContaCobranca, conta_id) if conta_id else ContaCobranca(padrao=False)
+    if conta is None:
+        raise NaoEncontrado("Conta de cobrança não encontrada")
+    outra = db.scalar(select(ContaCobranca).where(func.lower(ContaCobranca.nome) == nome.lower(),
+                                                  ContaCobranca.id != (conta.id or 0)))
+    if outra is not None:
+        raise DadoInvalido(f"Já existe a conta de cobrança {outra.nome}")
+    if conta.padrao and not ativo:
+        raise DadoInvalido("A conta Geral não pode ser desativada")
+    conta.nome, conta.ativo = nome, ativo
+    db.add(conta)
+    db.commit()
+    return conta
+
+
+def mudar_cobranca(db: Session, parcela_ids: list[int], conta_cobranca_id: int) -> int:
+    """Muda as parcelas de conta de cobrança, em lote (entregar ao cobrador, mandar ao advogado, voltar à loja...).
+    Devolve quantas mudaram."""
+    conta = db.get(ContaCobranca, conta_cobranca_id)
+    if conta is None or not conta.ativo:
+        raise NaoEncontrado("Conta de cobrança não encontrada")
+    mudaram = 0
+    for parcela in _parcelas(db, parcela_ids):
+        if parcela.conta_cobranca_id != conta.id:
+            parcela.conta_cobranca = conta
+            mudaram += 1
+    db.commit()
+    return mudaram

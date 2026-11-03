@@ -2,6 +2,7 @@
   <q-page padding>
     <div class="row items-center q-mb-md q-gutter-sm">
       <div class="piki-titulo col">Contas a receber</div>
+      <q-btn v-if="sessao.pode('receber.cobranca') && selecionadas.length" flat no-caps icon="move_up" label="Mudar cobrança" @click="mudarCobranca" />
       <template v-if="sessao.pode('receber.prejuizo') && selecionadas.length">
         <q-btn v-if="todasNoPrejuizo" flat no-caps icon="restore" label="Tirar do prejuízo" @click="tirarDoPrejuizo" />
         <q-btn v-else flat no-caps color="negative" icon="money_off" label="Pôr no prejuízo" @click="porNoPrejuizo" />
@@ -45,6 +46,19 @@
           class="col-6 col-sm-3 col-md-2"
         />
         <q-select v-model="filtros.origem" outlined dense clearable label="Espécie" :options="ORIGENS" emit-value map-options class="col-6 col-sm-3 col-md-2" />
+        <q-select
+          v-model="filtros.conta_cobranca_id"
+          outlined
+          dense
+          clearable
+          label="Cobrança"
+          :options="contasCobranca"
+          option-value="id"
+          option-label="nome"
+          emit-value
+          map-options
+          class="col-6 col-sm-3 col-md-2"
+        />
 
         <q-select v-model="filtros.data" outlined dense label="Data" :options="DATAS" emit-value map-options class="col-6 col-sm-3 col-md-2" />
         <q-input v-model="filtros.de" outlined dense type="date" stack-label label="De" class="col-6 col-sm-3 col-md-2" />
@@ -125,6 +139,7 @@
             </q-tooltip>
           </q-badge>
           <div class="text-caption text-suave ellipsis" style="max-width: 220px">{{ props.row.historico }}</div>
+          <div v-if="props.row.conta_cobranca !== 'Geral'" class="text-caption"><q-icon name="contact_mail" size="14px" /> {{ props.row.conta_cobranca }}</div>
         </q-td>
       </template>
       <template #body-cell-cliente="props">
@@ -198,6 +213,7 @@ const VAZIOS = {
   situacao: 'aberto', busca: '', documento: '', loja: null, origem: null, data: 'vencimento', de: '', ate: '', ordem: 'vencimento',
   valor: '', historico: '', cidade_id: null, bloqueio: null, credito_suspenso: null, setor_id: null, orgao_id: null, grupo_id: null,
   prejuizo: 'fora',
+  conta_cobranca_id: null,
 }
 
 const $q = useQuasar()
@@ -208,6 +224,7 @@ const filtros = ref({ ...VAZIOS })
 const cidade = ref(null)
 const maisFiltros = ref(false)
 const listas = ref({ setores: [], orgaos: [], grupos: [] })
+const contasCobranca = ref([])
 const parcelas = ref([])
 const selecionadas = ref([])
 const somas = ref({ valor: 0, aberto: 0 })
@@ -284,6 +301,27 @@ function receberSelecionadas() {
   roteador.push({ name: 'receber-crediario', query: { cliente: cliente.id, nome: cliente.nome, parcelas: abertas.map((p) => p.id).join(',') } })
 }
 
+/** Muda as selecionadas de conta de cobrança: entregar ao cobrador, mandar ao advogado, voltar para a Geral... */
+function mudarCobranca() {
+  $q.dialog({
+    title: 'Mudar cobrança',
+    message: `Para onde vão as ${selecionadas.value.length} parcelas selecionadas?`,
+    options: { type: 'radio', model: null, items: contasCobranca.value.filter((c) => c.ativo).map((c) => ({ label: c.nome, value: c.id })) },
+    cancel: { flat: true, label: 'Voltar' },
+    ok: { label: 'Mudar' },
+  }).onOk(async (conta) => {
+    if (!conta) return
+    try {
+      const { data } = await api.post('/receber/cobranca', { parcelas: selecionadas.value.map((p) => p.id), conta_cobranca_id: conta })
+      $q.notify({ type: 'positive', message: `${data.alteradas} parcela${data.alteradas === 1 ? '' : 's'} mudada${data.alteradas === 1 ? '' : 's'}` })
+      selecionadas.value = []
+      carregar()
+    } catch (e) {
+      $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+    }
+  })
+}
+
 /** Prejuízo: a parcela que não se espera mais receber sai da lista; o cliente continua devendo. */
 function porNoPrejuizo() {
   const abertas = selecionadas.value.filter((p) => Number(p.aberto) > 0 && !p.prejuizo)
@@ -318,6 +356,7 @@ async function mudarPrejuizo(url, pedido) {
 
 onMounted(async () => {
   carregar()
+  api.get('/receber/contas-cobranca').then(({ data }) => (contasCobranca.value = data)).catch(() => {})
   if (sessao.pode('clientes.ver')) {
     try {
       const [s, o, g] = await Promise.all(['/setores', '/orgaos', '/grupos-clientes'].map((url) => api.get(url)))

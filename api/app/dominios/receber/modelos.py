@@ -8,7 +8,7 @@ em qualquer loja: o recebimento é da loja e do caixa de quem recebeu.
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, false, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.dominios.acesso.modelos import Usuario
@@ -16,6 +16,18 @@ from app.dominios.caixa.modelos import FormaPagamento, SessaoCaixa
 from app.dominios.clientes.modelos import Cliente
 from app.dominios.empresas.modelos import Empresa
 from app.nucleo.banco import Base, ComDatas
+
+
+class ContaCobranca(ComDatas, Base):
+    """Onde o carnê está para ser cobrado (tab_contacob do VB6): na loja, sem estar com ninguém (a padrão, Geral),
+    com um cobrador, com o advogado, num balanço... Uma lista só para todas as lojas, juntada pelo nome."""
+
+    __tablename__ = "conta_cobranca"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nome: Mapped[str] = mapped_column(String(40), unique=True)
+    padrao: Mapped[bool] = mapped_column(Boolean, server_default=false(), default=False)  # a Geral
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 # de onde veio a conta (esp_doc do VB6: V venda, A acerto de consignação, F e outros avulsos)
@@ -71,6 +83,7 @@ class ParcelaReceber(Base):
     vencimento_inicial: Mapped[date | None] = mapped_column(Date)
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     aberto: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # o que falta pagar (reman_itd no VB6)
+    conta_cobranca_id: Mapped[int] = mapped_column(ForeignKey("conta_cobranca.id"), index=True)
     # prejuízo: a parcela que não se espera mais receber (o cliente morreu, não foi achado...). Sai da lista
     # do contas a receber, mas o cliente continua devendo: se pagar um dia, recebe normalmente.
     prejuizo_em: Mapped[datetime | None] = mapped_column(DateTime)
@@ -79,6 +92,7 @@ class ParcelaReceber(Base):
 
     conta: Mapped[ContaReceber] = relationship(back_populates="parcelas", lazy="selectin")
     prejuizo_por: Mapped[Usuario | None] = relationship(lazy="joined")
+    conta_cobranca: Mapped[ContaCobranca] = relationship(lazy="joined")
 
     @property
     def prejuizo(self) -> bool:

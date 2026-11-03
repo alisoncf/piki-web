@@ -18,8 +18,8 @@ const BAIRRO = { id: 2, codigo: '02', nome: 'Loja Bairro' }
 const PARCELAS = {
   juros_ao_mes: '5.00',
   parcelas: [
-    { id: 31, conta_id: 7, loja: BAIRRO, venda: null, documento: '02-0000777', origem: 'acerto', numero: 1, parcelas: 2, vencimento: '2026-10-13', valor: '300.00', aberto: '300.00', dias_atraso: 20, juros: '10.00' },
-    { id: 32, conta_id: 7, loja: BAIRRO, venda: null, documento: '02-0000777', origem: 'acerto', numero: 2, parcelas: 2, vencimento: '2026-11-13', valor: '300.00', aberto: '300.00', dias_atraso: 0, juros: '0.00' },
+    { id: 31, conta_id: 7, loja: BAIRRO, venda: null, documento: '02-0000777', origem: 'acerto', conta_cobranca: 'Geral', numero: 1, parcelas: 2, vencimento: '2026-10-13', valor: '300.00', aberto: '300.00', dias_atraso: 20, juros: '10.00' },
+    { id: 32, conta_id: 7, loja: BAIRRO, venda: null, documento: '02-0000777', origem: 'acerto', conta_cobranca: 'Geral', numero: 2, parcelas: 2, vencimento: '2026-11-13', valor: '300.00', aberto: '300.00', dias_atraso: 0, juros: '0.00' },
   ],
 }
 
@@ -87,7 +87,7 @@ describe('receber crediário', () => {
     await wrapper.findAll('button').find((b) => b.text().includes('Confirmar recebimento')).trigger('click')
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/crediario/recebimentos', {
-      sessao_caixa_id: 11, cliente_id: 8, valor_recebido: '320.00',
+      sessao_caixa_id: 11, cliente_id: 8, valor_recebido: '320.00', voltar_para_geral: false,
       itens: [{ parcela_id: 31, valor: '300.00', juros: '10.00' }],
       pagamentos: [{ forma_pagamento_id: 1, valor: '310.00' }],
     })
@@ -177,5 +177,31 @@ describe('receber crediário', () => {
     ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.includes('Pôr no prejuízo')).click()
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/receber/prejuizo', { parcelas: [31], motivo: 'Cliente faleceu' })
+  })
+
+  it('contas a receber: muda as selecionadas de conta de cobrança', async () => {
+    useSessaoStore().permissoes = ['receber.ver', 'receber.cobranca']
+    const linha = {
+      id: 31, conta_id: 7, documento: '02-0000777', origem: 'venda', loja: BAIRRO, conta_cobranca: 'Geral',
+      cliente: { id: 8, nome: 'Ana Ficticia', cpf_cnpj: null, bloqueado: false, credito_suspenso: false }, setor: null, cidade: null,
+      historico: '', emissao: '2026-09-13', numero: 1, parcelas: 1, vencimento: '2026-10-13', vencimento_inicial: '2026-10-13',
+      valor: '300.00', aberto: '300.00', dias_atraso: 20, juros: '10.00', prejuizo: false, prejuizo_em: null, prejuizo_por: null, prejuizo_motivo: null,
+    }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: url === '/receber/contas-cobranca'
+        ? [{ id: 1, nome: 'Geral', padrao: true, ativo: true }, { id: 2, nome: 'José Cobrador', padrao: false, ativo: true }]
+        : { itens: [linha], total: 1, soma_valor: '300.00', soma_aberto: '300.00', juros_ao_mes: '5.00' },
+    }))
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { alteradas: 1 } })
+    const wrapper = await montar('/financeiro/receber')
+    await wrapper.findAllComponents(QCheckbox)[1].vm.$emit('update:modelValue', true)
+    await flushPromises()
+    await wrapper.findAll('button').find((b) => b.text().includes('Mudar cobrança')).trigger('click')
+    await flushPromises()
+    ;[...document.querySelectorAll('.q-dialog .q-radio')].find((r) => r.textContent.includes('José Cobrador')).click()
+    await flushPromises()
+    ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.includes('Mudar')).click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/receber/cobranca', { parcelas: [31], conta_cobranca_id: 2 })
   })
 })

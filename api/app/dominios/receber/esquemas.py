@@ -31,6 +31,7 @@ class ParcelaAberta(BaseModel):
     dias_atraso: int
     juros: Decimal = Field(description="Sugerido: % ao mês da forma Crediário, por dia de atraso, sobre o que falta")
     prejuizo: bool
+    conta_cobranca: str
 
 
 class ParcelasDoCliente(BaseModel):
@@ -51,6 +52,8 @@ class PagamentoDados(BaseModel):
 
 class RecebimentoDados(BaseModel):
     sessao_caixa_id: int
+    voltar_para_geral: bool = Field(
+        default=False, description="Os carnês das parcelas recebidas voltam para a conta de cobrança Geral (a loja)")
     cliente_id: int
     itens: list[ItemDados] = Field(min_length=1)
     pagamentos: list[PagamentoDados] = Field(min_length=1)
@@ -97,6 +100,7 @@ class Recebimento(BaseModel):
     troco: Decimal | None
     estornado_em: datetime | None
     estornado_por: Pessoa | None
+    quitou: bool = Field(default=False, description="Depois deste recebimento, o cliente não deve mais nada")
 
 
 class ClienteDaParcela(BaseModel):
@@ -129,6 +133,7 @@ class LinhaParcela(BaseModel):
     dias_atraso: int
     juros: Decimal
     prejuizo: bool
+    conta_cobranca: str
     prejuizo_em: datetime | None
     prejuizo_por: str | None
     prejuizo_motivo: str | None
@@ -145,3 +150,22 @@ class PaginaParcelas(BaseModel):
     soma_valor: Decimal
     soma_aberto: Decimal
     juros_ao_mes: Decimal
+
+
+class ContaCobranca(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    padrao: bool
+    ativo: bool
+
+
+class ContaCobrancaDados(BaseModel):
+    nome: str = Field(min_length=1, max_length=40)
+    ativo: bool = True
+
+
+class PedidoCobranca(BaseModel):
+    parcelas: list[int] = Field(min_length=1)
+    conta_cobranca_id: int
