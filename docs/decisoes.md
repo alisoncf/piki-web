@@ -337,6 +337,16 @@ Decisão do Alison.
 - Não foi importado do VB6: começa com as contas que o VB6 tinha (vendas, venda de consignado, aluguel recebido, receitas diversas; água/luz/energia, aluguel, combustíveis, compra de mercadorias, pagamento de funcionários, pró-labore, gastos de chefia, juros e multas, investimentos, despesas diversas). No VB6 o campo existe no caixa, mas quase tudo está em "diversos".
 - No caixa, a **despesa** pede uma conta de despesa e a **outra entrada**, uma de receita. Os lançamentos automáticos (venda, crediário, cancelamento) são identificados pelo motivo e não pedem conta. O mesmo plano vai servir às contas a pagar e ao financeiro.
 
+### D29. Notas fiscais: emissão pela própria API (03/11/2026)
+
+Decisão do Alison.
+
+- O **ECF não é mais usado**: fica fora do escopo (P4).
+- Hoje o VB6 emite pelo ACBrMonitor. O sistema novo vai ter a **emissão própria**, na API, cuidando do ciclo de vida inteiro das notas (montar, assinar, transmitir, consultar, cancelar, inutilizar, carta de correção, contingência), sem programa à parte.
+- Quase tudo é **NFC-e** (modelo 65), de empresas pequenas; algumas **NF-e** (modelo 55) de devolução e remessa, que o VB6 já tem em telas próprias.
+- **Certificado e CSC** (P10): o certificado A1 (`.pfx`) fica numa pasta do servidor, fora do repositório e do banco; a senha do certificado e o CSC da NFC-e (id e token) ficam no cadastro de cada empresa, cifrados com uma chave que só existe no `.env` do servidor.
+- O Alison vai mostrar a tela de notas do VB6 e as de devolução e remessa antes do desenho das tabelas.
+
 ### Próximas etapas da venda (respostas do Alison, 03/11/2026)
 
 - **Troca:** é uma funcionalidade à parte e complexa; o Alison vai mostrar.
@@ -366,11 +376,11 @@ Decisão do Alison.
 - **P1.** ~~O servidor da API web que o VB6 já usa (piki.app.br)~~. É mantido pelo Alison e vai ser substituído pelo `piki-web`; os clientes não vêm dele (D15).
 - **P2.** Códigos das empresas (`sped_empresa.codigo`, o `cod_emp` do VB6). Conhecidos em 30/10/2026: **01** (matriz, Requinte Enxovais, banco `requinte`), **02** (Jundiaí Casa, nome fantasia Requinte Enxovais, banco `requintejun`) e **03** (La Viva Enxovais, banco `requintebps`). Falta saber se existem outras e conferir se os registros já gravados em cada banco estão com o código certo. O ETL recusa importar quando o mesmo código aparece com CNPJs diferentes.
 - **P3.** ~~Clientes e produtos globais ou por loja?~~ Resolvido na D9.
-- **P4.** As lojas ainda usam ECF, ou só NFC-e? Se só NFC-e, o código e as tabelas de ECF são descartados.
+- **P4.** ~~As lojas ainda usam ECF, ou só NFC-e?~~ Resolvido em 03/11/2026: o ECF não é mais usado; o código e as tabelas de ECF ficam de fora (D29).
 - **P6.** O login do VB6 monta o SQL concatenando o texto digitado (`frmLogin`), o que permite injeção de SQL. Vale corrigir no legado enquanto ele estiver em uso.
 - **P7.** ~~PostgreSQL ou MariaDB?~~ Resolvido na D12.
 - **P8.** Infraestrutura das filiais: quantas são, se o computador do banco fica ligado e com internet, e o tamanho de cada banco. Define a frequência do agente.
-- **P10.** Segredos fiscais por empresa: certificado digital A1 (`.pfx` e senha) e CSC da NFC-e (id e token). No VB6 ficam em texto puro na `sped_empresa`; o ETL não os lê. Proposta: os arquivos `.pfx` ficam no servidor, fora do repositório e do banco, e senhas e tokens ficam cifrados no banco com uma chave que só existe no `.env` do servidor (ou num cofre de segredos). Decidir antes da onda 6.
+- **P10.** Segredos fiscais por empresa: certificado digital A1 (`.pfx` e senha) e CSC da NFC-e (id e token). No VB6 ficam em texto puro na `sped_empresa`; o ETL não os lê. Proposta: os arquivos `.pfx` ficam no servidor, fora do repositório e do banco, e senhas e tokens ficam cifrados no banco com uma chave que só existe no `.env` do servidor (ou num cofre de segredos). ~~Decidir antes da onda 6.~~ Resolvido em 03/11/2026 pela D29.
 - **P11.** Token no `localStorage` é simples, mas fica exposto se algum dia o front tiver uma falha de XSS. Antes de ir para produção, avaliar trocar por cookie `HttpOnly` emitido pela API, com renovação automática.
 - **P12.** Todas as filiais usam a marca Requinte Enxovais? Se alguma tiver outra marca, o logo e as cores passam para o cadastro da empresa e o visual muda ao trocar de empresa. Em 30/10/2026: a 03 tem nome fantasia La Viva Enxovais na `sped_empresa`; falta confirmar se ela usa outra marca na loja.
 - **P9.** (02/11/2026: hoje as lojas recebem os produtos da matriz por uma API na internet; D24.) Durante a transição, produtos cadastrados no sistema novo precisam chegar aos VB6 das filiais que ainda não viraram? Se o cadastro de produtos é feito por uma só pessoa ou pela matriz, pode ser preciso uma sincronização de volta só para produtos.

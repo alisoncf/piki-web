@@ -126,10 +126,11 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 
 ## Onda 6 · Fiscal
 
-- [ ] Comunicação com o ACBrMonitor PLUS por TCP
+- [ ] ~~Comunicação com o ACBrMonitor PLUS por TCP~~ Substituída pela emissão própria na API (D29)
+- [ ] Emissão própria de NFC-e e NF-e na API: assinatura, transmissão, consulta, cancelamento, inutilização, carta de correção, contingência (D29)
 - [ ] Emissão de NF-e
 - [ ] Entrada de notas e SPED
-- [ ] Confirmar se o ECF ainda é usado; se não, remover do escopo (P4)
+- [x] ECF: não é mais usado, fora do escopo (P4, D29) — 03/11/2026
 
 ## Onda 7 · PDV e caixa
 
