@@ -325,10 +325,8 @@ async function confirmar() {
   for (const aviso of data.avisos) $q.notify({ type: 'warning', message: aviso, timeout: 8000 })
   if (data.carne && data.entrega) $q.notify({ type: 'info', message: 'Imprima também o canhoto de entrega, pela venda', timeout: 8000 })
   const proximo = data.carne ? 'carne' : data.entrega ? 'canhoto-entrega' : null
-  // a NFC-e sai logo (D29); o carnê e o canhoto vêm depois, pela tela da nota
-  if (data.modelo_nota === '65') roteador.push({ name: 'nfce-venda', params: { id: data.id }, query: { emitir: 1, ...(proximo && { depois: proximo }) } })
-  else if (proximo) roteador.push({ name: proximo, params: { id: data.id }, query: { imprimir: 1 } })
-  else roteador.push({ name: 'vendas' })
+  // a nota sai logo (D29); o carnê e o canhoto vêm depois, pela tela da nota
+  roteador.push({ name: 'nota-venda', params: { id: data.id }, query: { emitir: 1, modelo: data.modelo_nota, ...(proximo && { depois: proximo }) } })
 }
 
 onMounted(async () => {

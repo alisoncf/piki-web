@@ -35,7 +35,7 @@
       </template>
       <template #body-cell-acoes="props">
         <q-td :props="props" class="text-right">
-          <q-btn v-if="props.row.venda_id" flat dense no-caps icon="receipt" label="DANFE" :to="{ name: 'nfce-venda', params: { id: props.row.venda_id } }" />
+          <q-btn v-if="props.row.venda_id" flat dense no-caps icon="receipt" label="DANFE" :to="{ name: 'nota-venda', params: { id: props.row.venda_id }, query: { modelo: props.row.modelo } }" />
           <q-btn flat dense no-caps icon="download" label="XML" @click="baixarXml(props.row)" />
           <q-btn v-if="podeEmitir && !['cancelada', 'inutilizada'].includes(props.row.situacao)" flat dense no-caps icon="travel_explore" label="Consultar" @click="consultar(props.row)" />
           <q-btn v-if="podeCancelar && props.row.situacao === 'autorizada'" flat dense no-caps color="negative" icon="block" label="Cancelar" @click="cancelar(props.row)" />
@@ -68,7 +68,8 @@ const notas = ref([])
 const carregando = ref(false)
 
 const colunas = [
-  { name: 'numero', label: 'NFC-e', field: (n) => `${n.numero} · série ${n.serie}`, align: 'left' },
+  { name: 'numero', label: 'Nota', field: (n) => `${n.modelo === '55' ? 'NF-e' : 'NFC-e'} ${n.numero} · série ${n.serie}`, align: 'left' },
+  { name: 'destinatario', label: 'Destinatário', field: 'destinatario', align: 'left' },
   { name: 'emitida_em', label: 'Emissão', field: 'emitida_em', format: formatarDataHora, align: 'left' },
   { name: 'valor', label: 'Valor', field: 'valor', format: formatarMoeda, align: 'right' },
   { name: 'situacao', label: 'Situação', field: 'situacao', align: 'left' },
@@ -117,7 +118,7 @@ async function consultar(nota) {
 
 function cancelar(nota) {
   $q.dialog({
-    title: `Cancelar a NFC-e ${nota.numero}`,
+    title: `Cancelar a ${nota.modelo === '55' ? 'NF-e' : 'NFC-e'} ${nota.numero}`,
     message: 'O cancelamento vai para a SEFAZ e não se desfaz. A venda continua como está. Justificativa (de 15 a 255 letras):',
     prompt: { model: '', type: 'text', isValid: (v) => v.trim().length >= 15 && v.trim().length <= 255 },
     cancel: { flat: true, label: 'Voltar' },
@@ -125,7 +126,7 @@ function cancelar(nota) {
   }).onOk(async (justificativa) => {
     try {
       trocar((await api.post(`/notas/${nota.id}/cancelar`, { justificativa: justificativa.trim() })).data)
-      $q.notify({ type: 'positive', message: `NFC-e ${nota.numero} cancelada` })
+      $q.notify({ type: 'positive', message: `Nota ${nota.numero} cancelada` })
     } catch (e) {
       $q.notify({ type: 'negative', message: mensagemDeErro(e) })
     }

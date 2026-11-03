@@ -6,7 +6,7 @@ resto do sistema não depender da nfelib. Toda resposta vira um Retorno simples.
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.dominios.fiscal.nfce import NS, UF_GO
+from app.dominios.fiscal.leiaute import NS, UF_GO
 
 # os códigos de resposta da SEFAZ (cStat) que importam aqui
 AUTORIZADA = "100"

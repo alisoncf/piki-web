@@ -60,6 +60,7 @@ class NotaFiscal(ComDatas, Base):
     emitida_em: Mapped[datetime] = mapped_column(DateTime)
     emitida_por_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    destinatario: Mapped[str | None] = mapped_column(String(60))  # o nome, para a lista
     # a última resposta da SEFAZ (cStat e xMotivo)
     codigo_retorno: Mapped[str | None] = mapped_column(String(3))
     motivo_retorno: Mapped[str | None] = mapped_column(String(255))
@@ -96,3 +97,28 @@ class InutilizacaoNota(ComDatas, Base):
     xml: Mapped[str | None] = deferred(mapped_column(Text))  # o retInutNFe
 
     feita_por: Mapped[Usuario] = relationship(lazy="joined")
+
+
+# a natureza de cada operação que gera nota, com o CFOP: parametrizável, para conferir com o contador
+# (Alison, 03/11/2026). Os valores iniciais são os que o VB6 usa.
+USOS_OPERACAO = {
+    "venda": ("Venda de produtos", "1", "1", "5102", "6102"),
+    "remessa": ("Remessa de venda de mercadoria", "1", "1", "5904", "6904"),
+    "retorno_remessa": ("Retorno de remessa de venda de mercadoria", "1", "1", "5904", "6904"),
+    "devolucao": ("Devolução de mercadoria", "1", "1", "5915", "6915"),
+}
+
+
+class OperacaoNota(ComDatas, Base):
+    """A natureza da operação (natOp), se a nota é de entrada ou saída, a finalidade e o CFOP de dentro e de fora
+    do estado. Uma por uso; o uso é do sistema, o resto se edita."""
+
+    __tablename__ = "nota_operacao"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    uso: Mapped[str] = mapped_column(String(20), unique=True)  # ver USOS_OPERACAO
+    natureza: Mapped[str] = mapped_column(String(60))
+    tipo: Mapped[str] = mapped_column(String(1))  # tpNF: 0 entrada, 1 saída
+    finalidade: Mapped[str] = mapped_column(String(1))  # finNFe: 1 normal, 2 complementar, 3 ajuste, 4 devolução
+    cfop_estado: Mapped[str] = mapped_column(String(4))
+    cfop_fora: Mapped[str] = mapped_column(String(4))

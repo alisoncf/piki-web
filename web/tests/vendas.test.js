@@ -43,7 +43,7 @@ async function montar(componente, caminho) {
       { path: '/vendas/:id/carne', name: 'carne', component: componente === CarnePagina ? componente : vazio },
       { path: '/vendas/:id/entrega', name: 'canhoto-entrega', component: componente === CanhotoEntregaPagina ? componente : vazio },
       { path: '/vendas/:id/receber', name: 'receber-venda', component: componente === RecebimentoPagina ? componente : vazio },
-      { path: '/vendas/:id/nfce', name: 'nfce-venda', component: vazio },
+      { path: '/vendas/:id/nota', name: 'nota-venda', component: vazio },
     ],
   })
   await router.push(caminho)
@@ -141,7 +141,7 @@ describe('vendas', () => {
     localStorage.setItem('piki.caixa', JSON.stringify({ empresa_id: 1, id: 5, nome: 'Cx 02' }))
     const fechada = { ...COM_ITEM, situacao: 'fechada', comprador: 'José', forma_pagamento: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' } }
     vi.spyOn(api, 'get').mockImplementation(gets(fechada))
-    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...fechada, situacao: 'recebida', troco: '10.00', carne: null } })
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...fechada, situacao: 'recebida', troco: '10.00', carne: null, modelo_nota: '65' } })
     const { wrapper, router } = await montar(RecebimentoPagina, '/vendas/3/receber')
     expect(wrapper.text()).toContain('Cx 02')
     expect(wrapper.text()).toContain('José')
@@ -164,7 +164,9 @@ describe('vendas', () => {
       sessao_caixa_id: 11, valor_recebido: '50.00', data_base: null, tipo_cobranca: null, modelo_nota: '65', autorizacao: null,
       pagamentos: [{ forma_pagamento_id: 1, valor: '40.00', parcelas: 1 }, { forma_pagamento_id: 2, valor: '60.00', parcelas: 1 }],
     })
-    expect(router.currentRoute.value.name).toBe('vendas')
+    // a nota sai logo depois de receber
+    expect(router.currentRoute.value.name).toBe('nota-venda')
+    expect(router.currentRoute.value.query).toEqual({ emitir: '1', modelo: '65' })
   })
 
   it('sem caixa neste computador não recebe', async () => {
@@ -187,7 +189,7 @@ describe('vendas', () => {
     vi.spyOn(api, 'get').mockImplementation((url, opcoes) =>
       url === '/formas-pagamento' ? Promise.resolve({ data: [DINHEIRO, CARTAO, CREDIARIO] }) : padrao(url, opcoes),
     )
-    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...noCrediario, situacao: 'recebida', carne: { id: 21 } } })
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...noCrediario, situacao: 'recebida', carne: { id: 21 }, modelo_nota: '55' } })
     const { wrapper, router } = await montar(RecebimentoPagina, '/vendas/3/receber')
     expect(wrapper.text()).toContain('Sem entrada')
     const data = wrapper.findAllComponents(QInput).find((c) => c.props('label') === 'Data base')
@@ -208,7 +210,9 @@ describe('vendas', () => {
       sessao_caixa_id: 11, valor_recebido: null, data_base: '2026-01-31', tipo_cobranca: 'cliente', modelo_nota: '55', autorizacao: null,
       pagamentos: [{ forma_pagamento_id: 1, valor: '40.00', parcelas: 1 }],
     })
-    expect(router.currentRoute.value.name).toBe('carne')
+    // a NF-e primeiro; o carnê vem depois, pela tela da nota
+    expect(router.currentRoute.value.name).toBe('nota-venda')
+    expect(router.currentRoute.value.query).toEqual({ emitir: '1', modelo: '55', depois: 'carne' })
   })
 
   it('no caixa, trocar para uma forma com outro desconto avisa e recalcula', async () => {
@@ -299,7 +303,7 @@ describe('vendas', () => {
     const { wrapper, router } = await montar(VendaPagina, '/vendas/3')
     await wrapper.findAll('a').find((a) => a.text().includes('NFC-e')).trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.name).toBe('nfce-venda')
+    expect(router.currentRoute.value.name).toBe('nota-venda')
   })
 
   it('cancela a venda recebida pelo caixa deste computador e imprime o canhoto de entrega', async () => {

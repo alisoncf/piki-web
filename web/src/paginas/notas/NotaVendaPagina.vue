@@ -1,10 +1,11 @@
 <template>
-  <!-- a NFC-e da venda (D29): emite logo depois de receber, mostra a resposta da SEFAZ e imprime o DANFE na bobina -->
+  <!-- a nota da venda (D29): emite logo depois de receber, mostra a resposta da SEFAZ e imprime o DANFE
+       (a NFC-e na bobina; a NF-e em A4, pelo PDF) -->
   <div class="nfce">
     <div class="sem-impressao q-pa-md">
       <div class="row items-center q-gutter-sm q-mb-sm">
         <q-btn flat no-caps icon="arrow_back" label="Vendas" :to="{ name: 'vendas' }" />
-        <div class="piki-titulo col">NFC-e da venda</div>
+        <div class="piki-titulo col">{{ nomeNota }} da venda</div>
       </div>
 
       <div v-if="trabalhando" class="row items-center q-gutter-sm q-pa-md">
@@ -14,31 +15,35 @@
       <q-banner v-else-if="erro" rounded class="bg-red-1 text-negative q-mb-sm">{{ erro }}</q-banner>
 
       <div v-if="!trabalhando && carregado" class="cartao q-pa-md">
-        <div v-if="!nota" class="text-suave">A venda ainda não tem NFC-e.</div>
+        <div v-if="!nota" class="text-suave">A venda ainda não tem {{ nomeNota }}.</div>
         <template v-else>
           <div class="row items-center q-gutter-sm">
             <q-badge :color="COR[nota.situacao]" class="text-body2">{{ NOME[nota.situacao] }}</q-badge>
-            <div>NFC-e {{ nota.numero }} · série {{ nota.serie }}</div>
+            <div>{{ nomeNota }} {{ nota.numero }} · série {{ nota.serie }}<span v-if="nota.destinatario"> · {{ nota.destinatario }}</span></div>
             <q-badge v-if="nota.ambiente === '2'" outline color="orange">Homologação</q-badge>
           </div>
           <div v-if="nota.motivo_retorno && nota.situacao !== 'autorizada'" class="q-mt-sm">
             <span v-if="nota.codigo_retorno">{{ nota.codigo_retorno }} - </span>{{ nota.motivo_retorno }}
           </div>
           <div v-if="nota.situacao === 'rejeitada'" class="text-caption text-suave q-mt-xs">
-            Corrija o que a SEFAZ apontou (o NCM do produto, o cadastro da loja...) e transmita de novo: vai com o mesmo número.
+            Corrija o que a SEFAZ apontou (o NCM do produto, o cadastro da loja ou do cliente...) e transmita de novo: vai com o mesmo número.
           </div>
           <div v-if="nota.situacao === 'pendente'" class="text-caption text-suave q-mt-xs">
             A SEFAZ não respondeu. Consulte, ou transmita de novo: se ela já tinha autorizado, a nota vem autorizada.
           </div>
         </template>
         <div class="row q-gutter-sm q-mt-md">
-          <q-btn v-if="podeTransmitir" unelevated no-caps color="primary" icon="send" :label="nota && nota.situacao !== 'inutilizada' ? 'Transmitir de novo' : 'Emitir a NFC-e'" @click="emitir" />
+          <q-btn v-if="podeTransmitir" unelevated no-caps color="primary" icon="send" :label="nota && nota.situacao !== 'inutilizada' ? 'Transmitir de novo' : `Emitir a ${nomeNota}`" @click="emitir" />
           <q-btn v-if="nota?.situacao === 'pendente'" flat no-caps color="primary" icon="travel_explore" label="Consultar na SEFAZ" @click="consultar" />
-          <q-btn v-if="danfe" unelevated no-caps color="primary" icon="print" label="Imprimir" @click="imprimir" />
+          <q-btn v-if="danfe || pdf" unelevated no-caps color="primary" icon="print" label="Imprimir" @click="imprimir" />
+          <q-btn v-if="pdf" flat no-caps color="primary" icon="open_in_new" label="Abrir o PDF" :href="pdf" target="_blank" />
           <q-btn v-if="depois" flat no-caps color="primary" icon="arrow_forward" :label="depois.rotulo" :to="depois.rota" />
         </div>
       </div>
     </div>
+
+    <!-- DANFE da NF-e, em A4: o PDF gerado pela API -->
+    <iframe v-if="pdf" ref="quadroPdf" :src="pdf" class="pdf sem-impressao" title="DANFE" />
 
     <!-- DANFE NFC-e, para a bobina de 80 mm -->
     <div v-if="danfe" class="danfe">
@@ -114,6 +119,11 @@ const PROXIMOS = { carne: 'Imprimir o carnê', 'canhoto-entrega': 'Imprimir o ca
 const rota = useRoute()
 const nota = ref(null)
 const danfe = ref(null)
+const pdf = ref('')
+const quadroPdf = ref(null)
+// quem abre a tela diz o modelo (a nota ainda pode não existir)
+const modelo = computed(() => nota.value?.modelo ?? rota.query.modelo ?? '65')
+const nomeNota = computed(() => (modelo.value === '55' ? 'NF-e' : 'NFC-e'))
 const carregado = ref(false)
 const trabalhando = ref('')
 const erro = ref('')
@@ -136,7 +146,14 @@ function nomePagamento(p) {
 async function mostrar(dados, imprimirLogo = false) {
   nota.value = dados
   danfe.value = null
+  if (pdf.value) URL.revokeObjectURL(pdf.value)
+  pdf.value = ''
   if (!dados || !['autorizada', 'cancelada'].includes(dados.situacao)) return
+  if (dados.modelo === '55') {
+    const { data } = await api.get(`/notas/${dados.id}/danfe.pdf`, { responseType: 'blob' })
+    pdf.value = URL.createObjectURL(data)
+    return // o PDF aparece na tela, com o botão de imprimir
+  }
   danfe.value = (await api.get(`/notas/${dados.id}/danfe`)).data
   if (imprimirLogo) {
     await nextTick()
@@ -152,7 +169,7 @@ async function trabalhar(mensagem, acao) {
   } catch (e) {
     erro.value = mensagemDeErro(e)
     // a SEFAZ não respondeu: a nota ficou pendente
-    await mostrar((await api.get(`/vendas/${rota.params.id}/nfce`)).data).catch(() => {})
+    await mostrar((await api.get(`/vendas/${rota.params.id}/nota`)).data).catch(() => {})
   } finally {
     trabalhando.value = ''
     carregado.value = true
@@ -161,7 +178,7 @@ async function trabalhar(mensagem, acao) {
 
 function emitir() {
   return trabalhar('Transmitindo para a SEFAZ...', async () => {
-    await mostrar((await api.post(`/vendas/${rota.params.id}/nfce`)).data, true)
+    await mostrar((await api.post(`/vendas/${rota.params.id}/nota`)).data, true)
   })
 }
 
@@ -172,15 +189,20 @@ function consultar() {
 }
 
 function imprimir() {
-  window.print()
+  if (!pdf.value) return window.print()
+  try {
+    quadroPdf.value.contentWindow.print()
+  } catch {
+    window.open(pdf.value, '_blank')
+  }
 }
 
 onMounted(async () => {
   await trabalhar('Carregando...', async () => {
-    const atual = (await api.get(`/vendas/${rota.params.id}/nfce`)).data
+    const atual = (await api.get(`/vendas/${rota.params.id}/nota`)).data
     if (!atual && rota.query.emitir) {
       trabalhando.value = 'Transmitindo para a SEFAZ...'
-      await mostrar((await api.post(`/vendas/${rota.params.id}/nfce`)).data, true)
+      await mostrar((await api.post(`/vendas/${rota.params.id}/nota`)).data, true)
     } else await mostrar(atual)
   })
 })
@@ -188,8 +210,14 @@ onMounted(async () => {
 
 <style scoped>
 .nfce {
-  max-width: 640px;
+  max-width: 900px;
   margin: 0 auto;
+}
+.pdf {
+  display: block;
+  width: 100%;
+  height: 80vh;
+  border: 0;
 }
 .danfe {
   width: 72mm;

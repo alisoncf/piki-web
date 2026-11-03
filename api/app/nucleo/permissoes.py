@@ -40,6 +40,7 @@ PERMISSOES: dict[str, str] = {
     "notas.emitir": "Emitir, transmitir de novo e consultar na SEFAZ as notas da loja (o caixa já emite a da venda)",
     "notas.cancelar": "Cancelar nota autorizada na SEFAZ",
     "notas.inutilizar": "Inutilizar na SEFAZ os números pulados das séries da loja",
+    "notas.configurar": "Alterar a natureza da operação e o CFOP das notas (venda, remessa, retorno, devolução)",
 }
 
 # nome de cada área (a parte antes do ponto), para agrupar as permissões na tela de perfis

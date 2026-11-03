@@ -18,9 +18,10 @@ from app.dominios.acesso.modelos import Usuario
 from app.dominios.caixa.modelos import TIPOS_DE_FORMA
 from app.dominios.empresas.modelos import Empresa
 from app.dominios.estoque.modelos import Estoque
-from app.dominios.fiscal import nfce, sefaz
+from app.dominios.fiscal import leiaute, sefaz
 from app.dominios.fiscal.modelos import (
-    AUTORIZADA, CANCELADA, DENEGADA, INUTILIZADA, PENDENTE, REJEITADA, InutilizacaoNota, NotaFiscal, NumeracaoNota,
+    AUTORIZADA, CANCELADA, DENEGADA, INUTILIZADA, PENDENTE, REJEITADA, USOS_OPERACAO, InutilizacaoNota, NotaFiscal,
+    NumeracaoNota, OperacaoNota,
 )
 from app.dominios.vendas.modelos import Venda
 from app.nucleo import segredos
@@ -121,9 +122,9 @@ def status(db: Session, empresa_id: int) -> sefaz.Retorno:
 
 # --- NFC-e da venda ---
 
-def _emitente(empresa: Empresa) -> nfce.Emitente:
+def _emitente(empresa: Empresa) -> leiaute.Emitente:
     cidade = empresa.cidade
-    return nfce.Emitente(
+    return leiaute.Emitente(
         cnpj=empresa.cnpj or "", razao_social=empresa.razao_social or empresa.nome, nome_fantasia=empresa.nome_fantasia,
         inscricao_estadual=so_digitos(empresa.inscricao_estadual or ""), logradouro=empresa.logradouro or "",
         numero=empresa.numero or "", complemento=empresa.complemento, bairro=empresa.bairro or "",
@@ -133,17 +134,17 @@ def _emitente(empresa: Empresa) -> nfce.Emitente:
 
 
 def _gtin(produto) -> str | None:
-    validos = [c.codigo for c in produto.codigos_barras if nfce.gtin_valido(c.codigo)]
+    validos = [c.codigo for c in produto.codigos_barras if leiaute.gtin_valido(c.codigo)]
     return validos[0] if validos else None
 
 
-def _itens(db: Session, venda: Venda) -> list[nfce.ItemNota]:
+def _itens(db: Session, venda: Venda) -> list[leiaute.ItemNota]:
     impostos = {e.produto_id: e for e in db.scalars(select(Estoque).where(
         Estoque.empresa_id == venda.empresa_id, Estoque.produto_id.in_([i.produto_id for i in venda.itens])))}
     itens = []
     for item in sorted(venda.itens, key=lambda i: i.ordem):
         produto, estoque = item.produto, impostos.get(item.produto_id)
-        itens.append(nfce.ItemNota(
+        itens.append(leiaute.ItemNota(
             codigo=str(produto.codigo), gtin=_gtin(produto), descricao=item.descricao, ncm=produto.ncm,
             cest=produto.cest, cfop=(estoque and estoque.cfop) or "5102", unidade=produto.unidade or "UN",
             quantidade=item.quantidade, preco=item.preco, bruto=item.total + item.desconto, desconto=item.desconto,
@@ -151,7 +152,7 @@ def _itens(db: Session, venda: Venda) -> list[nfce.ItemNota]:
     return itens
 
 
-def _pagamentos(venda: Venda) -> tuple[list[nfce.PagamentoNota], Decimal]:
+def _pagamentos(venda: Venda) -> tuple[list[leiaute.PagamentoNota], Decimal]:
     """As formas da venda com o código da NFC-e (tPag); o dinheiro vai com o que o cliente deu, e o troco à parte.
     O que ficou no carnê vai como crédito da loja."""
     troco = venda.troco or ZERO
@@ -159,38 +160,63 @@ def _pagamentos(venda: Venda) -> tuple[list[nfce.PagamentoNota], Decimal]:
     for p in sorted(venda.pagamentos, key=lambda p: p.ordem):
         tipo = p.forma_pagamento.tipo
         valor = p.valor + troco if tipo == "dinheiro" and troco > 0 else p.valor
-        pagamentos.append(nfce.PagamentoNota(TIPOS_DE_FORMA[tipo][1], valor, p.forma_pagamento.nome))
+        pagamentos.append(leiaute.PagamentoNota(TIPOS_DE_FORMA[tipo][1], valor, p.forma_pagamento.nome))
     if venda.a_prazo > 0:
-        pagamentos.append(nfce.PagamentoNota(TIPOS_DE_FORMA["crediario"][1], venda.a_prazo))
+        pagamentos.append(leiaute.PagamentoNota(TIPOS_DE_FORMA["crediario"][1], venda.a_prazo))
     if not pagamentos:
-        pagamentos.append(nfce.PagamentoNota("90", ZERO))  # sem pagamento
+        pagamentos.append(leiaute.PagamentoNota("90", ZERO))  # sem pagamento
     return pagamentos, max(troco, ZERO)
 
 
-def _destinatario(venda: Venda) -> tuple[str | None, str | None]:
-    if venda.cliente is not None and venda.cliente.cpf_cnpj:
-        return venda.cliente.cpf_cnpj, venda.cliente.nome
+def _destinatario(venda: Venda, modelo: str) -> leiaute.Destinatario | None:
+    """Na NFC-e, só o CPF de quem comprou, se tiver; na NF-e, o cliente cadastrado, com o endereço."""
+    cliente = venda.cliente
+    if modelo == "55":
+        if cliente is None:
+            raise DadoInvalido("A NF-e precisa de cliente cadastrado (com CPF ou CNPJ e endereço)")
+        setor = cliente.setor
+        cidade = setor.cidade if setor else None
+        return leiaute.Destinatario(
+            documento=cliente.cpf_cnpj or "", nome=cliente.nome,
+            inscricao_estadual=so_digitos(cliente.inscricao_estadual or "") or None,
+            logradouro=cliente.logradouro, numero=cliente.numero or "S/N", complemento=cliente.complemento,
+            bairro=setor.nome if setor else None, codigo_municipio=cidade.codigo_ibge if cidade else None,
+            municipio=cidade.nome if cidade else None, uf=cidade.uf if cidade else None, cep=cliente.cep,
+            telefone=cliente.telefones[0].numero if cliente.telefones else None, email=cliente.email)
+    if cliente is not None and cliente.cpf_cnpj:
+        return leiaute.Destinatario(cliente.cpf_cnpj, cliente.nome)
     if venda.consumidor is not None and venda.consumidor.cpf:
-        return venda.consumidor.cpf, venda.consumidor.nome
-    return None, None
+        return leiaute.Destinatario(venda.consumidor.cpf, venda.consumidor.nome)
+    return None
 
 
 def _montar(db: Session, venda: Venda, nota: NotaFiscal, empresa: Empresa) -> str:
     """O XML assinado da nota, conferido com o esquema oficial."""
-    if not empresa.csc_id or not empresa.csc_token:
+    nfce = nota.modelo == "65"
+    if nfce and (not empresa.csc_id or not empresa.csc_token):
         raise DadoInvalido("A loja não tem o CSC da NFC-e: cadastre-o na ficha da empresa")
-    documento, nome = _destinatario(venda)
+    destinatario = _destinatario(venda, nota.modelo)
+    operacao = obter_operacao(db, "venda")
+    # o cliente de fora de Goiás: operação interestadual, com o CFOP de fora (a conferir com o contador)
+    fora = not nfce and destinatario.uf not in (None, "GO")
+    itens = _itens(db, venda)
+    if not nfce:  # na NF-e, o CFOP é o da natureza da operação; na NFC-e, o do estoque da loja
+        for item in itens:
+            item.cfop = operacao.cfop_fora if fora else operacao.cfop_estado
     pagamentos, troco = _pagamentos(venda)
-    dados = nfce.DadosNfce(
+    dados = leiaute.DadosNota(
         emitente=_emitente(empresa), ambiente=nota.ambiente, serie=nota.serie, numero=nota.numero,
-        emissao=nota.emitida_em, itens=_itens(db, venda), pagamentos=pagamentos, outros=venda.taxa_entrega,
-        troco=troco, cpf_cnpj_destinatario=documento, nome_destinatario=nome,
-        informacoes=f"Venda {venda.numero}", codigo_numerico=nota.codigo_numerico)
+        emissao=nota.emitida_em, itens=itens, pagamentos=pagamentos, outros=venda.taxa_entrega,
+        troco=troco, destinatario=destinatario, informacoes=f"Venda {venda.numero}",
+        codigo_numerico=nota.codigo_numerico, modelo=nota.modelo, natureza=operacao.natureza, tipo=operacao.tipo,
+        finalidade=operacao.finalidade, destino="2" if fora else "1")
     try:
-        chave, xml = nfce.montar(dados)
-    except nfce.NotaInvalida as e:
+        chave, xml = leiaute.montar(dados)
+    except leiaute.NotaInvalida as e:
         raise DadoInvalido(str(e))
-    xml = nfce.com_qrcode(xml, chave, nota.ambiente, empresa.csc_id, _segredo(empresa.csc_token))
+    if nfce:
+        xml = leiaute.com_qrcode(xml, chave, nota.ambiente, empresa.csc_id, _segredo(empresa.csc_token))
+    nota.destinatario = destinatario.nome[:60] if destinatario else None
     pfx, senha = certificado(empresa)
     assinado = sefaz.assinar(xml, pfx, senha, chave)
     erros = sefaz.erros_de_leiaute(assinado)
@@ -226,15 +252,14 @@ def nota_da_venda(db: Session, venda_id: int) -> NotaFiscal | None:
                      .order_by((NotaFiscal.situacao == CANCELADA), NotaFiscal.id.desc()).limit(1))
 
 
-def emitir_nfce(db: Session, empresa_id: int, usuario: Usuario, venda_id: int) -> NotaFiscal:
-    """Emite a NFC-e da venda recebida, ou transmite de novo a que ficou pendente ou foi rejeitada."""
+def emitir(db: Session, empresa_id: int, usuario: Usuario, venda_id: int) -> NotaFiscal:
+    """Emite a nota da venda recebida (a NFC-e ou a NF-e, a que o caixa escolheu ao receber), ou transmite de novo a
+    que ficou pendente ou foi rejeitada."""
     venda = db.get(Venda, venda_id)
     if venda is None or venda.empresa_id != empresa_id:
         raise NaoEncontrada("Venda não encontrada")
     if venda.situacao != "recebida":
         raise DadoInvalido("Só se emite a nota da venda recebida")
-    if venda.modelo_nota != "65":
-        raise DadoInvalido("Esta venda é com NF-e (modelo 55), que ainda não sai por aqui")
     empresa = db.get(Empresa, empresa_id)
     nota = nota_da_venda(db, venda_id)
     if nota is not None and nota.situacao in (AUTORIZADA, DENEGADA):
@@ -248,9 +273,9 @@ def emitir_nfce(db: Session, empresa_id: int, usuario: Usuario, venda_id: int) -
             caixa = venda.sessao_caixa.caixa if venda.sessao_caixa else None
             if caixa is None or not caixa.serie_nfe:
                 raise DadoInvalido("O caixa que recebeu a venda não tem série das notas: configure-a nos caixas")
-            nota = NotaFiscal(empresa_id=empresa_id, ambiente=empresa.nfe_ambiente, modelo="65", serie=caixa.serie_nfe,
-                              codigo_numerico=nfce.novo_codigo_numerico(), venda_id=venda.id)
-            nota.numero = proximo_numero(db, empresa_id, "65", nota.serie, nota.ambiente)
+            nota = NotaFiscal(empresa_id=empresa_id, ambiente=empresa.nfe_ambiente, modelo=venda.modelo_nota,
+                              serie=caixa.serie_nfe, codigo_numerico=leiaute.novo_codigo_numerico(), venda_id=venda.id)
+            nota.numero = proximo_numero(db, empresa_id, nota.modelo, nota.serie, nota.ambiente)
         nota.emitida_em, nota.emitida_por = datetime.now().replace(microsecond=0), usuario
         try:
             assinado = _montar(db, venda, nota, empresa)
@@ -323,6 +348,37 @@ def cancelar(db: Session, empresa_id: int, usuario: Usuario, nota_id: int, justi
         return nota
     db.commit()
     raise DadoInvalido(f"A SEFAZ não cancelou: {retorno.codigo} - {retorno.motivo}")
+
+
+# --- naturezas da operação (o CFOP de cada uso) ---
+
+def operacoes(db: Session) -> list[OperacaoNota]:
+    """Todas, criando com os valores do VB6 as que ainda não existem."""
+    existentes = {o.uso: o for o in db.scalars(select(OperacaoNota))}
+    faltam = [uso for uso in USOS_OPERACAO if uso not in existentes]
+    for uso in faltam:
+        natureza, tipo, finalidade, estado, fora = USOS_OPERACAO[uso]
+        existentes[uso] = OperacaoNota(uso=uso, natureza=natureza, tipo=tipo, finalidade=finalidade,
+                                       cfop_estado=estado, cfop_fora=fora)
+        db.add(existentes[uso])
+    if faltam:
+        db.flush()
+    return [existentes[uso] for uso in USOS_OPERACAO]
+
+
+def obter_operacao(db: Session, uso: str) -> OperacaoNota:
+    return next(o for o in operacoes(db) if o.uso == uso)
+
+
+def alterar_operacao(db: Session, operacao_id: int, natureza: str, tipo: str, finalidade: str, cfop_estado: str,
+                     cfop_fora: str) -> OperacaoNota:
+    operacao = db.get(OperacaoNota, operacao_id)
+    if operacao is None:
+        raise NaoEncontrada("Natureza de operação não encontrada")
+    operacao.natureza, operacao.tipo, operacao.finalidade = " ".join(natureza.split()), tipo, finalidade
+    operacao.cfop_estado, operacao.cfop_fora = cfop_estado, cfop_fora
+    db.commit()
+    return operacao
 
 
 # --- inutilização: os números da série que não vão ser usados ---

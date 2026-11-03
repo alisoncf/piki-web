@@ -17,9 +17,9 @@ export const rotas = [
   },
   {
     // fora do layout, para imprimir só o DANFE na bobina
-    path: '/vendas/:id(\\d+)/nfce',
-    name: 'nfce-venda',
-    component: () => import('@/paginas/notas/NfceVendaPagina.vue'),
+    path: '/vendas/:id(\\d+)/nota',
+    name: 'nota-venda',
+    component: () => import('@/paginas/notas/NotaVendaPagina.vue'),
     meta: { permissao: ['notas.ver', 'notas.emitir', 'caixa.operar'] },
   },
   {
@@ -225,6 +225,12 @@ export const rotas = [
         name: 'receber-venda',
         component: () => import('@/paginas/vendas/RecebimentoPagina.vue'),
         meta: { permissao: 'caixa.operar' },
+      },
+      {
+        path: 'notas/operacoes',
+        name: 'operacoes-nota',
+        component: () => import('@/paginas/notas/OperacoesNotaPagina.vue'),
+        meta: { permissao: ['notas.configurar', 'notas.ver'] },
       },
       {
         path: 'notas/inutilizar',

@@ -26,6 +26,7 @@ class Nota(BaseModel):
     emitida_em: datetime
     emitida_por: UsuarioResumido
     valor: Decimal
+    destinatario: str | None
     codigo_retorno: str | None
     motivo_retorno: str | None
     protocolo: str | None
@@ -75,6 +76,21 @@ class Inutilizacao(BaseModel):
     protocolo: str | None
     homologada_em: datetime | None
     feita_por: UsuarioResumido
+
+
+class OperacaoDados(BaseModel):
+    natureza: str = Field(min_length=1, max_length=60)
+    tipo: Literal["0", "1"] = Field(description="0 entrada, 1 saída")
+    finalidade: Literal["1", "2", "3", "4"] = Field(description="1 normal, 2 complementar, 3 ajuste, 4 devolução")
+    cfop_estado: str = Field(pattern=r"^\d{4}$")
+    cfop_fora: str = Field(pattern=r"^\d{4}$")
+
+
+class Operacao(OperacaoDados):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    uso: str
 
 
 class RetornoSefaz(BaseModel):

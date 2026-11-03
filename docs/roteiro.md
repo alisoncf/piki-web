@@ -132,7 +132,10 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
   - [~] NFC-e da venda em homologação: montar, conferir com o XSD, assinar, transmitir, retransmitir, consultar, cancelar, DANFE de 80 mm, lista de notas (migração 0035) — 03/11/2026, falta testar com a SEFAZ de Goiás
   - [x] Inutilização dos números pulados da série, como no VB6 (migração 0036) — 03/11/2026
   - [ ] Contingência (nova, o VB6 não tem), carta de correção
-- [ ] Emissão de NF-e
+- [~] Emissão de NF-e
+  - [x] NF-e da venda recebida, natureza e CFOP parametrizáveis, DANFE A4 em PDF (migração 0037) — 03/11/2026
+  - [ ] E-mail do DANFE e do XML, carta de correção
+  - [ ] Remessa e retorno do consignado (com a consignação, onda 5) e devolução
 - [ ] Entrada de notas e SPED
 - [x] ECF: não é mais usado, fora do escopo (P4, D29) — 03/11/2026
 

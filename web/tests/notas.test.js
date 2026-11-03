@@ -6,8 +6,9 @@ import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
 import InutilizarNumerosPagina from '@/paginas/notas/InutilizarNumerosPagina.vue'
-import NfceVendaPagina from '@/paginas/notas/NfceVendaPagina.vue'
+import NotaVendaPagina from '@/paginas/notas/NotaVendaPagina.vue'
 import NotasPagina from '@/paginas/notas/NotasPagina.vue'
+import OperacoesNotaPagina from '@/paginas/notas/OperacoesNotaPagina.vue'
 import { api } from '@/servicos/api'
 import { useSessaoStore } from '@/stores/sessao'
 
@@ -36,8 +37,9 @@ async function montar(componente, caminho) {
     routes: [
       { path: '/vendas', name: 'vendas', component: vazio },
       { path: '/notas', name: 'notas', component: componente === NotasPagina ? componente : vazio },
-      { path: '/vendas/:id/nfce', name: 'nfce-venda', component: componente === NfceVendaPagina ? componente : vazio },
+      { path: '/vendas/:id/nota', name: 'nota-venda', component: componente === NotaVendaPagina ? componente : vazio },
       { path: '/vendas/:id/carne', name: 'carne', component: vazio },
+      { path: '/notas/operacoes', name: 'operacoes-nota', component: componente === OperacoesNotaPagina ? componente : vazio },
       { path: '/notas/inutilizar', name: 'inutilizar-numeros', component: componente === InutilizarNumerosPagina ? componente : vazio },
     ],
   })
@@ -70,10 +72,10 @@ beforeEach(() => {
 describe('notas fiscais', () => {
   it('logo depois de receber, emite a NFC-e, imprime o DANFE e segue para o carnê', async () => {
     entrar(['caixa.operar'])
-    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url === '/vendas/3/nfce' ? null : DANFE }))
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url === '/vendas/3/nota' ? null : DANFE }))
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: NOTA })
-    const { wrapper } = await montar(NfceVendaPagina, '/vendas/3/nfce?emitir=1&depois=carne')
-    expect(post).toHaveBeenCalledWith('/vendas/3/nfce')
+    const { wrapper } = await montar(NotaVendaPagina, '/vendas/3/nota?emitir=1&depois=carne')
+    expect(post).toHaveBeenCalledWith('/vendas/3/nota')
     expect(api.get).toHaveBeenCalledWith('/notas/8/danfe')
     expect(window.print).toHaveBeenCalled()
     const texto = wrapper.text()
@@ -89,28 +91,28 @@ describe('notas fiscais', () => {
 
   it('aberta pela venda, sem nota: não emite sozinha, só no botão', async () => {
     entrar(['caixa.operar'])
-    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url === '/vendas/3/nfce' ? null : DANFE }))
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url === '/vendas/3/nota' ? null : DANFE }))
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: NOTA })
-    const { wrapper } = await montar(NfceVendaPagina, '/vendas/3/nfce')
+    const { wrapper } = await montar(NotaVendaPagina, '/vendas/3/nota')
     expect(post).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('A venda ainda não tem NFC-e')
     await botao(wrapper, 'Emitir a NFC-e').trigger('click')
     await flushPromises()
-    expect(post).toHaveBeenCalledWith('/vendas/3/nfce')
+    expect(post).toHaveBeenCalledWith('/vendas/3/nota')
     expect(wrapper.text()).toContain('Autorizada')
   })
 
   it('a rejeitada mostra o motivo e transmite de novo', async () => {
     entrar(['caixa.operar'])
     const rejeitada = { ...NOTA, situacao: 'rejeitada', codigo_retorno: '778', motivo_retorno: 'Rejeicao: NCM inexistente', protocolo: null }
-    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url === '/vendas/3/nfce' ? rejeitada : DANFE }))
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url === '/vendas/3/nota' ? rejeitada : DANFE }))
     const post = vi.spyOn(api, 'post').mockResolvedValue({ data: NOTA })
-    const { wrapper } = await montar(NfceVendaPagina, '/vendas/3/nfce')
+    const { wrapper } = await montar(NotaVendaPagina, '/vendas/3/nota')
     expect(post).not.toHaveBeenCalled() // só abre: não emite sozinha
     expect(wrapper.text()).toContain('778 - Rejeicao: NCM inexistente')
     await botao(wrapper, 'Transmitir de novo').trigger('click')
     await flushPromises()
-    expect(post).toHaveBeenCalledWith('/vendas/3/nfce')
+    expect(post).toHaveBeenCalledWith('/vendas/3/nota')
     expect(wrapper.text()).toContain('Autorizada')
   })
 
@@ -162,5 +164,35 @@ describe('notas fiscais', () => {
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/notas/inutilizacoes', { modelo: '65', serie: 101, inicial: 2, final: 3, justificativa: 'Notas rejeitadas e largadas' })
     expect(wrapper.text()).toContain('152260000000777')
+  })
+
+  it('a NF-e mostra o DANFE em PDF, A4', async () => {
+    entrar(['caixa.operar'])
+    globalThis.URL.createObjectURL = vi.fn(() => 'blob:danfe')
+    globalThis.URL.revokeObjectURL = vi.fn()
+    const nfe = { ...NOTA, modelo: '55', destinatario: 'Freguesa Ficticia' }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url === '/vendas/3/nota' ? nfe : new Blob(['%PDF']) }))
+    const { wrapper } = await montar(NotaVendaPagina, '/vendas/3/nota?modelo=55')
+    expect(api.get).toHaveBeenCalledWith('/notas/8/danfe.pdf', { responseType: 'blob' })
+    expect(wrapper.text()).toContain('NF-e da venda')
+    expect(wrapper.text()).toContain('NF-e 1 · série 101 · Freguesa Ficticia')
+    expect(wrapper.find('iframe').attributes('src')).toBe('blob:danfe')
+  })
+
+  it('edita a natureza e o CFOP da operação', async () => {
+    entrar(['notas.configurar'])
+    const VENDA = { id: 1, uso: 'venda', natureza: 'Venda de produtos', tipo: '1', finalidade: '1', cfop_estado: '5102', cfop_fora: '6102' }
+    vi.spyOn(api, 'get').mockResolvedValue({ data: [VENDA] })
+    const put = vi.spyOn(api, 'put').mockResolvedValue({ data: { ...VENDA, cfop_fora: '6108' } })
+    const { wrapper } = await montar(OperacoesNotaPagina, '/notas/operacoes')
+    await wrapper.find('tbody tr').trigger('click')
+    await flushPromises()
+    const campo = wrapper.findAllComponents({ name: 'QInput' }).find((c) => c.props('label') === 'CFOP para fora *')
+    await campo.vm.$emit('update:modelValue', '6108')
+    await flushPromises()
+    ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.includes('Salvar')).click()
+    await flushPromises()
+    expect(put).toHaveBeenCalledWith('/notas/operacoes/1', { natureza: 'Venda de produtos', tipo: '1', finalidade: '1', cfop_estado: '5102', cfop_fora: '6108' })
+    expect(wrapper.text()).toContain('6108')
   })
 })

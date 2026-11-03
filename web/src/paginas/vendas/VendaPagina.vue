@@ -9,14 +9,14 @@
         <q-btn v-if="(aberta || fechada) && podeVender" flat no-caps color="grey-8" icon="delete_outline" label="Descartar" @click="descartar">
           <q-tooltip>O cliente desistiu: a venda fica descartada, com o motivo (não gerou nada para desfazer)</q-tooltip>
         </q-btn>
-        <!-- emite a NFC-e que não saiu no recebimento; se já existe, a tela mostra a que há (D29) -->
+        <!-- emite a nota que não saiu no recebimento; se já existe, a tela mostra a que há (D29) -->
         <q-btn
-          v-if="venda.situacao === 'recebida' && venda.modelo_nota === '65' && sessao.pode(['notas.ver', 'notas.emitir', 'caixa.operar'])"
+          v-if="venda.situacao === 'recebida' && sessao.pode(['notas.ver', 'notas.emitir', 'caixa.operar'])"
           flat
           no-caps
           icon="receipt_long"
-          label="NFC-e"
-          :to="{ name: 'nfce-venda', params: { id: venda.id } }"
+          :label="venda.modelo_nota === '55' ? 'NF-e' : 'NFC-e'"
+          :to="{ name: 'nota-venda', params: { id: venda.id }, query: { modelo: venda.modelo_nota } }"
         />
         <q-btn v-if="venda.situacao === 'recebida' && sessao.pode('vendas.cancelar')" flat no-caps color="negative" icon="close" label="Cancelar venda" @click="cancelar" />
         <q-btn v-if="fechada && (podeVender || podeReceber)" flat no-caps icon="lock_open" label="Reabrir" class="q-ml-sm" @click="reabrir" />

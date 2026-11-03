@@ -13,13 +13,13 @@ from app.dominios.acesso import servico as acesso
 from app.dominios.cidades.modelos import Cidade, nome_de_busca
 from app.dominios.empresas.modelos import Empresa
 from app.dominios.estoque.modelos import Estoque
-from app.dominios.fiscal import nfce, sefaz
+from app.dominios.fiscal import leiaute, sefaz
 from app.dominios.fiscal import servico as fiscal
 from app.dominios.fiscal.modelos import NotaFiscal, NumeracaoNota
 from app.dominios.produtos.modelos import CodigoBarras, Produto
 from app.nucleo import segredos
 
-NS = {"n": nfce.NS}
+NS = {"n": leiaute.NS}
 
 
 def _auth(cliente, login, empresa_id):
@@ -36,7 +36,7 @@ class SefazFalsa:
         self.consulta = "100"
 
     def _protocolo(self, chave, codigo, motivo):
-        xml = (f'<protNFe xmlns="{nfce.NS}" versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>GO</verAplic>'
+        xml = (f'<protNFe xmlns="{leiaute.NS}" versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>GO</verAplic>'
                f"<chNFe>{chave}</chNFe><dhRecbto>2026-11-03T10:00:00-03:00</dhRecbto><nProt>152260000000123</nProt>"
                f"<digVal>abc=</digVal><cStat>{codigo}</cStat><xMotivo>{motivo}</xMotivo></infProt></protNFe>")
         return sefaz.Retorno(codigo, motivo, "152260000000123", datetime(2026, 11, 3, 10), xml)
@@ -64,12 +64,12 @@ class SefazFalsa:
     def inutilizar(self, cnpj, modelo, serie, inicial, final, justificativa):
         self.inutilizacoes.append((cnpj, modelo, serie, inicial, final, justificativa))
         return sefaz.Retorno("102", "Inutilizacao de numero homologado", "152260000000777", datetime(2026, 11, 3, 11),
-                             f'<retInutNFe xmlns="{nfce.NS}" versao="4.00"/>')
+                             f'<retInutNFe xmlns="{leiaute.NS}" versao="4.00"/>')
 
     def cancelar(self, chave, protocolo, justificativa, cnpj):
         self.cancelamentos.append((chave, protocolo, justificativa, cnpj))
         return sefaz.Retorno("135", "Evento registrado e vinculado a NF-e", "152260000000999", datetime(2026, 11, 3, 10, 5),
-                             f'<retEvento xmlns="{nfce.NS}" versao="1.00"/>')
+                             f'<retEvento xmlns="{leiaute.NS}" versao="1.00"/>')
 
 
 @pytest.fixture
@@ -135,17 +135,17 @@ def _com_ncm(banco, loja):
 
 def test_monta_xml_valido_no_leiaute():
     """O XML montado passa no esquema oficial; a chave tem o dígito certo; o QR Code é o da versão 2."""
-    emitente = nfce.Emitente(CNPJ, "LOJA FICTICIA LTDA", None, "100000001", "RUA FICTICIA", "10", None, "CENTRO",
+    emitente = leiaute.Emitente(CNPJ, "LOJA FICTICIA LTDA", None, "100000001", "RUA FICTICIA", "10", None, "CENTRO",
                              "5208707", "Goiânia", "GO", "74000000", None)
-    item = nfce.ItemNota("1", "123", "TOALHA & CIA", "63026000", None, "5102", "UN", Decimal("1"), Decimal("30"),
+    item = leiaute.ItemNota("1", "123", "TOALHA & CIA", "63026000", None, "5102", "UN", Decimal("1"), Decimal("30"),
                          Decimal("30.00"), Decimal("0.00"), 0, "500")
-    dados = nfce.DadosNfce(emitente, "1", 101, 44537, datetime(2026, 11, 3, 10), [item],
-                           [nfce.PagamentoNota("17", Decimal("30.00")), nfce.PagamentoNota("99", Decimal("5.00"), "Vale")],
-                           outros=Decimal("5.00"), cpf_cnpj_destinatario="52998224725", nome_destinatario="Fulano",
+    dados = leiaute.DadosNota(emitente, "1", 101, 44537, datetime(2026, 11, 3, 10), [item],
+                           [leiaute.PagamentoNota("17", Decimal("30.00")), leiaute.PagamentoNota("99", Decimal("5.00"), "Vale")],
+                           outros=Decimal("5.00"), destinatario=leiaute.Destinatario("52998224725", "Fulano"),
                            codigo_numerico="12345678")
-    chave, xml = nfce.montar(dados)
-    assert chave[:-1] == f"522611{CNPJ}65101000044537112345678" and chave[-1] == nfce.digito_chave(chave[:-1])
-    xml = nfce.com_qrcode(xml, chave, "1", "000001", "CSC")
+    chave, xml = leiaute.montar(dados)
+    assert chave[:-1] == f"522611{CNPJ}65101000044537112345678" and chave[-1] == leiaute.digito_chave(chave[:-1])
+    xml = leiaute.com_qrcode(xml, chave, "1", "000001", "CSC")
     assinado = sefaz.assinar(xml, _pfx(CNPJ, "s"), "s", chave)
     assert sefaz.erros_de_leiaute(assinado) == []
     raiz = etree.fromstring(assinado.encode())
@@ -160,19 +160,19 @@ def test_monta_xml_valido_no_leiaute():
 def test_emite_a_nfce_da_venda(banco, cliente, loja, falsa):
     url = _venda(cliente, loja, loja["davi"])
     # sem NCM: nem vai para a SEFAZ, e o número não é gasto
-    r = cliente.post(f"{url}/nfce", headers=loja["davi"])
+    r = cliente.post(f"{url}/nota", headers=loja["davi"])
     assert r.status_code == 422 and "Produto sem NCM: Lençol Ficticio Casal" in r.json()["detail"]
     assert falsa.enviados == []
     _com_ncm(banco, loja)
 
-    r = cliente.post(f"{url}/nfce", headers=loja["davi"])
+    r = cliente.post(f"{url}/nota", headers=loja["davi"])
     assert r.status_code == 200, r.text
     nota = r.json()
     assert (nota["situacao"], nota["ambiente"], nota["serie"], nota["numero"], nota["valor"], nota["protocolo"]) == (
         "autorizada", "2", 101, 1, "200.00", "152260000000123")
     enviado = etree.fromstring(falsa.enviados[0].encode())
     # homologação: a descrição do primeiro item é a exigida; o dinheiro vai com o que o cliente deu, e o troco
-    assert enviado.find(".//n:xProd", NS).text == nfce.HOMOLOGACAO
+    assert enviado.find(".//n:xProd", NS).text == leiaute.HOMOLOGACAO
     assert enviado.find(".//n:cEAN", NS).text == "7891234567895"
     assert [(p.find("n:tPag", NS).text, p.find("n:vPag", NS).text) for p in enviado.findall(".//n:detPag", NS)] == [("01", "250.00")]
     assert enviado.find(".//n:vTroco", NS).text == "50.00"
@@ -184,8 +184,8 @@ def test_emite_a_nfce_da_venda(banco, cliente, loja, falsa):
         assert producao.ultimo == 500
 
     # de novo: já autorizada, não vai outra vez
-    assert cliente.post(f"{url}/nfce", headers=loja["davi"]).json()["id"] == nota["id"] and len(falsa.enviados) == 1
-    assert cliente.get(f"{url}/nfce", headers=loja["davi"]).json()["id"] == nota["id"]
+    assert cliente.post(f"{url}/nota", headers=loja["davi"]).json()["id"] == nota["id"] and len(falsa.enviados) == 1
+    assert cliente.get(f"{url}/nota", headers=loja["davi"]).json()["id"] == nota["id"]
 
     danfe = cliente.get(f"/notas/{nota['id']}/danfe", headers=loja["davi"]).json()
     assert (danfe["total"], danfe["troco"], danfe["protocolo"], danfe["numero"]) == ("200.00", "50.00", "152260000000123", 1)
@@ -198,14 +198,14 @@ def test_resposta_perdida_e_retransmissao(banco, cliente, loja, falsa):
     _com_ncm(banco, loja)
     url = _venda(cliente, loja, loja["davi"])
     falsa.resposta = "fora"
-    r = cliente.post(f"{url}/nfce", headers=loja["davi"])
+    r = cliente.post(f"{url}/nota", headers=loja["davi"])
     assert r.status_code == 503 and "ficou pendente" in r.json()["detail"]
-    nota = cliente.get(f"{url}/nfce", headers=loja["davi"]).json()
+    nota = cliente.get(f"{url}/nota", headers=loja["davi"]).json()
     assert nota["situacao"] == "pendente"
 
     # a SEFAZ tinha autorizado: o mesmo XML de novo dá duplicidade, e a consulta traz o protocolo
     falsa.resposta = "204"
-    nota2 = cliente.post(f"{url}/nfce", headers=loja["davi"]).json()
+    nota2 = cliente.post(f"{url}/nota", headers=loja["davi"]).json()
     assert (nota2["id"], nota2["situacao"], nota2["numero"]) == (nota["id"], "autorizada", 1)
     assert falsa.enviados[0] == falsa.enviados[1] and falsa.consultas == [nota["chave"]]
 
@@ -214,15 +214,15 @@ def test_rejeitada_e_transmitida_de_novo(banco, cliente, loja, falsa):
     _com_ncm(banco, loja)
     url = _venda(cliente, loja, loja["davi"])
     falsa.resposta = "778"
-    nota = cliente.post(f"{url}/nfce", headers=loja["davi"]).json()
+    nota = cliente.post(f"{url}/nota", headers=loja["davi"]).json()
     assert (nota["situacao"], nota["codigo_retorno"], nota["motivo_retorno"]) == ("rejeitada", "778", "Rejeicao: NCM inexistente")
 
     # corrigido, vai de novo com o mesmo número
     falsa.resposta = "100"
-    nota2 = cliente.post(f"{url}/nfce", headers=loja["davi"]).json()
+    nota2 = cliente.post(f"{url}/nota", headers=loja["davi"]).json()
     assert (nota2["id"], nota2["situacao"], nota2["numero"]) == (nota["id"], "autorizada", 1)
     # a próxima venda pega o número seguinte
-    outra = cliente.post(f"{_venda(cliente, loja, loja['davi'])}/nfce", headers=loja["davi"]).json()
+    outra = cliente.post(f"{_venda(cliente, loja, loja['davi'])}/nota", headers=loja["davi"]).json()
     assert outra["numero"] == 2
 
     # a pendente que a SEFAZ não conhece (não chegou lá) vira rejeitada na consulta
@@ -236,7 +236,7 @@ def test_rejeitada_e_transmitida_de_novo(banco, cliente, loja, falsa):
 def test_cancelar_nota(banco, cliente, loja, falsa):
     _com_ncm(banco, loja)
     url = _venda(cliente, loja, loja["davi"])
-    nota = cliente.post(f"{url}/nfce", headers=loja["davi"]).json()
+    nota = cliente.post(f"{url}/nota", headers=loja["davi"]).json()
     r = cliente.post(f"/notas/{nota['id']}/cancelar", headers=loja["davi"], json={"justificativa": "Cliente desistiu da compra"})
     assert r.status_code == 403  # o caixa emite, mas não cancela
     r = cliente.post(f"/notas/{nota['id']}/cancelar", headers=loja["admin"], json={"justificativa": "curta"})
@@ -261,7 +261,7 @@ def test_sem_certificado_ou_sem_serie(banco, cliente, loja, falsa):
     with banco() as db:
         db.get(Empresa, loja["empresa"]).certificado_arquivo = None
         db.commit()
-    r = cliente.post(f"{url}/nfce", headers=loja["davi"])
+    r = cliente.post(f"{url}/nota", headers=loja["davi"])
     assert r.status_code == 422 and "não tem certificado" in r.json()["detail"]
     assert cliente.post(f"/empresas/{loja['empresa']}/sefaz", headers=loja["admin"]).status_code == 422
 
@@ -311,10 +311,10 @@ def test_inutiliza_as_lacunas_da_serie(banco, cliente, loja, falsa):
     # a venda cuja nota rejeitada teve o número inutilizado ganha outro número
     url = _venda(cliente, loja, loja["davi"])
     falsa.resposta = "778"
-    rejeitada = cliente.post(f"{url}/nfce", headers=loja["davi"]).json()
+    rejeitada = cliente.post(f"{url}/nota", headers=loja["davi"]).json()
     assert (rejeitada["numero"], rejeitada["situacao"]) == (9, "rejeitada")
     r = cliente.post("/notas/inutilizacoes", headers=admin, json=pedido | {"inicial": 7, "final": 9})
     assert r.status_code == 201, r.text
     falsa.resposta = "100"
-    nova = cliente.post(f"{url}/nfce", headers=loja["davi"]).json()
+    nova = cliente.post(f"{url}/nota", headers=loja["davi"]).json()
     assert (nova["numero"], nova["situacao"]) == (10, "autorizada") and nova["id"] != rejeitada["id"]

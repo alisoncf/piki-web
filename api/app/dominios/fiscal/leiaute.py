@@ -1,8 +1,9 @@
-"""Monta o XML da NFC-e (modelo 65, leiaute 4.00) a partir da venda recebida (D29).
+"""Monta o XML da NFC-e (modelo 65) e da NF-e (modelo 55), leiaute 4.00 (D29).
 
 Só as regras do Simples Nacional, que é o caso de todas as lojas: ICMS pelo CSOSN
-(102 ou 500, como no VB6), PIS e COFINS com CST 49 zerados, CFOP 5102. A assinatura,
-o QR Code e o envio ficam em sefaz.py. Função pura: recebe os dados e devolve o texto.
+(102 ou 500, como no VB6), PIS e COFINS com CST 49 zerados. A natureza e o CFOP vêm de
+quem chama. A NF-e leva o destinatário com o endereço; a NFC-e, o QR Code. A assinatura
+e o envio ficam em sefaz.py. Funções puras: recebem os dados e devolvem o texto.
 """
 import hashlib
 import random
@@ -68,6 +69,23 @@ class ItemNota:
 
 
 @dataclass
+class Destinatario:
+    documento: str  # CPF ou CNPJ, só dígitos
+    nome: str
+    inscricao_estadual: str | None = None
+    logradouro: str | None = None
+    numero: str | None = None
+    complemento: str | None = None
+    bairro: str | None = None
+    codigo_municipio: str | None = None
+    municipio: str | None = None
+    uf: str | None = None
+    cep: str | None = None
+    telefone: str | None = None
+    email: str | None = None
+
+
+@dataclass
 class PagamentoNota:
     tipo: str  # tPag: 01 dinheiro, 03 crédito, 04 débito, 05 crédito loja, 17 PIX...
     valor: Decimal
@@ -75,7 +93,7 @@ class PagamentoNota:
 
 
 @dataclass
-class DadosNfce:
+class DadosNota:
     emitente: Emitente
     ambiente: str  # 1 produção, 2 homologação
     serie: int
@@ -85,10 +103,14 @@ class DadosNfce:
     pagamentos: list[PagamentoNota]
     outros: Decimal = Decimal("0.00")  # a taxa de entrega
     troco: Decimal = Decimal("0.00")
-    cpf_cnpj_destinatario: str | None = None
-    nome_destinatario: str | None = None
+    destinatario: Destinatario | None = None
     informacoes: str | None = None
     codigo_numerico: str = field(default_factory=novo_codigo_numerico)
+    modelo: str = "65"
+    natureza: str = "Venda de produtos"
+    tipo: str = "1"  # tpNF: 0 entrada, 1 saída
+    finalidade: str = "1"  # finNFe: 1 normal, 4 devolução
+    destino: str = "1"  # idDest: 1 dentro do estado, 2 para fora
 
 
 def digito_chave(chave43: str) -> str:
@@ -125,8 +147,21 @@ def _tag(nome: str, valor: object | None) -> str:
     return "" if valor is None or valor == "" else f"<{nome}>{_t(valor)}</{nome}>"
 
 
-def montar(dados: DadosNfce) -> tuple[str, str]:
-    """Devolve a chave de acesso e o XML da NFC-e (sem assinatura e sem o grupo do QR Code)."""
+def _dest(d: Destinatario, modelo: str, homologacao: bool) -> str:
+    tag = "CPF" if len(d.documento) == 11 else "CNPJ"
+    nome = DEST_HOMOLOGACAO if homologacao else d.nome[:60]
+    endereco = ""
+    if modelo == "55":
+        endereco = (f"<enderDest>{_tag('xLgr', d.logradouro)}{_tag('nro', d.numero)}{_tag('xCpl', d.complemento)}"
+                    f"{_tag('xBairro', d.bairro)}<cMun>{d.codigo_municipio}</cMun>{_tag('xMun', d.municipio)}"
+                    f"<UF>{d.uf}</UF><CEP>{d.cep}</CEP><cPais>1058</cPais><xPais>BRASIL</xPais>"
+                    f"{_tag('fone', d.telefone)}</enderDest>")
+    contribuinte = f"<indIEDest>1</indIEDest><IE>{d.inscricao_estadual}</IE>" if d.inscricao_estadual else "<indIEDest>9</indIEDest>"
+    return f"<dest><{tag}>{d.documento}</{tag}>{_tag('xNome', nome)}{endereco}{contribuinte}{_tag('email', d.email)}</dest>"
+
+
+def montar(dados: DadosNota) -> tuple[str, str]:
+    """Devolve a chave de acesso e o XML da nota (sem assinatura e, na NFC-e, sem o grupo do QR Code)."""
     e = dados.emitente
     faltas = [nome for nome, valor in (("o CNPJ", e.cnpj), ("a inscrição estadual", e.inscricao_estadual),
                                        ("a rua", e.logradouro), ("o número", e.numero), ("o bairro", e.bairro),
@@ -138,15 +173,26 @@ def montar(dados: DadosNfce) -> tuple[str, str]:
         raise NotaInvalida(f"Produto sem NCM: {', '.join(sem_ncm)}")
     if not dados.itens:
         raise NotaInvalida("A nota não tem itens")
+    d = dados.destinatario
+    if dados.modelo == "55":
+        if d is None:
+            raise NotaInvalida("A NF-e precisa do destinatário: escolha o cliente na venda")
+        faltas = [nome for nome, valor in (("o CPF ou CNPJ", d.documento), ("a rua", d.logradouro), ("o bairro", d.bairro),
+                                           ("a cidade", d.codigo_municipio), ("o CEP", d.cep)) if not valor]
+        if faltas:
+            raise NotaInvalida(f"Falta no cadastro do cliente {d.nome}: {', '.join(faltas)}")
 
-    chave = chave_acesso(UF_GO, dados.emissao, e.cnpj, "65", dados.serie, dados.numero, "1", dados.codigo_numerico)
+    chave = chave_acesso(UF_GO, dados.emissao, e.cnpj, dados.modelo, dados.serie, dados.numero, "1", dados.codigo_numerico)
     homologacao = dados.ambiente == "2"
     emissao = dados.emissao.strftime("%Y-%m-%dT%H:%M:%S-03:00")
 
-    ide = (f"<ide><cUF>{UF_GO}</cUF><cNF>{dados.codigo_numerico}</cNF><natOp>Venda de produtos</natOp><mod>65</mod>"
-           f"<serie>{dados.serie}</serie><nNF>{dados.numero}</nNF><dhEmi>{emissao}</dhEmi><tpNF>1</tpNF>"
-           f"<idDest>1</idDest><cMunFG>{e.codigo_municipio}</cMunFG><tpImp>4</tpImp><tpEmis>1</tpEmis>"
-           f"<cDV>{chave[-1]}</cDV><tpAmb>{dados.ambiente}</tpAmb><finNFe>1</finNFe><indFinal>1</indFinal>"
+    nfce = dados.modelo == "65"
+    ide = (f"<ide><cUF>{UF_GO}</cUF><cNF>{dados.codigo_numerico}</cNF>{_tag('natOp', dados.natureza[:60])}"
+           f"<mod>{dados.modelo}</mod><serie>{dados.serie}</serie><nNF>{dados.numero}</nNF><dhEmi>{emissao}</dhEmi>"
+           f"{'' if nfce else f'<dhSaiEnt>{emissao}</dhSaiEnt>'}<tpNF>{dados.tipo}</tpNF>"
+           f"<idDest>{dados.destino}</idDest><cMunFG>{e.codigo_municipio}</cMunFG><tpImp>{4 if nfce else 1}</tpImp>"
+           f"<tpEmis>1</tpEmis><cDV>{chave[-1]}</cDV><tpAmb>{dados.ambiente}</tpAmb><finNFe>{dados.finalidade}</finNFe>"
+           f"<indFinal>1</indFinal>"
            f"<indPres>1</indPres><indIntermed>0</indIntermed><procEmi>0</procEmi><verProc>Piki 1.0</verProc></ide>")
     endereco = (f"<enderEmit>{_tag('xLgr', e.logradouro)}{_tag('nro', e.numero)}{_tag('xCpl', e.complemento)}"
                 f"{_tag('xBairro', e.bairro)}<cMun>{e.codigo_municipio}</cMun>{_tag('xMun', e.municipio)}"
@@ -154,17 +200,12 @@ def montar(dados: DadosNfce) -> tuple[str, str]:
                 f"{_tag('fone', e.telefone)}</enderEmit>")
     emit = (f"<emit><CNPJ>{e.cnpj}</CNPJ>{_tag('xNome', e.razao_social[:60])}{_tag('xFant', (e.nome_fantasia or '')[:60])}"
             f"{endereco}<IE>{e.inscricao_estadual}</IE><CRT>{e.crt}</CRT></emit>")
-    dest = ""
-    if dados.cpf_cnpj_destinatario:
-        documento = dados.cpf_cnpj_destinatario
-        tag = "CPF" if len(documento) == 11 else "CNPJ"
-        nome = DEST_HOMOLOGACAO if homologacao else (dados.nome_destinatario or "")[:60]
-        dest = f"<dest><{tag}>{documento}</{tag}>{_tag('xNome', nome)}<indIEDest>9</indIEDest></dest>"
+    dest = _dest(d, dados.modelo, homologacao) if d else ""
 
     # a taxa de entrega entra como outras despesas, no primeiro item
     dets = []
     for n, item in enumerate(dados.itens, start=1):
-        descricao = HOMOLOGACAO if homologacao and n == 1 else item.descricao[:120]
+        descricao = HOMOLOGACAO if homologacao and nfce and n == 1 else item.descricao[:120]
         gtin = item.gtin if gtin_valido(item.gtin) else "SEM GTIN"
         outros = dados.outros if n == 1 and dados.outros else None
         prod = (f"<prod><cProd>{_t(item.codigo)}</cProd><cEAN>{gtin}</cEAN>{_tag('xProd', descricao)}"
@@ -212,6 +253,13 @@ def com_qrcode(xml: str, chave: str, ambiente: str, csc_id: str, csc_token: str)
     """Põe o grupo infNFeSupl (QR Code e endereço da consulta), que vai depois da infNFe e antes da assinatura."""
     supl = f"<infNFeSupl><qrCode>{escape(qrcode(chave, ambiente, csc_id, csc_token))}</qrCode><urlChave>{URL_CHAVE[ambiente]}</urlChave></infNFeSupl>"
     return xml.replace("</infNFe></NFe>", f"</infNFe>{supl}</NFe>")
+
+
+def danfe_pdf(xml: str, logo: bytes | None = None, cancelada: bool = False) -> bytes:
+    """O DANFE da NF-e em folha A4, em PDF (para imprimir e mandar por e-mail)."""
+    from brazilfiscalreport.danfe import Danfe, DanfeConfig
+
+    return bytes(Danfe(xml=xml.encode(), config=DanfeConfig(logo=logo, watermark_cancelled=cancelada)).output())
 
 
 def _texto(elemento, caminho: str) -> str | None:

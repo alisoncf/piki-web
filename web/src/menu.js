@@ -47,6 +47,7 @@ export const MENU = [
       { titulo: 'Vendas', icone: 'shopping_bag', rota: '/vendas', permissao: ['vendas.ver', 'vendas.vender', 'caixa.operar'] },
       { titulo: 'Notas fiscais', icone: 'receipt_long', rota: '/notas', permissao: ['notas.ver', 'notas.emitir', 'caixa.operar'] },
       { titulo: 'Inutilizar números', icone: 'block', rota: '/notas/inutilizar', permissao: 'notas.inutilizar' },
+      { titulo: 'Naturezas das notas', icone: 'rule', rota: '/notas/operacoes', permissao: ['notas.configurar', 'notas.ver'] },
     ],
   },
   {
