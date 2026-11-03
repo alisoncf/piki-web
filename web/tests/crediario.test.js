@@ -70,7 +70,7 @@ describe('receber crediário', () => {
     const wrapper = await montar()
     expect(wrapper.text()).toContain('Cx Crediário')
 
-    await wrapper.findComponent(QSelect).vm.$emit('update:modelValue', 8)
+    await wrapper.findComponent(QSelect).vm.$emit('update:modelValue', { como: 'cliente', cliente: { id: 8, nome: 'Freguesa Ficticia', cpf_cnpj: null } })
     await flushPromises()
     expect(wrapper.text()).toContain('20 dias de atraso')
     expect(wrapper.text()).toContain('02-0000777 Acerto')
@@ -229,5 +229,27 @@ describe('receber crediário', () => {
     document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
     await flushPromises()
     expect(post).toHaveBeenCalledWith('/receber/prorrogar', { parcelas: [31], vencimento: '2026-11-30', dias: null, anotacao: 'Paga no dia 30' })
+  })
+
+  it('acha pelo número da parcela do carnê e já marca a parcela', async () => {
+    localStorage.setItem('piki.caixa', JSON.stringify({ empresa_id: 1, id: 5, nome: 'Cx Crediário' }))
+    const achado = { como: 'parcela', cliente: { id: 8, nome: 'Freguesa Ficticia', cpf_cnpj: null }, conta_id: 7, documento: '02-0000777', parcela_id: 32, parcela: '2/2, vence 13/11/2026, falta R$ 300,00' }
+    const get = vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: {
+        '/formas-pagamento': [DINHEIRO, CREDIARIO],
+        '/caixas': [{ id: 5, nome: 'Cx Crediário', ativo: true, sessao: { id: 11 } }],
+        '/crediario/busca': [achado],
+        '/crediario/clientes/8/parcelas': PARCELAS,
+      }[url],
+    }))
+    const wrapper = await montar()
+    const busca = wrapper.findComponent(QSelect)
+    const atualizar = vi.fn((f) => f())
+    busca.vm.$emit('filter', '0001234', atualizar, vi.fn())
+    await flushPromises()
+    expect(get).toHaveBeenCalledWith('/crediario/busca', { params: { termo: '0001234' } })
+    await busca.vm.$emit('update:modelValue', achado)
+    await flushPromises()
+    expect(wrapper.findAllComponents(QCheckbox).map((c) => c.props('modelValue'))).toEqual([false, true])
   })
 })

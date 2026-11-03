@@ -205,3 +205,20 @@ class Mudanca(BaseModel):
 class PedidoBloqueio(BaseModel):
     clientes: list[int] = Field(min_length=1)
     bloquear: bool
+
+
+class ClienteAchado(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    cpf_cnpj: str | None
+
+
+class Achado(BaseModel):
+    como: str = Field(description="cliente, documento ou parcela: como a busca achou")
+    cliente: ClienteAchado
+    conta_id: int | None = None
+    documento: str | None = Field(default=None, description="Loja e número do documento achado")
+    parcela_id: int | None = None
+    parcela: str | None = Field(default=None, description="A parcela achada: 2/5, vencimento e valor")

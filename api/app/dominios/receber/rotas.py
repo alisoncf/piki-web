@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dominios.receber import servico
 from app.dominios.receber.esquemas import (
-    ClienteDaParcela, ContaCobranca, ContaCobrancaDados, DocumentoDados, LinhaParcela, Mudanca, ParcelaDados,
+    Achado, ClienteAchado, ClienteDaParcela, ContaCobranca, ContaCobrancaDados, DocumentoDados, LinhaParcela, Mudanca, ParcelaDados,
     PedidoBloqueio, PedidoCobranca, PedidoProrrogacao, PaginaParcelas, ParcelaAberta, ParcelasDoCliente, PedidoPrejuizo, Recebimento,
     RecebimentoDados,
 )
@@ -50,6 +50,22 @@ def parcelas(cliente_id: int, ctx: Operar) -> ParcelasDoCliente:
             dias_atraso=dias, juros=juros, prejuizo=p.prejuizo, conta_cobranca=p.conta_cobranca.nome,
         ))
     return ParcelasDoCliente(juros_ao_mes=taxa, parcelas=resposta)
+
+
+@router.get("/crediario/busca", response_model=list[Achado])
+def buscar(termo: str, ctx: Operar) -> list[Achado]:
+    """Para receber: pelo nome ou CPF do cliente, pelo número do documento ou pelo número da parcela.
+    Os números do VB6 se repetem entre as lojas: pode vir mais de um, cada um com a sua loja."""
+    resposta = []
+    for a in servico.buscar(ctx.db, termo):
+        p = a.parcela
+        resposta.append(Achado(
+            como=a.como, cliente=ClienteAchado.model_validate(a.cliente), conta_id=a.conta.id if a.conta else None,
+            documento=a.conta.documento if a.conta else None, parcela_id=p.id if p else None,
+            parcela=f"{p.numero}/{len(p.conta.parcelas)}, vence {p.vencimento.strftime('%d/%m/%Y')}, falta R$ {p.aberto}"
+            .replace(".", ",") if p else None,
+        ))
+    return resposta
 
 
 @router.post("/crediario/recebimentos", response_model=Recebimento, status_code=status.HTTP_201_CREATED)

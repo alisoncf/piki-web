@@ -18,6 +18,7 @@ from app.dominios.receber.esquemas import RecebimentoDados
 from app.dominios.receber.modelos import (
     TIPOS_COBRANCA, ContaCobranca, ContaReceber, HistoricoParcela, ItemRecebimento, PagamentoRecebimento, ParcelaReceber, RecebimentoCrediario,
 )
+from app.nucleo.legado import MapaLegado
 from app.nucleo.textos import moeda
 
 ZERO = Decimal("0.00")
@@ -550,3 +551,58 @@ def teve_pagamento(db: Session, conta: ContaReceber) -> bool:
     return bool(ids) and db.scalar(select(func.count()).select_from(ItemRecebimento).join(RecebimentoCrediario)
                                    .where(ItemRecebimento.parcela_id.in_(ids),
                                           RecebimentoCrediario.estornado_em.is_(None))) > 0
+
+
+# ------------------------------------------------------------ achar o que receber
+
+@dataclass
+class Achado:
+    """O que a busca do recebimento achou: o cliente, e o documento ou a parcela, quando a busca foi por eles."""
+
+    como: str  # cliente, documento ou parcela
+    cliente: Cliente
+    conta: ContaReceber | None = None
+    parcela: ParcelaReceber | None = None
+
+
+def _sem_zeros(valor: str) -> str:
+    return valor.lstrip("0") or "0"
+
+
+def buscar(db: Session, termo: str, limite: int = 20) -> list[Achado]:
+    """O caixa procura pelo nome ou CPF do cliente, pelo número do documento (o do VB6, que se repete entre as
+    lojas, ou o do carnê novo) ou pelo número da parcela (o "Nº Seq." do carnê do VB6, ou o da parcela nova).
+    Só entra o que tem parcela em aberto."""
+    termo = termo.strip()
+    if not termo:
+        return []
+    achados: list[Achado] = []
+    com_aberto = select(ContaReceber.cliente_id).join(ParcelaReceber).where(ParcelaReceber.aberto > 0)
+    digitos = termo.replace(".", "").replace("-", "").replace("/", "")
+    if digitos.isdigit():
+        numero = _sem_zeros(digitos)
+        # documento: o número do VB6 (com ou sem os zeros da frente) ou o do carnê novo
+        contas = db.scalars(select(ContaReceber).where(
+            (func.ltrim(ContaReceber.documento_legado, "0") == numero)
+            | ((ContaReceber.id == int(digitos)) & ContaReceber.documento_legado.is_(None)),  # o número do carnê novo
+            ContaReceber.id.in_(select(ParcelaReceber.conta_id).where(ParcelaReceber.aberto > 0))).limit(limite))
+        achados += [Achado("documento", c.cliente, conta=c) for c in contas]
+        # parcela: o seq_itd do VB6 (no legado_mapa) ou o número da parcela nova
+        ids = select(MapaLegado.novo_id).where(MapaLegado.tabela == "tab_itdoc",
+                                               func.ltrim(MapaLegado.codigo, "0") == numero)
+        parcelas = db.scalars(select(ParcelaReceber).where(
+            ParcelaReceber.id.in_(ids)
+            | ((ParcelaReceber.id == int(digitos))  # o número da parcela do carnê novo
+               & ParcelaReceber.conta_id.in_(select(ContaReceber.id).where(ContaReceber.documento_legado.is_(None)))),
+            ParcelaReceber.aberto > 0).limit(limite))
+        achados += [Achado("parcela", p.conta.cliente, conta=p.conta, parcela=p) for p in parcelas]
+        # CPF ou CNPJ, do começo
+        if len(digitos) >= 5:
+            clientes = db.scalars(select(Cliente).where(Cliente.cpf_cnpj.like(f"{digitos}%"), Cliente.id.in_(com_aberto))
+                                  .order_by(Cliente.nome).limit(limite))
+            achados += [Achado("cliente", c) for c in clientes]
+    else:
+        clientes = db.scalars(select(Cliente).where(Cliente.nome.ilike(f"%{termo}%"), Cliente.id.in_(com_aberto))
+                              .order_by(Cliente.nome).limit(limite))
+        achados += [Achado("cliente", c) for c in clientes]
+    return achados[:limite]

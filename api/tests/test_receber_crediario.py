@@ -203,3 +203,28 @@ def test_bloquear_e_liberar_clientes_em_lote(banco, cliente, loja, admin, carnes
         assert cli.bloqueado and cli.anotacoes[0].texto == "Bloqueado pela cobrança (contas a receber)"
     r = cliente.post("/receber/clientes/bloqueio", headers=admin, json={"clientes": [carnes["cliente"]], "bloquear": False})
     assert r.json() == {"alterados": 1}
+
+
+def test_busca_por_cliente_documento_ou_parcela(banco, cliente, cenario, loja, carnes):  # noqa: F811
+    from app.nucleo.legado import MapaLegado
+    from app.dominios.receber.modelos import ParcelaReceber
+    davi = loja["davi"]
+    with banco() as db:
+        vencida = db.get(ParcelaReceber, carnes["vencida"])
+        vencida.conta.documento_legado = "0000777"  # veio do VB6, com o "Nº Seq." 0001234
+        db.add(MapaLegado(tabela="tab_itdoc", empresa_id=cenario["e2"], codigo="0001234", novo_id=vencida.id))
+        conta_nova = db.get(ParcelaReceber, carnes["a_vencer"]).conta_id
+        db.commit()
+
+    def busca(termo):
+        return cliente.get("/crediario/busca", headers=davi, params={"termo": termo}).json()
+
+    assert [(a["como"], a["cliente"]["nome"]) for a in busca("fregues")] == [("cliente", "Freguesa Ficticia")]
+    assert [(a["como"], a["documento"]) for a in busca("777")] == [("documento", "02-0000777")]  # sem os zeros
+    achado = busca("1234")[0]
+    assert (achado["como"], achado["parcela_id"]) == ("parcela", carnes["vencida"])
+    assert achado["parcela"].startswith("1/1, vence")
+    # o carnê novo: pelo número do carnê e pelo número da parcela
+    assert ("documento", conta_nova) in [(a["como"], a["conta_id"]) for a in busca(str(conta_nova))]
+    assert [a["parcela_id"] for a in busca(str(carnes["a_vencer"])) if a["como"] == "parcela"] == [carnes["a_vencer"]]
+    assert busca("ninguem") == []

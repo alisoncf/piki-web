@@ -13,21 +13,30 @@
 
     <section class="cartao q-pa-md q-mb-md">
       <q-select
-        v-model="clienteId"
+        v-model="achado"
         outlined
         use-input
         input-debounce="300"
         clearable
-        label="Cliente"
-        :options="clientes"
-        option-value="id"
-        option-label="nome"
-        emit-value
-        map-options
-        @filter="buscarClientes"
-        @update:model-value="carregarParcelas()"
+        label="Cliente (nome ou CPF), nº do documento ou nº da parcela"
+        :options="achados"
+        :option-label="(a) => a.cliente.nome"
+        @filter="buscar"
+        @update:model-value="escolher"
       >
-        <template #no-option><q-item><q-item-section class="text-suave">Digite parte do nome ou o CPF</q-item-section></q-item></template>
+        <template #option="scope">
+          <q-item v-bind="scope.itemProps">
+            <q-item-section>
+              <q-item-label>{{ scope.opt.cliente.nome }}</q-item-label>
+              <q-item-label caption>
+                <template v-if="scope.opt.como === 'documento'">Documento {{ scope.opt.documento }}</template>
+                <template v-else-if="scope.opt.como === 'parcela'">Parcela {{ scope.opt.parcela }} · documento {{ scope.opt.documento }}</template>
+                <template v-else>{{ scope.opt.cliente.cpf_cnpj ? formatarDocumento(scope.opt.cliente.cpf_cnpj) : 'Cliente' }}</template>
+              </q-item-label>
+            </q-item-section>
+          </q-item>
+        </template>
+        <template #no-option><q-item><q-item-section class="text-suave">Digite o nome, o CPF, o nº do documento ou o nº da parcela</q-item-section></q-item></template>
       </q-select>
     </section>
 
@@ -153,7 +162,7 @@ import { useRoute } from 'vue-router'
 
 import LinhasPagamento from '@/componentes/LinhasPagamento.vue'
 import { api, mensagemDeErro } from '@/servicos/api'
-import { formatarDataHora, formatarMoeda } from '@/servicos/formatos'
+import { formatarDataHora, formatarDocumento, formatarMoeda } from '@/servicos/formatos'
 import { centavos, completos, noDinheiro as somarDinheiro, novaLinha, somar, troco as calcularTroco } from '@/servicos/pagamentos'
 import { useCaixaDaMaquinaStore } from '@/stores/caixaDaMaquina'
 
@@ -163,7 +172,8 @@ const caixaDaMaquina = useCaixaDaMaquinaStore()
 const sessaoCaixa = ref(null)
 const semCaixa = ref('')
 const formas = ref([])
-const clientes = ref([])
+const achados = ref([])
+const achado = ref(null)
 const clienteId = ref(null)
 const valorADistribuir = ref('')
 const voltarParaGeral = ref(false)
@@ -197,20 +207,29 @@ function formatarPercentual(valor) {
   return `${Number(valor).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`
 }
 
-function buscarClientes(texto, atualizar, cancelar) {
+/** Busca pelo cliente (nome ou CPF), pelo nº do documento ou pelo nº da parcela; só o que tem parcela em aberto. */
+function buscar(texto, atualizar, cancelar) {
   if (texto.trim().length < 2) {
     cancelar()
     return
   }
   api
-    .get('/clientes', { params: { busca: texto.trim(), limite: 20 } })
-    .then(({ data }) => atualizar(() => (clientes.value = data.itens)))
+    .get('/crediario/busca', { params: { termo: texto.trim() } })
+    .then(({ data }) => atualizar(() => (achados.value = data)))
     .catch(() => cancelar())
+}
+
+/** Achou: carrega as parcelas do cliente e já marca as do documento, ou a parcela, que foi buscada. */
+function escolher(a) {
+  clienteId.value = a?.cliente.id ?? null
+  if (a?.como === 'parcela') carregarParcelas((p) => p.id === a.parcela_id)
+  else if (a?.como === 'documento') carregarParcelas((p) => p.conta_id === a.conta_id)
+  else carregarParcelas()
 }
 
 /** As parcelas do cliente, já com os juros sugeridos; começam desmarcadas (menos as que vieram marcadas da
  * tela de contas a receber), com o que falta para pagar. */
-async function carregarParcelas(marcar = []) {
+async function carregarParcelas(marcar = () => false) {
   parcelas.value = []
   pagamentos.value = []
   valorRecebido.value = ''
@@ -220,7 +239,7 @@ async function carregarParcelas(marcar = []) {
     const { data } = await api.get(`/crediario/clientes/${clienteId.value}/parcelas`)
     jurosAoMes.value = data.juros_ao_mes
     parcelas.value = data.parcelas.map((p) => ({
-      ...p, marcada: marcar.includes(p.id), pagar: Number(p.aberto).toFixed(2), juros: Number(p.juros).toFixed(2),
+      ...p, marcada: marcar(p), pagar: Number(p.aberto).toFixed(2), juros: Number(p.juros).toFixed(2),
     }))
   } catch (e) {
     $q.notify({ type: 'negative', message: mensagemDeErro(e) })
@@ -292,8 +311,9 @@ onMounted(async () => {
   // vindo da tela de contas a receber: o cliente e as parcelas já escolhidos
   if (rota.query.cliente) {
     clienteId.value = Number(rota.query.cliente)
-    clientes.value = [{ id: clienteId.value, nome: rota.query.nome ?? '' }]
-    carregarParcelas(String(rota.query.parcelas ?? '').split(',').filter(Boolean).map(Number))
+    achado.value = { como: 'cliente', cliente: { id: clienteId.value, nome: rota.query.nome ?? '', cpf_cnpj: null } }
+    const marcar = String(rota.query.parcelas ?? '').split(',').filter(Boolean).map(Number)
+    carregarParcelas((p) => marcar.includes(p.id))
   }
   try {
     const [f, c] = await Promise.all([api.get('/formas-pagamento', { params: { so_ativas: true } }), caixaDaMaquina.sessaoAberta()])

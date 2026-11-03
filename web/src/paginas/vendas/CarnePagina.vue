@@ -14,7 +14,7 @@
         <div class="canhoto">
           <div class="loja">{{ dados.loja.nome }}</div>
           <div class="campo"><span>Carnê</span>{{ dados.carne.id }} · venda {{ dados.venda }}</div>
-          <div class="campo"><span>Parcela</span>{{ p.numero }}/{{ dados.carne.parcelas.length }}</div>
+          <div class="campo"><span>Parcela</span>{{ p.numero }}/{{ dados.carne.parcelas.length }} · nº {{ p.id }}</div>
           <div class="campo"><span>Vencimento</span><strong>{{ data(p.vencimento) }}</strong></div>
           <div class="campo"><span>Valor</span><strong>{{ formatarMoeda(p.valor) }}</strong></div>
           <div class="campo"><span>Cliente</span>{{ dados.cliente.nome }}</div>
@@ -41,7 +41,7 @@
           <div class="grade">
             <div class="campo"><span>Vencimento</span><strong class="destaque">{{ data(p.vencimento) }}</strong></div>
             <div class="campo"><span>Valor da parcela</span><strong class="destaque">{{ formatarMoeda(p.valor) }}</strong></div>
-            <div class="campo"><span>Carnê</span>{{ dados.carne.id }}</div>
+            <div class="campo"><span>Carnê · nº da parcela</span>{{ dados.carne.id }} · {{ p.id }}</div>
             <div class="campo"><span>Venda</span>{{ dados.venda }} de {{ formatarDataHora(dados.data).slice(0, 10) }}</div>
             <div class="campo"><span>Valor do carnê</span>{{ formatarMoeda(dados.carne.valor) }}</div>
             <div class="campo"><span>Juros de atraso</span>__________</div>

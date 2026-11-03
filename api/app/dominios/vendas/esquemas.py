@@ -278,6 +278,7 @@ class Credito(BaseModel):
 class Parcela(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    id: int = Field(description="O número da parcela no carnê: o caixa acha a parcela por ele")
     numero: int
     vencimento: date
     valor: Decimal
