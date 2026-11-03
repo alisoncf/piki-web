@@ -129,7 +129,17 @@ def fiscal(empresa: Empresa) -> dict:
         certificado = {"titular": empresa.certificado_titular, "validade": empresa.certificado_validade,
                        "dias_para_vencer": dias}
     return {"ambiente": empresa.nfe_ambiente, "certificado": certificado, "csc_id": empresa.csc_id,
-            "tem_csc": bool(empresa.csc_token)}
+            "csc_token": _decifrado(empresa.csc_token)}
+
+
+def _decifrado(cifrado: str | None) -> str | None:
+    """O token do CSC aparece na ficha (Alison, 03/11/2026); no banco continua cifrado. Sem a chave, não aparece."""
+    if not cifrado:
+        return None
+    try:
+        return segredos.decifrar(cifrado)
+    except segredos.SemChave:
+        return None
 
 
 def configurar_fiscal(db: Session, empresa_id: int, ambiente: str, csc_id: str | None, csc_token: str | None) -> Empresa:

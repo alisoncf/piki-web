@@ -73,12 +73,11 @@ def test_certificado_e_csc_da_empresa(banco, cliente, cenario, admin, config, tm
         empresa = db.get(Empresa, cenario["e1"])
         assert empresa.certificado_senha != "senha-certa" and segredos.decifrar(empresa.certificado_senha) == "senha-certa"
 
-    # o CSC: o token é cifrado e nunca volta
+    # o CSC: o token aparece na ficha, mas no banco fica cifrado
     r = cliente.put(f"{url}/fiscal", headers=admin, json={"ambiente": "2", "csc_id": "000001", "csc_token": "ABC123"})
-    assert r.json() | {"certificado": None} == {"ambiente": "2", "certificado": None, "csc_id": "000001", "tem_csc": True}
-    assert "ABC123" not in r.text
+    assert r.json() | {"certificado": None} == {"ambiente": "2", "certificado": None, "csc_id": "000001", "csc_token": "ABC123"}
     r = cliente.put(f"{url}/fiscal", headers=admin, json={"ambiente": "1", "csc_id": "000001"})  # sem token: fica o mesmo
-    assert (r.json()["ambiente"], r.json()["tem_csc"]) == ("1", True)
+    assert (r.json()["ambiente"], r.json()["csc_token"]) == ("1", "ABC123")
     with banco() as db:
         assert segredos.decifrar(db.get(Empresa, cenario["e1"]).csc_token) == "ABC123"
 

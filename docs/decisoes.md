@@ -360,6 +360,7 @@ Decisão do Alison.
   - Guardados: o XML autorizado (nfeProc, com o protocolo), a situação (pendente, rejeitada, autorizada, cancelada, denegada), o último código e motivo da SEFAZ e o cancelamento (justificativa, protocolo, quem e quando).
   - O caixa emite logo depois de receber e o DANFE NFC-e sai na bobina de 80 mm pela janela de impressão; depois vem o carnê ou o canhoto. Permissões novas: `notas.ver`, `notas.emitir` (o caixa já emite a da venda que recebeu) e `notas.cancelar`. Na ficha da empresa, "Testar com a SEFAZ" confere o certificado e a conexão.
   - O cancelamento da nota é separado do da venda (como o Alison pediu); o prazo é o da SEFAZ, que recusa fora dele.
+  - O **token do CSC aparece na ficha da empresa** (Alison, 03/11/2026); no banco continua cifrado. A senha do certificado continua sem voltar da API.
   - **A confirmar nos primeiros testes em homologação:** o endereço do QR Code e da consulta de Goiás e a versão do QR Code (a 3, sem CSC, já está no leiaute); se Goiás exige o grupo do responsável técnico (`infRespTec`).
   - Falta: inutilização, carta de correção (só NF-e), contingência, a NF-e (modelo 55) e a tela de notas completa como a do VB6.
 

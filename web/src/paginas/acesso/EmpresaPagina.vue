@@ -146,10 +146,8 @@
                 v-model="notas.csc_token"
                 outlined
                 dense
-                type="password"
-                autocomplete="new-password"
+                autocomplete="off"
                 label="Token do CSC"
-                :hint="notas.tem_csc ? 'Já cadastrado; preencha só para trocar' : 'Guardado cifrado; não aparece de novo'"
                 maxlength="50"
                 class="col-8"
               />
@@ -285,7 +283,7 @@ const certificado = ref({ nome: '', arquivo: '', senha: '' })
 const enviandoCertificado = ref(false)
 
 function mostrarNotas(dados) {
-  notas.value = { ...dados, csc_id: dados.csc_id ?? '', csc_token: '' }
+  notas.value = { ...dados, csc_id: dados.csc_id ?? '', csc_token: dados.csc_token ?? '' }
 }
 
 // o certificado, o ambiente e a conexão: a SEFAZ responde 107 quando está em operação

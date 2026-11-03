@@ -96,12 +96,12 @@ class Certificado(BaseModel):
 
 
 class Fiscal(BaseModel):
-    """Os dados das notas fiscais da empresa. A senha do certificado e o token do CSC nunca saem da API."""
+    """Os dados das notas fiscais da empresa. A senha do certificado nunca sai da API; o token do CSC aparece na ficha."""
 
     ambiente: str = Field(description="1 produção, 2 homologação")
     certificado: Certificado | None
     csc_id: str | None
-    tem_csc: bool
+    csc_token: str | None
 
 
 class FiscalDados(BaseModel):

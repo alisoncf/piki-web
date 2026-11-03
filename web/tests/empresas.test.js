@@ -88,11 +88,11 @@ describe('empresas', () => {
     expect(api.get).toHaveBeenCalledWith('/auth/eu') // a empresa ativa ganha as cores novas
   })
 
-  it('notas fiscais: mostra o certificado e salva o ambiente e o CSC, sem mostrar o token', async () => {
+  it('notas fiscais: mostra o certificado e salva o ambiente e o CSC, com o token à vista', async () => {
     entrar()
-    const FISCAL = { ambiente: '2', certificado: { titular: 'CN=LOJA FICTICIA LTDA:11222333000181', validade: '2027-03-01T10:00:00', dias_para_vencer: 20 }, csc_id: null, tem_csc: false }
+    const FISCAL = { ambiente: '2', certificado: { titular: 'CN=LOJA FICTICIA LTDA:11222333000181', validade: '2027-03-01T10:00:00', dias_para_vencer: 20 }, csc_id: null, csc_token: null }
     vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url === '/empresas/1/fiscal' ? FISCAL : MATRIZ }))
-    const put = vi.spyOn(api, 'put').mockResolvedValue({ data: { ...FISCAL, ambiente: '1', csc_id: '000001', tem_csc: true } })
+    const put = vi.spyOn(api, 'put').mockResolvedValue({ data: { ...FISCAL, ambiente: '1', csc_id: '000001', csc_token: 'TOKEN-FICTICIO' } })
     const { wrapper } = await montar(EmpresaPagina, '/acesso/empresas/1')
     expect(wrapper.text()).toContain('LOJA FICTICIA LTDA')
     expect(wrapper.text()).toContain('Vence em 01/03/2027 (20 dias)')
@@ -103,7 +103,7 @@ describe('empresas', () => {
     await wrapper.findAll('button').find((b) => b.text().includes('Salvar ambiente e CSC')).trigger('click')
     await flushPromises()
     expect(put).toHaveBeenCalledWith('/empresas/1/fiscal', { ambiente: '1', csc_id: '000001', csc_token: 'TOKEN-FICTICIO' })
-    expect(campo(wrapper, 'Token do CSC').props('modelValue')).toBe('') // não fica na tela
+    expect(campo(wrapper, 'Token do CSC').props('modelValue')).toBe('TOKEN-FICTICIO')
   })
 
   it('nova: envia o código; o CEP traz rua, bairro e cidade', async () => {
