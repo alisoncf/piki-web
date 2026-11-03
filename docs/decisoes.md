@@ -241,6 +241,10 @@ Decisão do Alison. Vendas vão em etapas: (1) formas de pagamento e caixa, (2) 
 - Numeração própria por loja. A venda aberta pode ser cancelada com o motivo; a recebida, só pela devolução (etapa 5).
 - Permissões: `vendas.ver`, `vendas.vender` e `vendas.autorizar`; quem recebe precisa de `caixa.operar`.
 
+**Reabrir e vendas de cada vendedor (03/11/2026)**
+- Pedido do Alison: na tela de receber, o caixa pode **reabrir** a venda, que volta para o vendedor incluir mais coisas e fechar de novo. Só a venda **fechada** reabre.
+- **Um vendedor não vê nem abre a venda de outro.** Quem só vende (sem `vendas.ver` nem `caixa.operar`) vê na lista e abre só as vendas que ele mesmo começou; a de outro vendedor responde como se não existisse. A gerência (`vendas.ver`) e o caixa (`caixa.operar`) veem todas.
+
 **Recebimento no caixa (02/11/2026)**
 - Pedido do Alison. O computador fica no caixa: quem entra num caixa aberto (ou o abre) deixa aquele computador nele, e as vendas são recebidas ali sem escolher o caixa. O caixa aparece no cabeçalho, com "Sair do caixa neste computador"; fechar o caixa tira o computador dele. Fica guardado no navegador, por loja.
 - A tela de recebimento é própria (o "troco" do VB6). O caixa da loja abre as vendas fechadas direto nela.
@@ -327,6 +331,7 @@ Explicação do Alison. A conta de cobrança (`tab_contacob` do VB6) diz onde o 
 
 - **Troca:** é uma funcionalidade à parte e complexa; o Alison vai mostrar.
 - **Cancelamento:** a venda é marcada como cancelada, e também os registros que vieram dela. O cancelamento da NFC-e não é automático: o usuário faz.
+  - O cancelamento que desfaz o documento, a nota etc. é só da venda **efetivada** (recebida) (Alison, 03/11/2026). A aberta ou fechada só muda de situação, por quem vende.
   - Feito em 03/11/2026, com as regras do Alison: a venda **recebida** só é cancelada nos primeiros **7 dias** depois de recebida (prazo curto; o número é a confirmar) e só se **nenhuma parcela do carnê foi paga** (recebimento estornado não conta). Pede a permissão `vendas.cancelar`; a aberta ou fechada continua com quem vende.
   - Desfaz o que veio da venda: os lançamentos do caixa são estornados se o caixa do recebimento ainda está aberto; se já fechou, sai o mesmo valor, em cada forma, pelo caixa do computador ("Cancelamento de venda"). Os produtos voltam ao estoque (movimento "Cancelamento de venda"). O carnê é marcado como cancelado e as parcelas deixam de ser devidas, com o registro no histórico de cada uma.
 - **Entrega:** sai um canhoto para fazer a entrega, no endereço que o vendedor informou; a taxa de entrega entra no caixa com a venda (já é assim).

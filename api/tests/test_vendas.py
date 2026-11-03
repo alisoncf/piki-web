@@ -331,3 +331,32 @@ def test_cancelar_com_o_caixa_do_recebimento_ja_fechado(banco, cliente, cenario,
     assert r.status_code == 200, r.text
     saidas = cliente.get(f"/caixas/sessoes/{nova['id']}", headers=admin).json()["lancamentos"]
     assert [(x["tipo"], x["descricao_motivo"], x["valor"]) for x in saidas] == [("saida", "Cancelamento de venda", "95.00")]
+
+
+def test_vendedor_so_ve_e_mexe_nas_suas_vendas(banco, cliente, cenario, loja, admin):
+    with banco() as db:
+        so_vende = acesso.criar_perfil(db, "Só vende", ["vendas.vender"])
+        eva = acesso.criar_usuario(db, "eva", "Eva Vendedora", "senha-eva")
+        acesso.dar_acesso(db, eva, db.get(Empresa, cenario["e1"]), so_vende)
+        db.commit()
+    eva = _auth(cliente, "eva", cenario["e1"])
+    da_eva = cliente.post("/vendas", headers=eva).json()
+    do_davi = cliente.post("/vendas", headers=loja["davi"]).json()
+
+    assert [v["id"] for v in cliente.get("/vendas", headers=eva).json()["itens"]] == [da_eva["id"]]
+    assert cliente.get(f"/vendas/{do_davi['id']}", headers=eva).status_code == 404
+    r = cliente.post(f"/vendas/{do_davi['id']}/itens", headers=eva, json={"produto_id": loja["produtos"]["lencol"]})
+    assert r.status_code == 404
+    # o caixa (davi tem caixa.operar) vê as de todos
+    assert {v["id"] for v in cliente.get("/vendas", headers=loja["davi"]).json()["itens"]} >= {da_eva["id"], do_davi["id"]}
+
+    # o caixa devolve a venda fechada para a vendedora, que inclui mais coisas
+    url = f"/vendas/{da_eva['id']}"
+    cliente.post(f"{url}/itens", headers=eva, json={"produto_id": loja["produtos"]["lencol"]})
+    cliente.put(url, headers=eva, json={"forma_pagamento_id": loja["formas"]["dinheiro"], "consumidor": {"nome": "José"}})
+    assert cliente.post(f"{url}/fechar", headers=eva).json()["situacao"] == "fechada"
+    r = cliente.post(f"/vendas/{do_davi['id']}/reabrir", headers=loja["davi"])
+    assert r.status_code == 422 and "O vendedor ainda não fechou" in r.json()["detail"]  # só a fechada reabre
+    assert cliente.post(f"{url}/reabrir", headers=loja["davi"]).json()["situacao"] == "aberta"
+    venda = cliente.post(f"{url}/itens", headers=eva, json={"produto_id": loja["produtos"]["toalha"]}).json()
+    assert len(venda["itens"]) == 2

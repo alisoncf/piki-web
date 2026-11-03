@@ -427,7 +427,7 @@ def fechar(db: Session, empresa_id: int, venda_id: int) -> Venda:
 
 
 def reabrir(db: Session, empresa_id: int, venda_id: int) -> Venda:
-    """A venda fechada volta para o vendedor mudar (o cliente mudou de ideia no caixa...)."""
+    """Só a venda fechada volta para o vendedor mudar ou incluir mais coisas (o cliente mudou de ideia no caixa...)."""
     venda = _na_situacao(db, empresa_id, venda_id, FECHADA)
     venda.situacao = ABERTA
     venda.fechada_em = None
@@ -441,7 +441,8 @@ def buscar_cpf(db: Session, cpf: str) -> tuple[Cliente | None, Consumidor | None
 
 
 def cancelar(db: Session, empresa_id: int, usuario_id: int, venda_id: int, motivo: str) -> Venda:
-    """A venda aberta ou fechada; a recebida tem regras próprias (cancelar_recebida)."""
+    """A venda aberta ou fechada, que ainda não gerou nada (caixa, estoque, carnê, nota): só muda a situação.
+    O cancelamento que desfaz tudo é o da venda efetivada (cancelar_recebida)."""
     venda = _na_situacao(db, empresa_id, venda_id, ABERTA, FECHADA)
     venda.situacao = CANCELADA
     venda.cancelada_em = datetime.now()

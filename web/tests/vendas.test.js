@@ -318,4 +318,20 @@ describe('vendas', () => {
     expect(canhoto.wrapper.text()).toContain('Perto da praça')
     expect(canhoto.wrapper.findAll('.via')).toHaveLength(2)
   })
+
+  it('no receber, o caixa reabre a venda fechada para o vendedor', async () => {
+    entrar()
+    localStorage.setItem('piki.caixa', JSON.stringify({ empresa_id: 1, id: 5, nome: 'Cx 02' }))
+    const fechada = { ...COM_ITEM, situacao: 'fechada', comprador: 'José', forma_pagamento: { id: 1, nome: 'Dinheiro', tipo: 'dinheiro' } }
+    vi.spyOn(api, 'get').mockImplementation(gets(fechada))
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { ...fechada, situacao: 'aberta' } })
+    const { wrapper, router } = await montar(RecebimentoPagina, '/vendas/3/receber')
+    await botao(wrapper, 'Reabrir para o vendedor').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('volta para o vendedor (Davi Vendedor)')
+    ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.trim() === 'Reabrir').click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/vendas/3/reabrir')
+    expect(router.currentRoute.value.name).toBe('vendas')
+  })
 })

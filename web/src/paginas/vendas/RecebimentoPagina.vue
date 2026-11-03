@@ -3,6 +3,17 @@
     <div class="row items-center q-mb-md">
       <q-btn flat round dense icon="arrow_back" aria-label="Voltar" class="q-mr-sm" :to="{ name: 'venda', params: { id: rota.params.id } }" />
       <div class="piki-titulo col">{{ venda ? `Receber a venda ${venda.numero}` : 'Receber' }}</div>
+      <q-btn
+        v-if="venda?.situacao === 'fechada'"
+        flat
+        no-caps
+        icon="lock_open"
+        label="Reabrir para o vendedor"
+        class="q-mr-sm"
+        @click="reabrir"
+      >
+        <q-tooltip>A venda volta a ser aberta: o vendedor pode incluir mais coisas e fechar de novo</q-tooltip>
+      </q-btn>
       <q-chip v-if="sessaoCaixa" icon="point_of_sale" color="primary" text-color="white">{{ sessaoCaixa.nome }}</q-chip>
     </div>
 
@@ -280,6 +291,21 @@ function trocarForma(id) {
 async function trocarParcelas(n) {
   const data = await mandar((autorizacao) => api.post(`${url.value}/forma`, { forma_pagamento_id: forma.value.id, parcelas: n, autorizacao }))
   if (data) venda.value = data
+}
+
+/** O cliente quer mais alguma coisa: a venda volta para o vendedor e sai da fila do caixa. */
+function reabrir() {
+  $q.dialog({
+    title: 'Reabrir a venda',
+    message: `A venda ${venda.value.numero} volta para o vendedor (${venda.value.vendedor.nome}), que pode incluir mais coisas e fechar de novo.`,
+    cancel: { flat: true, label: 'Voltar' },
+    ok: { label: 'Reabrir' },
+  }).onOk(async () => {
+    const data = await mandar(() => api.post(`${url.value}/reabrir`))
+    if (!data) return
+    $q.notify({ type: 'positive', message: `Venda ${data.numero} reaberta: voltou para ${data.vendedor.nome}` })
+    roteador.push({ name: 'vendas' })
+  })
 }
 
 async function confirmar() {

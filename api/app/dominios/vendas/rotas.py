@@ -35,6 +35,23 @@ def _http(ctx: Contexto, erro: servico.ErroVenda) -> HTTPException:
     return HTTPException(_STATUS[type(erro)], str(erro), headers=cabecalhos)
 
 
+def _so_as_suas(ctx: Contexto) -> int | None:
+    """O vendedor (sem vendas.ver nem caixa.operar) só vê e mexe nas vendas que ele mesmo abriu; a gerência e o
+    caixa veem todas. Devolve o id do vendedor, ou None se vê todas."""
+    if "vendas.ver" in ctx.permissoes or "caixa.operar" in ctx.permissoes:
+        return None
+    return ctx.usuario.id
+
+
+def _do_vendedor(ctx: Contexto, venda_id: int) -> None:
+    """A venda de outro vendedor é como se não existisse para ele."""
+    dono = _so_as_suas(ctx)
+    if dono is not None:
+        venda = ctx.db.get(ModeloVenda, venda_id)
+        if venda is None or venda.vendedor_id != dono:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Venda não encontrada")
+
+
 def _venda(ctx: Contexto, venda: ModeloVenda, avisos: list[str] | None = None) -> Venda:
     resposta = Venda.model_validate(venda)
     resposta.avisos = avisos or []
@@ -58,9 +75,10 @@ def listar(
     limite: Annotated[int, Query(ge=1, le=200)] = 50,
     deslocamento: Annotated[int, Query(ge=0)] = 0,
 ) -> PaginaVendas:
-    """Vendas da loja, da mais nova para a mais antiga. As abertas há mais de 10 dias vencem aqui."""
-    itens, total = servico.listar(ctx.db, ctx.empresa_id, situacao, busca, ctx.usuario.id if minhas else None,
-                                  limite, deslocamento)
+    """Vendas da loja, da mais nova para a mais antiga. As abertas há mais de 10 dias vencem aqui.
+    O vendedor só vê as dele."""
+    vendedor = _so_as_suas(ctx) or (ctx.usuario.id if minhas else None)
+    itens, total = servico.listar(ctx.db, ctx.empresa_id, situacao, busca, vendedor, limite, deslocamento)
     return PaginaVendas(itens=[VendaResumo.model_validate(v) for v in itens], total=total)
 
 
@@ -72,6 +90,7 @@ def criar(ctx: Vender) -> Venda:
 @router.get("/vendas/{venda_id}", response_model=Venda)
 def obter(venda_id: int, ctx: Ver) -> Venda:
     try:
+        _do_vendedor(ctx, venda_id)
         return _venda(ctx, servico.obter(ctx.db, ctx.empresa_id, venda_id))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -85,6 +104,7 @@ def alterar(venda_id: int, dados: VendaDados, ctx: Vender) -> Venda:
     mande de novo com `autorizacao` (login e senha de quem autoriza).
     """
     try:
+        _do_vendedor(ctx, venda_id)
         return _venda(ctx, servico.alterar(ctx.db, ctx.empresa_id, ctx.usuario, ctx.permissoes, venda_id, dados))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -93,6 +113,7 @@ def alterar(venda_id: int, dados: VendaDados, ctx: Vender) -> Venda:
 @router.post("/vendas/{venda_id}/itens", response_model=Venda)
 def incluir_item(venda_id: int, dados: ItemNovo, ctx: Vender) -> Venda:
     try:
+        _do_vendedor(ctx, venda_id)
         return _venda(ctx, servico.incluir_item(ctx.db, ctx.empresa_id, ctx.usuario, venda_id, dados))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -101,6 +122,7 @@ def incluir_item(venda_id: int, dados: ItemNovo, ctx: Vender) -> Venda:
 @router.put("/vendas/{venda_id}/itens/{item_id}", response_model=Venda)
 def alterar_item(venda_id: int, item_id: int, dados: ItemAlteracao, ctx: Vender) -> Venda:
     try:
+        _do_vendedor(ctx, venda_id)
         return _venda(ctx, servico.alterar_item(ctx.db, ctx.empresa_id, ctx.usuario, venda_id, item_id, dados))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -109,6 +131,7 @@ def alterar_item(venda_id: int, item_id: int, dados: ItemAlteracao, ctx: Vender)
 @router.delete("/vendas/{venda_id}/itens/{item_id}", response_model=Venda)
 def excluir_item(venda_id: int, item_id: int, ctx: Vender) -> Venda:
     try:
+        _do_vendedor(ctx, venda_id)
         return _venda(ctx, servico.excluir_item(ctx.db, ctx.empresa_id, venda_id, item_id))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -118,6 +141,7 @@ def excluir_item(venda_id: int, item_id: int, ctx: Vender) -> Venda:
 def dar_desconto(venda_id: int, pedido: PedidoDesconto, ctx: Vender) -> Venda:
     """Desconto no total, em % ou em reais, rateado entre os itens."""
     try:
+        _do_vendedor(ctx, venda_id)
         return _venda(ctx, servico.dar_desconto(ctx.db, ctx.empresa_id, ctx.usuario, venda_id, pedido))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -127,6 +151,7 @@ def dar_desconto(venda_id: int, pedido: PedidoDesconto, ctx: Vender) -> Venda:
 def fechar(venda_id: int, ctx: Vender) -> Venda:
     """O vendedor fecha a venda com o cliente; ela vai para o caixa receber."""
     try:
+        _do_vendedor(ctx, venda_id)
         return _venda(ctx, servico.fechar(ctx.db, ctx.empresa_id, venda_id))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -136,6 +161,7 @@ def fechar(venda_id: int, ctx: Vender) -> Venda:
 def reabrir(venda_id: int, ctx: Reabrir) -> Venda:
     """A venda fechada volta a ser aberta, para o vendedor mudar."""
     try:
+        _do_vendedor(ctx, venda_id)
         return _venda(ctx, servico.reabrir(ctx.db, ctx.empresa_id, venda_id))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -146,6 +172,7 @@ def trocar_forma(venda_id: int, pedido: PedidoForma, ctx: Receber) -> Venda:
     """No caixa, o cliente muda a forma de pagamento (ou as parcelas) da venda fechada.
     Se o desconto da forma nova é outro, ele substitui o que a venda tinha."""
     try:
+        _do_vendedor(ctx, venda_id)
         return _venda(ctx, servico.trocar_forma(ctx.db, ctx.empresa_id, ctx.usuario, ctx.permissoes, venda_id, pedido))
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -165,13 +192,15 @@ def buscar_cpf(cpf: str, ctx: Vender) -> BuscaPorCpf:
 @router.post("/vendas/{venda_id}/cancelar", response_model=Venda)
 def cancelar(venda_id: int, pedido: PedidoCancelamento,
              ctx: Annotated[Contexto, Depends(exige("vendas.vender", "vendas.cancelar"))]) -> Venda:
-    """A aberta ou fechada (quem vende); a recebida, só com vendas.cancelar, nos primeiros dias e sem parcela paga:
-    desfaz o caixa, o estoque e o carnê. A NFC-e é cancelada pelo usuário, à parte."""
+    """A aberta ou fechada (quem vende) só muda de situação. O cancelamento que desfaz o que a venda gerou
+    (caixa, estoque, carnê; a NFC-e o usuário cancela à parte) é só da venda efetivada: pede vendas.cancelar,
+    nos primeiros dias e sem parcela paga."""
     try:
+        _do_vendedor(ctx, venda_id)
         venda = servico.obter(ctx.db, ctx.empresa_id, venda_id)
         if venda.situacao == RECEBIDA:
             if "vendas.cancelar" not in ctx.permissoes:
-                raise HTTPException(status.HTTP_403_FORBIDDEN, "Cancelar venda já recebida pede a permissão vendas.cancelar")
+                raise HTTPException(status.HTTP_403_FORBIDDEN, "Cancelar venda efetivada pede a permissão vendas.cancelar")
             return _venda(ctx, servico.cancelar_recebida(ctx.db, ctx.empresa_id, ctx.usuario.id, venda_id,
                                                           pedido.motivo, pedido.sessao_caixa_id))
         if "vendas.vender" not in ctx.permissoes:
@@ -190,6 +219,7 @@ def receber(venda_id: int, pedido: PedidoRecebimento, ctx: Receber) -> Venda:
     403 com o cabeçalho X-Pede-Autorizacao, como no desconto.
     """
     try:
+        _do_vendedor(ctx, venda_id)
         venda, avisos = servico.receber(ctx.db, ctx.empresa_id, ctx.usuario, ctx.permissoes, venda_id, pedido)
     except servico.ErroVenda as e:
         raise _http(ctx, e)
@@ -204,6 +234,7 @@ def _juntar(*partes: str | None, separador: str = " ") -> str:
 def carne(venda_id: int, ctx: Ver) -> ImpressaoCarne:
     """O que vai no carnê impresso da venda no crediário."""
     try:
+        _do_vendedor(ctx, venda_id)
         venda = servico.obter(ctx.db, ctx.empresa_id, venda_id)
     except servico.ErroVenda as e:
         raise _http(ctx, e)
