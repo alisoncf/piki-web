@@ -159,6 +159,7 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"contas novas: {r.contas}, parcelas novas: {r.parcelas}, parcelas atualizadas: {r.atualizadas}")
                 print(f"em aberto: {r.parcelas_em_aberto} parcelas, R$ {r.em_aberto}; "
                       f"documentos de cliente não importado: {r.sem_cliente}")
+                print(f"no prejuízo no VB6: {r.prejuizo} parcelas, R$ {r.em_prejuizo}")
                 for linha in r.fora:
                     print(f"fora: {linha}")
                 _avisos(r.avisos, args.avisos)

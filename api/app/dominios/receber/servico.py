@@ -39,8 +39,9 @@ class DadoInvalido(ErroReceber):
 @dataclass
 class Credito:
     limite: Decimal
-    em_aberto: Decimal  # parcelas em aberto em todas as lojas
+    em_aberto: Decimal  # parcelas em aberto em todas as lojas (o prejuízo também: o cliente continua devendo)
     disponivel: Decimal
+    em_prejuizo: Decimal
     bloqueado: bool
     suspenso: bool
 
@@ -60,11 +61,19 @@ def em_aberto(db: Session, cliente_id: int) -> Decimal:
     return Decimal(total or 0).quantize(CENTAVO)
 
 
+def em_prejuizo(db: Session, cliente_id: int) -> Decimal:
+    total = db.scalar(select(func.sum(ParcelaReceber.aberto)).join(ContaReceber)
+                      .where(ContaReceber.cliente_id == cliente_id, ParcelaReceber.prejuizo_em.is_not(None)))
+    return Decimal(total or 0).quantize(CENTAVO)
+
+
 def credito(db: Session, cliente: Cliente) -> Credito:
-    """O limite restante é o limite do cliente menos tudo o que ele tem em aberto, em qualquer loja."""
+    """O limite restante é o limite do cliente menos tudo o que ele tem em aberto, em qualquer loja. O que caiu
+    no prejuízo conta também, como no VB6: quem deu prejuízo não compra no crediário sem a gerência."""
     aberto = em_aberto(db, cliente.id)
     return Credito(limite=cliente.limite_credito, em_aberto=aberto, disponivel=cliente.limite_credito - aberto,
-                   bloqueado=cliente.bloqueado, suspenso=cliente.credito_suspenso)
+                   em_prejuizo=em_prejuizo(db, cliente.id), bloqueado=cliente.bloqueado,
+                   suspenso=cliente.credito_suspenso)
 
 
 def somar_meses(inicio: date, meses: int) -> date:
@@ -248,6 +257,7 @@ class Filtros:
     grupo_id: int | None = None
     bloqueio: str | None = None  # bloqueados ou liberados
     credito_suspenso: bool | None = None
+    prejuizo: str = "fora"  # fora (o normal, como no VB6), so ou junto
 
 
 ORDENS = {
@@ -305,6 +315,10 @@ def _condicoes(f: Filtros) -> list:
         c.append(Cliente.bloqueado.is_(False))
     if f.credito_suspenso is not None:
         c.append(Cliente.credito_suspenso.is_(f.credito_suspenso))
+    if f.prejuizo == "fora":
+        c.append(ParcelaReceber.prejuizo_em.is_(None))
+    elif f.prejuizo == "so":
+        c.append(ParcelaReceber.prejuizo_em.is_not(None))
     return c
 
 
@@ -320,3 +334,37 @@ def consultar(db: Session, f: Filtros, ordem: str, limite: int,
     itens = db.scalars(base.order_by(*ORDENS.get(ordem, ORDENS["vencimento"]), ParcelaReceber.id)
                        .limit(limite).offset(deslocamento))
     return list(itens), total, Decimal(soma_valor).quantize(CENTAVO), Decimal(soma_aberto).quantize(CENTAVO)
+
+
+# ------------------------------------------------------------ prejuízo
+
+def marcar_prejuizo(db: Session, usuario_id: int, parcela_ids: list[int], motivo: str) -> int:
+    """As parcelas em aberto caem no prejuízo: saem da lista do contas a receber. Devolve quantas mudaram."""
+    agora = datetime.now()
+    mudaram = 0
+    for parcela in _parcelas(db, parcela_ids):
+        if parcela.aberto <= 0:
+            raise DadoInvalido(f"A parcela {parcela.conta.documento} {parcela.numero} já está paga")
+        if parcela.prejuizo_em is None:
+            parcela.prejuizo_em, parcela.prejuizo_por_id, parcela.prejuizo_motivo = agora, usuario_id, motivo
+            mudaram += 1
+    db.commit()
+    return mudaram
+
+
+def tirar_prejuizo(db: Session, parcela_ids: list[int]) -> int:
+    """A parcela volta a ser cobrada (no VB6, o mesmo botão marcava e desmarcava)."""
+    mudaram = 0
+    for parcela in _parcelas(db, parcela_ids):
+        if parcela.prejuizo_em is not None:
+            parcela.prejuizo_em = parcela.prejuizo_por_id = parcela.prejuizo_motivo = None
+            mudaram += 1
+    db.commit()
+    return mudaram
+
+
+def _parcelas(db: Session, parcela_ids: list[int]) -> list[ParcelaReceber]:
+    parcelas = list(db.scalars(select(ParcelaReceber).where(ParcelaReceber.id.in_(parcela_ids))))
+    if len(parcelas) != len(set(parcela_ids)):
+        raise NaoEncontrado("Parcela não encontrada")
+    return parcelas

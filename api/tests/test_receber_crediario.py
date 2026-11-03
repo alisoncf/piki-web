@@ -102,3 +102,26 @@ def test_consulta_das_contas_a_receber_com_filtros(cliente, cenario, loja, admin
     assert cliente.get("/receber/parcelas", headers=admin, params={"ordem": "valor"}).json()["itens"][0]["aberto"] == "300.00"
     # a consulta pede a permissão própria
     assert cliente.get("/receber/parcelas", headers=loja["davi"]).status_code == 403
+
+
+def test_prejuizo_tira_da_lista_mas_o_cliente_continua_devendo(cliente, loja, admin, carnes):  # noqa: F811
+    vencida = carnes["vencida"]
+    assert cliente.post("/receber/prejuizo", headers=admin, json={"parcelas": [vencida]}).status_code == 422  # sem motivo
+    assert cliente.post("/receber/prejuizo", headers=loja["davi"],
+                        json={"parcelas": [vencida], "motivo": "x"}).status_code == 403  # pede receber.prejuizo
+    r = cliente.post("/receber/prejuizo", headers=admin, json={"parcelas": [vencida], "motivo": "Cliente não encontrado"})
+    assert r.json() == {"alteradas": 1}
+
+    def consulta(**filtros):
+        return cliente.get("/receber/parcelas", headers=admin, params=filtros).json()
+
+    assert (consulta()["total"], consulta()["soma_aberto"]) == (1, "100.00")  # saiu da lista
+    so = consulta(prejuizo="so")["itens"]
+    assert [(p["id"], p["prejuizo_motivo"], p["prejuizo_por"]) for p in so] == [(vencida, "Cliente não encontrado", "Caio Admin")]
+    assert consulta(prejuizo="junto")["total"] == 2
+    # continua devendo: aparece no recebimento, marcada, e conta no limite
+    abertas = cliente.get(f"/crediario/clientes/{carnes['cliente']}/parcelas", headers=loja["davi"]).json()["parcelas"]
+    assert [p["prejuizo"] for p in abertas] == [True, False]
+
+    assert cliente.post("/receber/prejuizo/tirar", headers=admin, json={"parcelas": [vencida]}).json() == {"alteradas": 1}
+    assert consulta()["total"] == 2

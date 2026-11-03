@@ -194,6 +194,9 @@
             <template v-else>
               <div class="row justify-between"><span>Limite do cliente</span><span>{{ formatarMoeda(venda.credito.limite) }}</span></div>
               <div class="row justify-between"><span>Em aberto (todas as lojas)</span><span>{{ formatarMoeda(venda.credito.em_aberto) }}</span></div>
+              <div v-if="Number(venda.credito.em_prejuizo)" class="row justify-between text-negative">
+                <span>· dos quais no prejuízo</span><span>{{ formatarMoeda(venda.credito.em_prejuizo) }}</span>
+              </div>
               <div class="row justify-between text-weight-bold" :class="{ 'text-negative': passaDoLimite }">
                 <span>Disponível</span><span>{{ formatarMoeda(venda.credito.disponivel) }}</span>
               </div>

@@ -1,7 +1,11 @@
 <template>
   <q-page padding>
-    <div class="row items-center q-mb-md">
+    <div class="row items-center q-mb-md q-gutter-sm">
       <div class="piki-titulo col">Contas a receber</div>
+      <template v-if="sessao.pode('receber.prejuizo') && selecionadas.length">
+        <q-btn v-if="todasNoPrejuizo" flat no-caps icon="restore" label="Tirar do prejuízo" @click="tirarDoPrejuizo" />
+        <q-btn v-else flat no-caps color="negative" icon="money_off" label="Pôr no prejuízo" @click="porNoPrejuizo" />
+      </template>
       <q-btn
         v-if="sessao.pode('caixa.operar')"
         unelevated
@@ -58,6 +62,7 @@
           <selecao-cidade v-model="filtros.cidade_id" v-model:cidade="cidade" dense class="col-12 col-sm-6 col-md-3" />
           <q-select v-model="filtros.bloqueio" outlined dense clearable label="Cliente" :options="BLOQUEIO" emit-value map-options class="col-6 col-sm-3 col-md-2" />
           <q-select v-model="filtros.credito_suspenso" outlined dense clearable label="Crédito suspenso" :options="SIM_NAO" emit-value map-options class="col-6 col-sm-3 col-md-2" />
+          <q-select v-model="filtros.prejuizo" outlined dense label="Prejuízo" :options="PREJUIZO" emit-value map-options class="col-6 col-sm-3 col-md-2" />
           <template v-if="listas.setores.length">
             <selecao-busca v-model="filtros.setor_id" :opcoes="listas.setores" :rotulo="nomeSetor" dense label="Setor" class="col-12 col-sm-6 col-md-3" />
             <selecao-busca v-model="filtros.orgao_id" :opcoes="listas.orgaos" dense label="Órgão" class="col-12 col-sm-6 col-md-3" />
@@ -112,6 +117,13 @@
         <q-td :props="props">
           {{ props.row.documento }}
           <q-badge v-if="props.row.origem !== 'venda'" outline color="grey-7" class="q-ml-xs">{{ nomeOrigem(props.row.origem) }}</q-badge>
+          <q-badge v-if="props.row.prejuizo" color="negative" class="q-ml-xs">
+            Prejuízo
+            <q-tooltip>
+              {{ props.row.prejuizo_motivo }}<br />
+              {{ formatarDataHora(props.row.prejuizo_em) }}<template v-if="props.row.prejuizo_por"> · {{ props.row.prejuizo_por }}</template>
+            </q-tooltip>
+          </q-badge>
           <div class="text-caption text-suave ellipsis" style="max-width: 220px">{{ props.row.historico }}</div>
         </q-td>
       </template>
@@ -177,9 +189,15 @@ const SIM_NAO = [
   { label: 'Com crédito suspenso', value: true },
   { label: 'Sem crédito suspenso', value: false },
 ]
+const PREJUIZO = [
+  { label: 'Fora da lista', value: 'fora' },
+  { label: 'Só as do prejuízo', value: 'so' },
+  { label: 'Junto com as outras', value: 'junto' },
+]
 const VAZIOS = {
   situacao: 'aberto', busca: '', documento: '', loja: null, origem: null, data: 'vencimento', de: '', ate: '', ordem: 'vencimento',
   valor: '', historico: '', cidade_id: null, bloqueio: null, credito_suspenso: null, setor_id: null, orgao_id: null, grupo_id: null,
+  prejuizo: 'fora',
 }
 
 const $q = useQuasar()
@@ -197,6 +215,7 @@ const carregando = ref(false)
 const paginacao = ref({ page: 1, rowsPerPage: 100, rowsNumber: 0 })
 
 const nomeOrigem = (o) => ORIGENS.find((x) => x.value === o)?.label ?? o
+const todasNoPrejuizo = computed(() => selecionadas.value.every((p) => p.prejuizo))
 const somaSelecionadas = computed(() => selecionadas.value.reduce((s, p) => s + centavos(p.aberto), 0) / 100)
 
 const colunas = [
@@ -263,6 +282,38 @@ function receberSelecionadas() {
   }
   const { cliente } = abertas[0]
   roteador.push({ name: 'receber-crediario', query: { cliente: cliente.id, nome: cliente.nome, parcelas: abertas.map((p) => p.id).join(',') } })
+}
+
+/** Prejuízo: a parcela que não se espera mais receber sai da lista; o cliente continua devendo. */
+function porNoPrejuizo() {
+  const abertas = selecionadas.value.filter((p) => Number(p.aberto) > 0 && !p.prejuizo)
+  if (!abertas.length) {
+    $q.notify({ type: 'warning', message: 'Nenhuma das selecionadas está em aberto fora do prejuízo' })
+    return
+  }
+  $q.dialog({
+    title: 'Pôr no prejuízo',
+    message: `${abertas.length} parcela${abertas.length > 1 ? 's' : ''}, faltando ${formatarMoeda(abertas.reduce((s, p) => s + centavos(p.aberto), 0) / 100)}. `
+      + 'Elas saem da lista do contas a receber, mas o cliente continua devendo. Por quê?',
+    prompt: { model: '', type: 'text', outlined: true, isValid: (v) => !!v.trim() },
+    cancel: { flat: true, label: 'Voltar' },
+    ok: { label: 'Pôr no prejuízo', color: 'negative' },
+  }).onOk((motivo) => mudarPrejuizo('/receber/prejuizo', { parcelas: abertas.map((p) => p.id), motivo }))
+}
+
+function tirarDoPrejuizo() {
+  mudarPrejuizo('/receber/prejuizo/tirar', { parcelas: selecionadas.value.map((p) => p.id) })
+}
+
+async function mudarPrejuizo(url, pedido) {
+  try {
+    const { data } = await api.post(url, pedido)
+    $q.notify({ type: 'positive', message: `${data.alteradas} parcela${data.alteradas === 1 ? '' : 's'} alterada${data.alteradas === 1 ? '' : 's'}` })
+    selecionadas.value = []
+    carregar()
+  } catch (e) {
+    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+  }
 }
 
 onMounted(async () => {

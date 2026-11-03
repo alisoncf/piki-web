@@ -72,6 +72,7 @@
               <td>
                 {{ p.documento }}
                 <q-badge v-if="p.origem !== 'venda'" outline color="grey-7" class="q-ml-xs">{{ p.origem === 'acerto' ? 'Acerto' : 'Avulsa' }}</q-badge>
+                <q-badge v-if="p.prejuizo" color="negative" class="q-ml-xs">Prejuízo</q-badge>
               </td>
               <td>{{ p.numero }}/{{ p.parcelas }}</td>
               <td>

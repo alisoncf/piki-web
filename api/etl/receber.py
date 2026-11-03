@@ -12,6 +12,10 @@ Rode antes os ETLs de clientes e de usuários desta loja.
   tem a sua sequência). Por isso a ligação com o VB6 fica no legado_mapa, por
   loja, e o num_doc fica na conta (documento_legado), sempre mostrado com o
   código da loja (01-0001234).
+- Prejuízo: no VB6 a parcela cai no prejuízo pela marca prejuizo_itd (quase não
+  usada) ou, quase sempre, indo para uma conta de cobrança chamada "PREJUIZO".
+  As duas viram o prejuízo da parcela aqui, com o motivo dizendo de onde veio.
+  A reimportação só marca; tirar do prejuízo é pela tela.
 - Reimportar atualiza o que falta pagar, o vencimento e o valor das parcelas já
   importadas, inclusive das que foram quitadas no VB6 depois; a parcela que já
   teve recebimento no sistema novo não é mexida (aviso).
@@ -49,9 +53,11 @@ _DOCS = text("""
            CAST(historico_doc AS CHAR) historico_doc, CAST(esp_doc AS CHAR) esp_doc, CAST(excluido_doc AS CHAR) excluido_doc
       FROM tab_doc WHERE seq_doc IN :seqs""").bindparams(bindparam("seqs", expanding=True))
 _PARCELAS = text("""
-    SELECT CAST(seq_itd AS CHAR) seq_itd, CAST(seq_doc AS CHAR) seq_doc, parcela_itd, valor_itd, reman_itd,
-           CAST(venc_itd AS CHAR) venc_itd, CAST(vencini_itd AS CHAR) vencini_itd
-      FROM tab_itdoc WHERE seq_doc IN :seqs ORDER BY seq_doc, parcela_itd, venc_itd, seq_itd
+    SELECT CAST(i.seq_itd AS CHAR) seq_itd, CAST(i.seq_doc AS CHAR) seq_doc, i.parcela_itd, i.valor_itd, i.reman_itd,
+           CAST(i.venc_itd AS CHAR) venc_itd, CAST(i.vencini_itd AS CHAR) vencini_itd,
+           CAST(i.prejuizo_itd AS CHAR) prejuizo_itd, CAST(c.nome_cob AS CHAR) nome_cob
+      FROM tab_itdoc i LEFT JOIN tab_contacob c ON c.cod_cob = i.cod_cob
+     WHERE i.seq_doc IN :seqs ORDER BY i.seq_doc, i.parcela_itd, i.venc_itd, i.seq_itd
 """).bindparams(bindparam("seqs", expanding=True))
 
 
@@ -61,6 +67,8 @@ class Resultado:
     parcelas: int = 0  # novas
     atualizadas: int = 0  # parcelas já importadas que mudaram
     em_aberto: Decimal = ZERO
+    prejuizo: int = 0  # parcelas em aberto que estão no prejuízo no VB6 (marcadas agora ou antes)
+    em_prejuizo: Decimal = ZERO
     parcelas_em_aberto: int = 0
     sem_cliente: int = 0  # documentos de cliente que não foi importado
     fora: list[str] = field(default_factory=list)  # o que não entra (representantes, funcionários)
@@ -188,6 +196,10 @@ def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clie
         if aberto:
             r.em_aberto += aberto
             r.parcelas_em_aberto += 1
+        prejuizo = _motivo_prejuizo(p) if aberto else None
+        if prejuizo:
+            r.prejuizo += 1
+            r.em_prejuizo += aberto
         parcela_id = parcelas_importadas.get(seq_itd)
         parcela = db.get(ParcelaReceber, parcela_id) if parcela_id else None
         if parcela is None:
@@ -198,7 +210,9 @@ def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clie
             db.add(MapaLegado(tabela="tab_itdoc", empresa_id=empresa.id, codigo=seq_itd, novo_id=parcela.id))
             parcelas_importadas[seq_itd] = parcela.id
             r.parcelas += 1
+            _marcar_prejuizo(parcela, prejuizo)
         else:
+            _marcar_prejuizo(parcela, prejuizo)
             inicial = _data(p["vencini_itd"]) or parcela.vencimento_inicial
             if (parcela.vencimento, parcela.vencimento_inicial, parcela.valor, parcela.aberto) == (
                     vencimento, inicial, valor, aberto):
@@ -210,3 +224,18 @@ def _importar_documento(db: Session, empresa: Empresa, doc, parcelas: list, clie
             parcela.vencimento, parcela.vencimento_inicial, parcela.valor, parcela.aberto = vencimento, inicial, valor, aberto
             r.atualizadas += 1
     conta.valor = sum((p.valor for p in conta.parcelas), ZERO)
+
+
+def _motivo_prejuizo(parcela) -> str | None:
+    """Por que a parcela está no prejuízo no VB6, ou None se não está."""
+    conta = _texto(parcela["nome_cob"])
+    if "PREJU" in conta.upper():
+        return f"No VB6: conta de cobrança {conta}"
+    if _texto(parcela["prejuizo_itd"]).upper() == "S":
+        return "No VB6: marcada como prejuízo"
+    return None
+
+
+def _marcar_prejuizo(parcela: ParcelaReceber, motivo: str | None) -> None:
+    if motivo and parcela.prejuizo_em is None:
+        parcela.prejuizo_em, parcela.prejuizo_motivo = datetime.now(), motivo

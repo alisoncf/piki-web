@@ -153,4 +153,29 @@ describe('receber crediário', () => {
     expect(wrapper.findAll('input[aria-label^="Valor da parcela"]').map((i) => i.element.value)).toEqual(['300.00', '100.00'])
     expect(wrapper.text()).toMatch(/Total\s*R\$\s410,00/)
   })
+
+  it('contas a receber: põe as selecionadas no prejuízo, com o motivo', async () => {
+    useSessaoStore().permissoes = ['receber.ver', 'receber.prejuizo']
+    const linha = {
+      id: 31, conta_id: 7, documento: '02-0000777', origem: 'venda', loja: BAIRRO,
+      cliente: { id: 8, nome: 'Ana Ficticia', cpf_cnpj: null, bloqueado: false, credito_suspenso: false }, setor: null, cidade: null,
+      historico: '', emissao: '2020-09-13', numero: 1, parcelas: 1, vencimento: '2020-10-13', vencimento_inicial: '2020-10-13',
+      valor: '300.00', aberto: '300.00', dias_atraso: 2000, juros: '0.00', prejuizo: false, prejuizo_em: null, prejuizo_por: null, prejuizo_motivo: null,
+    }
+    vi.spyOn(api, 'get').mockResolvedValue({ data: { itens: [linha], total: 1, soma_valor: '300.00', soma_aberto: '300.00', juros_ao_mes: '5.00' } })
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { alteradas: 1 } })
+    const wrapper = await montar('/financeiro/receber')
+    await wrapper.findAllComponents(QCheckbox)[1].vm.$emit('update:modelValue', true)
+    await flushPromises()
+    await wrapper.findAll('button').find((b) => b.text().includes('Pôr no prejuízo')).trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('o cliente continua devendo')
+    const motivo = document.querySelector('.q-dialog input')
+    motivo.value = 'Cliente faleceu'
+    motivo.dispatchEvent(new Event('input'))
+    await flushPromises()
+    ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.includes('Pôr no prejuízo')).click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/receber/prejuizo', { parcelas: [31], motivo: 'Cliente faleceu' })
+  })
 })

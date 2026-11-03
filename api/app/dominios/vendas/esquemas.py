@@ -266,6 +266,7 @@ class Credito(BaseModel):
     limite: Decimal
     em_aberto: Decimal
     disponivel: Decimal
+    em_prejuizo: Decimal = Field(description="Quanto do que está em aberto caiu no prejuízo (conta no limite)")
     impedimento: str | None = Field(description="Bloqueado ou com o crédito suspenso: não compra no crediário")
 
 

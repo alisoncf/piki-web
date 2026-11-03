@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dominios.receber import servico
 from app.dominios.receber.esquemas import (
-    ClienteDaParcela, LinhaParcela, PaginaParcelas, ParcelaAberta, ParcelasDoCliente, Recebimento, RecebimentoDados,
+    ClienteDaParcela, LinhaParcela, PaginaParcelas, ParcelaAberta, ParcelasDoCliente, PedidoPrejuizo, Recebimento,
+    RecebimentoDados,
 )
 from app.nucleo.contexto import Contexto, exige
 
@@ -14,6 +15,7 @@ router = APIRouter(tags=["crediário"])
 
 Operar = Annotated[Contexto, Depends(exige("caixa.operar"))]
 Consultar = Annotated[Contexto, Depends(exige("receber.ver"))]
+Prejuizo = Annotated[Contexto, Depends(exige("receber.prejuizo"))]
 
 _STATUS = {
     servico.NaoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -42,7 +44,7 @@ def parcelas(cliente_id: int, ctx: Operar) -> ParcelasDoCliente:
             id=p.id, conta_id=conta.id, loja=conta.empresa, venda=conta.venda.numero if conta.venda else None,
             documento=conta.documento, origem=conta.origem,
             numero=p.numero, parcelas=len(conta.parcelas), vencimento=p.vencimento, valor=p.valor, aberto=p.aberto,
-            dias_atraso=dias, juros=juros,
+            dias_atraso=dias, juros=juros, prejuizo=p.prejuizo,
         ))
     return ParcelasDoCliente(juros_ao_mes=taxa, parcelas=resposta)
 
@@ -93,6 +95,8 @@ def consultar(
     grupo_id: int | None = None,
     bloqueio: Literal["bloqueados", "liberados"] | None = None,
     credito_suspenso: bool | None = None,
+    prejuizo: Annotated[Literal["fora", "so", "junto"],
+                        Query(description="As que caíram no prejuízo: fora da lista (o normal), só elas ou junto")] = "fora",
     ordem: Literal["vencimento", "cliente", "documento", "valor"] = "vencimento",
     limite: Annotated[int, Query(ge=1, le=500)] = 100,
     deslocamento: Annotated[int, Query(ge=0)] = 0,
@@ -101,7 +105,7 @@ def consultar(
     filtros = servico.Filtros(
         situacao=situacao, empresa_id=loja, cliente_id=cliente_id, busca=busca, documento=documento, origem=origem,
         historico=historico, data=data, de=de, ate=ate, valor=valor, cidade_id=cidade_id, setor_id=setor_id,
-        orgao_id=orgao_id, grupo_id=grupo_id, bloqueio=bloqueio, credito_suspenso=credito_suspenso,
+        orgao_id=orgao_id, grupo_id=grupo_id, bloqueio=bloqueio, credito_suspenso=credito_suspenso, prejuizo=prejuizo,
     )
     itens, total, soma_valor, soma_aberto = servico.consultar(ctx.db, filtros, ordem, limite, deslocamento)
     taxa = servico.juros_ao_mes(ctx.db)
@@ -118,6 +122,27 @@ def consultar(
             cidade=f"{setor.cidade.nome}/{setor.cidade.uf}" if setor and setor.cidade else None,
             historico=conta.historico, emissao=conta.criado_em.date(), numero=p.numero, parcelas=len(conta.parcelas),
             vencimento=p.vencimento, vencimento_inicial=p.vencimento_inicial, valor=p.valor, aberto=p.aberto,
-            dias_atraso=dias, juros=juros,
+            dias_atraso=dias, juros=juros, prejuizo=p.prejuizo, prejuizo_em=p.prejuizo_em,
+            prejuizo_por=p.prejuizo_por.nome if p.prejuizo_por else None, prejuizo_motivo=p.prejuizo_motivo,
         ))
     return PaginaParcelas(itens=linhas, total=total, soma_valor=soma_valor, soma_aberto=soma_aberto, juros_ao_mes=taxa)
+
+
+@router.post("/receber/prejuizo")
+def marcar_prejuizo(pedido: PedidoPrejuizo, ctx: Prejuizo) -> dict:
+    """As parcelas caem no prejuízo (não se espera mais receber): saem da lista, mas o cliente continua devendo."""
+    if not pedido.motivo or not pedido.motivo.strip():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Informe por que as parcelas caíram no prejuízo")
+    try:
+        return {"alteradas": servico.marcar_prejuizo(ctx.db, ctx.usuario.id, pedido.parcelas, pedido.motivo.strip())}
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)
+
+
+@router.post("/receber/prejuizo/tirar")
+def tirar_prejuizo(pedido: PedidoPrejuizo, ctx: Prejuizo) -> dict:
+    """As parcelas voltam a ser cobradas."""
+    try:
+        return {"alteradas": servico.tirar_prejuizo(ctx.db, pedido.parcelas)}
+    except servico.ErroReceber as e:
+        raise _http(ctx, e)

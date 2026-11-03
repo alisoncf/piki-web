@@ -40,7 +40,8 @@ def test_crediario_com_entrada_dentro_do_limite(cliente, loja, admin, freguesa):
     davi = loja["davi"]
     url, venda = _venda_no_crediario(cliente, loja, freguesa["id"], 4)
     assert venda["total"] == "400.00"
-    assert venda["credito"] == {"limite": "500.00", "em_aberto": "200.00", "disponivel": "300.00", "impedimento": None}
+    assert venda["credito"] == {"limite": "500.00", "em_aberto": "200.00", "disponivel": "300.00", "em_prejuizo": "0.00",
+                                "impedimento": None}
 
     # 400 a prazo passa dos 300 disponíveis, e o davi não tem vendas.autorizar
     receber = {"sessao_caixa_id": loja["sessao"]}

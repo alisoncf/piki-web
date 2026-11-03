@@ -22,11 +22,14 @@ def _banco_vb6(caminho, docs, parcelas):
         c.execute(text("""CREATE TABLE tab_doc (seq_doc TEXT, num_doc TEXT, tipo_doc TEXT, cod_ter TEXT, valor_doc REAL,
             data_doc TEXT, cod_usu TEXT, excluido_doc TEXT, historico_doc TEXT, esp_doc TEXT, tipo_ter TEXT)"""))
         c.execute(text("""CREATE TABLE tab_itdoc (seq_itd TEXT, seq_doc TEXT, valor_itd REAL, reman_itd REAL,
-            vencini_itd TEXT, venc_itd TEXT, parcela_itd INTEGER)"""))
+            vencini_itd TEXT, venc_itd TEXT, parcela_itd INTEGER, prejuizo_itd TEXT DEFAULT 'N', cod_cob TEXT DEFAULT '000')"""))
+        c.execute(text("CREATE TABLE tab_contacob (cod_cob TEXT, nome_cob TEXT)"))
+        c.execute(text("INSERT INTO tab_contacob VALUES ('000', 'GERAL'), ('023', 'PREJUIZO')"))
         for d in docs:
             c.execute(text("INSERT INTO tab_doc VALUES (:seq, :num, 'R', :ter, :valor, '2026-05-10', '001', 'N', :hist, :esp, :tipo)"), d)
         for p in parcelas:
-            c.execute(text("INSERT INTO tab_itdoc VALUES (:seq, :doc, :valor, :resto, :venc, :venc, :n)"), p)
+            c.execute(text("INSERT INTO tab_itdoc VALUES (:seq, :doc, :valor, :resto, :venc, :venc, :n, :prej, :cob)"),
+                      {"prej": "N", "cob": "000"} | p)
     return eng
 
 
@@ -64,7 +67,7 @@ def test_importa_as_contas_de_cada_loja_mesmo_com_o_mesmo_numero(banco, lojas, t
     ], [
         _parcela("0000500", "0000100", 1, 0, "2026-06-10"),  # paga: entra para o carnê continuar "2 de 3"
         _parcela("0000501", "0000100", 2, 100, "2026-07-10"),
-        _parcela("0000502", "0000100", 3, 100, "2026-08-10"),
+        _parcela("0000502", "0000100", 3, 100, "2026-08-10") | {"cob": "023"},  # na conta de cobrança PREJUIZO
         _parcela("0000503", "0000101", 1, 50, "2026-06-10", 50),
         _parcela("0000504", "0000102", 1, 80, "2026-06-10", 80),
         _parcela("0000505", "0000103", 1, 0, "2026-06-10"),  # tudo pago: não entra
@@ -78,6 +81,7 @@ def test_importa_as_contas_de_cada_loja_mesmo_com_o_mesmo_numero(banco, lojas, t
 
     r = _importar(matriz, banco, "01")
     assert (r.contas, r.parcelas, r.parcelas_em_aberto, r.em_aberto, r.sem_cliente) == (1, 3, 2, Decimal("200.00"), 1)
+    assert (r.prejuizo, r.em_prejuizo) == (1, Decimal("100.00"))
     assert r.fora == ["1 parcelas em aberto de representantes (50.00), que não entram aqui"]
     r = _importar(filial, banco, "02")
     assert (r.contas, r.parcelas, r.em_aberto) == (1, 2, Decimal("120.00"))
@@ -88,6 +92,7 @@ def test_importa_as_contas_de_cada_loja_mesmo_com_o_mesmo_numero(banco, lojas, t
         assert (ana.documento, ana.origem, ana.valor, ana.criado_em.date()) == ("01-0000777", "venda", Decimal("300.00"), date(2026, 5, 10))
         assert (bia.documento, bia.origem) == ("02-0000777", "acerto")  # mesmo número, outra loja, outra conta
         assert [(p.numero, p.aberto) for p in ana.parcelas] == [(1, 0), (2, 100), (3, 100)]
+        assert [p.prejuizo_motivo for p in ana.parcelas] == [None, None, "No VB6: conta de cobrança PREJUIZO"]
         assert contas.em_aberto(db, lojas["ana"]) == Decimal("200.00")
 
 

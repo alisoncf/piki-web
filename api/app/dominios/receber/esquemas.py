@@ -30,6 +30,7 @@ class ParcelaAberta(BaseModel):
     aberto: Decimal
     dias_atraso: int
     juros: Decimal = Field(description="Sugerido: % ao mês da forma Crediário, por dia de atraso, sobre o que falta")
+    prejuizo: bool
 
 
 class ParcelasDoCliente(BaseModel):
@@ -127,6 +128,15 @@ class LinhaParcela(BaseModel):
     aberto: Decimal
     dias_atraso: int
     juros: Decimal
+    prejuizo: bool
+    prejuizo_em: datetime | None
+    prejuizo_por: str | None
+    prejuizo_motivo: str | None
+
+
+class PedidoPrejuizo(BaseModel):
+    parcelas: list[int] = Field(min_length=1)
+    motivo: str | None = Field(default=None, max_length=200, description="Para marcar: por que caiu no prejuízo")
 
 
 class PaginaParcelas(BaseModel):

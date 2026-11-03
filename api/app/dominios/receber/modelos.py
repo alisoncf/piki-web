@@ -71,8 +71,18 @@ class ParcelaReceber(Base):
     vencimento_inicial: Mapped[date | None] = mapped_column(Date)
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     aberto: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # o que falta pagar (reman_itd no VB6)
+    # prejuízo: a parcela que não se espera mais receber (o cliente morreu, não foi achado...). Sai da lista
+    # do contas a receber, mas o cliente continua devendo: se pagar um dia, recebe normalmente.
+    prejuizo_em: Mapped[datetime | None] = mapped_column(DateTime)
+    prejuizo_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    prejuizo_motivo: Mapped[str | None] = mapped_column(String(200))
 
     conta: Mapped[ContaReceber] = relationship(back_populates="parcelas", lazy="selectin")
+    prejuizo_por: Mapped[Usuario | None] = relationship(lazy="joined")
+
+    @property
+    def prejuizo(self) -> bool:
+        return self.prejuizo_em is not None
 
 
 class RecebimentoCrediario(Base):
