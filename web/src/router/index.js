@@ -227,6 +227,18 @@ export const rotas = [
         meta: { permissao: 'caixa.operar' },
       },
       {
+        path: 'consignacao/representantes',
+        name: 'representantes',
+        component: () => import('@/paginas/consignacao/RepresentantesPagina.vue'),
+        meta: { permissao: ['representantes.ver', 'representantes.editar'] },
+      },
+      {
+        path: 'consignacao/representantes/:id(\\d+)',
+        name: 'representante',
+        component: () => import('@/paginas/consignacao/RepresentantePagina.vue'),
+        meta: { permissao: ['representantes.ver', 'representantes.editar'] },
+      },
+      {
         path: 'notas/operacoes',
         name: 'operacoes-nota',
         component: () => import('@/paginas/notas/OperacoesNotaPagina.vue'),

@@ -121,7 +121,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 ## Onda 5 · Consignação e representantes
 
 - [~] Levantamento do fluxo com o Alison (D30) — 03/11/2026
-- [ ] Representantes: cadastro e importação do VB6
+- [x] Representantes: cadastro e importação do VB6 (migração 0038) — 03/11/2026
 - [ ] Transferência (saída), com o estoque reservado e o limite
 - [ ] Devolução de consignado
 - [ ] Acertos (para cliente e para o representante), com as comissões

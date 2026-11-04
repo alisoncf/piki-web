@@ -9,6 +9,7 @@
     python -m etl estoque --origem "mysql+pymysql://..." --empresa 02
     python -m etl receber --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-receber-01.txt
     python -m etl notas --origem "mysql+pymysql://..." --empresa 01
+    python -m etl representantes --origem "mysql+pymysql://..." --empresa 01 (depois dos clientes)
     python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun"
 
 Para um MariaDB local em que o root entra pela autenticação do Windows (sem
@@ -35,6 +36,7 @@ from etl.funcionarios import EmpresaNaoImportada, importar_funcionarios
 from etl.notas import importar_numeracao
 from etl.produtos import importar_produtos
 from etl.receber import importar_receber
+from etl.representantes import importar_representantes
 from etl.usuarios import importar_usuarios
 
 
@@ -88,6 +90,10 @@ def main(argv: list[str] | None = None) -> None:
     nt = sub.add_parser("notas", help="a numeração das notas (último número de cada modelo e série) de uma loja")
     nt.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     nt.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
+    rp = sub.add_parser("representantes", help="importa os representantes do consignado (depois dos clientes)")
+    rp.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
+    rp.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
+    rp.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
     args = p.parse_args(argv)
     # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
     sys.stdout.reconfigure(encoding="utf-8")
@@ -168,6 +174,11 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"prorrogações e anotações do VB6 novas (das parcelas em aberto): {r.historicos}")
                 for linha in r.fora:
                     print(f"fora: {linha}")
+                _avisos(r.avisos, args.avisos)
+            elif args.comando == "representantes":
+                r = importar_representantes(conexao, db, args.empresa)
+                print(f"representantes novos: {r.representantes} ({r.ja_clientes} já eram clientes, "
+                      f"{r.clientes_criados} viraram clientes); inativos: {r.inativos}; comissões próprias: {r.comissoes}")
                 _avisos(r.avisos, args.avisos)
             elif args.comando == "notas":
                 r = importar_numeracao(conexao, db, args.empresa)

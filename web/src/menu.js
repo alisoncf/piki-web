@@ -51,6 +51,13 @@ export const MENU = [
     ],
   },
   {
+    titulo: 'Consignação',
+    icone: 'local_shipping',
+    filhos: [
+      { titulo: 'Representantes', icone: 'badge', rota: '/consignacao/representantes', permissao: ['representantes.ver', 'representantes.editar'] },
+    ],
+  },
+  {
     titulo: 'Caixa',
     icone: 'point_of_sale',
     filhos: [

@@ -406,6 +406,19 @@ O que os dados do VB6 mostram (só a matriz usa):
 - A comissão é por representante e por tipo de cobrança (`tab_reptip`), com o padrão do tipo (`tab_tipocob`): pagamento na loja 20%, cobrança no cliente 15%, representante recebe 20% (vários com 25%).
 - O cadastro tem limite, situação (liberado ou bloqueado, com o motivo), senha, avalista, lembrete, lembrete do acerto, bloqueio de impressão e de devolução e data da última conferência. Alterar limite e comissão pede uma permissão própria no VB6.
 
+Regras do cadastro (Alison, 03/11/2026):
+
+- Hoje o consignado é só da matriz; o cadastro de representantes é global (como o de clientes), e o que for de loja (estoque consignado, transferências, acertos) vai ter `empresa_id`.
+- **O representante é um cliente especializado**: a ficha de cliente guarda os dados pessoais, o endereço e os telefones; o cadastro de representante guarda o código, a situação, o limite, a senha, os bloqueios, os lembretes, a observação, a data da última conferência, o avalista e as comissões. Hoje no VB6 são tabelas separadas, com um recurso alternativo para o representante comprar.
+- **Bloqueado:** não leva mercadoria; devolve e acerta para os clientes dele; para si mesmo, só à vista (o acerto a prazo para si, em boleto, fica bloqueado).
+- **Limite:** o "em uso" é pelo preço da transferência, mas a tela mostra também pelo preço atual.
+- **Última conferência:** basta guardar a data.
+- **Campos fora:** pai, mãe, cônjuge, naturalidade, endereço dos pais (não usados nos últimos cadastros).
+- **Comissão** por representante e por tipo de cobrança; sem a própria, vale a padrão do tipo (loja 20%, cliente 15%, representante 20%, depósito e boleto 0%).
+- **Senha** guardada como hash, conferida sem diferenciar maiúsculas (como no VB6); nunca volta da API.
+- **Feito (03/11/2026, migração 0038):** cadastro de representantes (lista, ficha com os dados do cliente, limite, bloqueio, comissões, senha, avalista, lembretes), permissões `representantes.ver`, `representantes.editar` e `representantes.limites` (limite, bloqueio e comissões, como a permissão própria do VB6), e a importação `python -m etl representantes`: liga ao cliente de mesmo CPF (200 já eram clientes) ou cria o cliente; o mesmo CPF em dois cadastros do VB6 vira um representante só, com o código do ativo; o excluído fica inativo; a senha vira hash; só as comissões diferentes da padrão são gravadas. Na matriz: 439 representantes, 121 ativos, 112 comissões próprias; 14 com CPF inválido (todos excluídos) ficam com o cliente sem CPF.
+- **A conferir com o Alison:** o que exatamente o "bloquear impressão" e o "bloquear devolução" impedem (por enquanto só são guardados).
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.

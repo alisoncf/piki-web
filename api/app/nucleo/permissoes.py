@@ -40,6 +40,9 @@ PERMISSOES: dict[str, str] = {
     "notas.emitir": "Emitir, transmitir de novo e consultar na SEFAZ as notas da loja (o caixa já emite a da venda)",
     "notas.cancelar": "Cancelar nota autorizada na SEFAZ",
     "notas.inutilizar": "Inutilizar na SEFAZ os números pulados das séries da loja",
+    "representantes.ver": "Consultar os representantes (consignado)",
+    "representantes.editar": "Cadastrar representantes, trocar a senha, o avalista e os lembretes",
+    "representantes.limites": "Alterar o limite, o bloqueio e as comissões dos representantes",
     "notas.configurar": "Alterar a natureza da operação e o CFOP das notas (venda, remessa, retorno, devolução)",
 }
 
@@ -57,4 +60,5 @@ AREAS: dict[str, str] = {
     "receber": "Contas a receber",
     "financeiro": "Financeiro",
     "notas": "Notas fiscais",
+    "representantes": "Consignação",
 }

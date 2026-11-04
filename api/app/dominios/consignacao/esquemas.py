@@ -1,0 +1,110 @@
+from datetime import date
+from decimal import Decimal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.dominios.cidades.esquemas import SetorResumo
+from app.dominios.funcionarios.esquemas import Telefone
+from app.nucleo.documentos import so_digitos
+
+
+class ClienteDoRepresentante(BaseModel):
+    """Os dados pessoais do representante, que são os da ficha de cliente dele."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    cpf_cnpj: str | None
+    logradouro: str | None
+    numero: str | None
+    complemento: str | None
+    cep: str | None
+    email: str | None
+    setor: SetorResumo | None
+    telefones: list[Telefone]
+
+
+class RepresentanteResumo(BaseModel):
+    """Uma linha da lista de representantes."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    codigo: int
+    cliente: ClienteDoRepresentante
+    ativo: bool
+    bloqueado: bool
+    limite: Decimal
+
+
+class RepresentanteDados(BaseModel):
+    """O que se edita com representantes.editar (o limite, o bloqueio e as comissões são à parte)."""
+
+    ativo: bool = True
+    lembrete: str | None = None
+    lembrete_acerto: str | None = None
+    observacao: str | None = None
+    ultima_conferencia: date | None = None
+    avalista_nome: str | None = Field(default=None, max_length=100)
+    avalista_cpf: str | None = Field(default=None, max_length=14)
+    avalista_rg: str | None = Field(default=None, max_length=20)
+    avalista_endereco: str | None = Field(default=None, max_length=200)
+    avalista_telefones: str | None = Field(default=None, max_length=200)
+    avalista_anotacoes: str | None = None
+
+    @field_validator("avalista_cpf")
+    @classmethod
+    def _digitos(cls, valor: str | None) -> str | None:
+        return so_digitos(valor) or None if valor else None
+
+
+class RepresentanteNovo(RepresentanteDados):
+    cliente_id: int = Field(description="O cliente que passa a ser representante")
+
+
+class ComissaoDados(BaseModel):
+    tipo_cobranca: str
+    percentual: Decimal | None = Field(default=None, ge=0, le=100, max_digits=5, decimal_places=2,
+                                       description="Sem ele, vale a comissão padrão do tipo")
+
+
+class LimitesDados(BaseModel):
+    """O que pede representantes.limites: limite, bloqueio e comissões."""
+
+    limite: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    bloqueado: bool
+    motivo_bloqueio: str | None = None
+    bloqueia_impressao: bool = False
+    bloqueia_devolucao: bool = False
+    comissoes: list[ComissaoDados] = []
+
+
+class SenhaDados(BaseModel):
+    senha: str = Field(min_length=4, max_length=20)
+
+
+class Comissao(BaseModel):
+    tipo_cobranca: str
+    nome: str
+    percentual: Decimal
+    padrao: bool  # vale a do tipo, o representante não tem uma própria
+
+
+class Representante(RepresentanteResumo):
+    motivo_bloqueio: str | None
+    tem_senha: bool
+    bloqueia_impressao: bool
+    bloqueia_devolucao: bool
+    lembrete: str | None
+    lembrete_acerto: str | None
+    observacao: str | None
+    ultima_conferencia: date | None
+    data_cadastro: date
+    avalista_nome: str | None
+    avalista_cpf: str | None
+    avalista_rg: str | None
+    avalista_endereco: str | None
+    avalista_telefones: str | None
+    avalista_anotacoes: str | None
+    comissoes: list[Comissao]
