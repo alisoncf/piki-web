@@ -195,4 +195,21 @@ describe('notas fiscais', () => {
     expect(put).toHaveBeenCalledWith('/notas/operacoes/1', { natureza: 'Venda de produtos', tipo: '1', finalidade: '1', cfop_estado: '5102', cfop_fora: '6108' })
     expect(wrapper.text()).toContain('6108')
   })
+
+  it('manda o DANFE e o XML por e-mail, já com o e-mail do cliente', async () => {
+    entrar(['caixa.operar'])
+    globalThis.URL.createObjectURL = vi.fn(() => 'blob:danfe')
+    const nfe = { ...NOTA, modelo: '55', ambiente: '1' }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: { '/vendas/3/nota': nfe, '/notas/8/email': { para: 'freguesa@exemplo.com', homologacao: false } }[url] ?? new Blob(['%PDF']),
+    }))
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ data: { para: 'freguesa@exemplo.com' } })
+    const { wrapper } = await montar(NotaVendaPagina, '/vendas/3/nota?modelo=55')
+    await botao(wrapper, 'Enviar por e-mail').trigger('click')
+    await flushPromises()
+    expect(document.querySelector('.q-dialog input').value).toBe('freguesa@exemplo.com')
+    ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.includes('Enviar')).click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/notas/8/email', { para: 'freguesa@exemplo.com' })
+  })
 })

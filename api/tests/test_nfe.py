@@ -90,3 +90,65 @@ def test_nfe_dentro_do_estado(banco, cliente, loja, falsa):  # noqa: F811
 def _venda_nfe_65(cliente, loja):
     from test_nfce import _venda
     return _venda(cliente, loja, loja["davi"])
+
+
+class SmtpFalso:
+    """Guarda o que seria enviado pelo Gmail."""
+
+    enviados = []
+
+    def __init__(self, servidor, porta, timeout):
+        self.servidor = (servidor, porta)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *erro):
+        return False
+
+    def starttls(self):
+        pass
+
+    def login(self, usuario, senha):
+        assert (usuario, senha) == ("piki.sistema@exemplo.com", "senha-de-app")
+
+    def send_message(self, mensagem):
+        SmtpFalso.enviados.append(mensagem)
+
+
+def test_email_do_danfe_e_do_xml(banco, cliente, loja, falsa, monkeypatch):  # noqa: F811
+    import smtplib
+
+    from app.config import configuracao
+
+    _com_ncm(banco, loja)
+    url = _venda_nfe(cliente, loja, {"cliente_id": _cliente(banco, uf="GO")})
+    nota = cliente.post(f"{url}/nota", headers=loja["davi"]).json()
+    r = cliente.post(f"/notas/{nota['id']}/email", headers=loja["davi"], json={})
+    assert r.status_code == 422 and "PIKI_EMAIL_USUARIO" in r.json()["detail"]
+
+    c = configuracao()
+    monkeypatch.setattr(c, "email_usuario", "piki.sistema@exemplo.com")
+    monkeypatch.setattr(c, "email_senha", "senha-de-app")
+    monkeypatch.setattr(smtplib, "SMTP", SmtpFalso)
+    SmtpFalso.enviados = []
+    # em homologação, sempre para a conta do sistema, mesmo pedindo outro
+    assert cliente.get(f"/notas/{nota['id']}/email", headers=loja["davi"]).json() == {
+        "para": "piki.sistema@exemplo.com", "homologacao": True}
+    r = cliente.post(f"/notas/{nota['id']}/email", headers=loja["davi"], json={"para": "outra@exemplo.com"})
+    assert r.json() == {"para": "piki.sistema@exemplo.com"}
+    mensagem = SmtpFalso.enviados[-1]
+    assert mensagem["To"] == "piki.sistema@exemplo.com" and mensagem["Subject"].startswith("NF-e 1 - ")
+    assert [a.get_filename() for a in mensagem.iter_attachments()] == [f"{nota['chave']}.pdf", f"{nota['chave']}.xml"]
+    assert "SEM VALOR FISCAL" in mensagem.get_body(("plain",)).get_content()
+
+    # em produção, para o cliente (ou para quem a pessoa disser)
+    from app.dominios.fiscal.modelos import NotaFiscal
+    with banco() as db:
+        db.get(NotaFiscal, nota["id"]).ambiente = "1"
+        db.commit()
+    assert cliente.get(f"/notas/{nota['id']}/email", headers=loja["davi"]).json()["para"] == "freguesa@exemplo.com"
+    assert cliente.post(f"/notas/{nota['id']}/email", headers=loja["davi"], json={}).json() == {"para": "freguesa@exemplo.com"}
+    r = cliente.post(f"/notas/{nota['id']}/email", headers=loja["davi"], json={"para": "contador@exemplo.com"})
+    assert r.json() == {"para": "contador@exemplo.com"} and SmtpFalso.enviados[-1]["To"] == "contador@exemplo.com"
+    assert cliente.post(f"/notas/{nota['id']}/email", headers=loja["davi"], json={"para": "sem-arroba"}).status_code == 422

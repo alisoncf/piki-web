@@ -45,6 +45,12 @@ class Configuracao(BaseSettings):
     # cifra no banco a senha do certificado e o CSC da NFC-e
     certificados_pasta: str = str(RAIZ / "certificados")
     chave_segredos: str = ""
+    # e-mail do sistema (D29), uma conta do Gmail com senha de app: manda o DANFE e o XML das notas
+    email_servidor: str = "smtp.gmail.com"
+    email_porta: int = 587
+    email_usuario: str = ""
+    email_senha: str = ""
+    email_nome: str = "Piki"
 
     @model_validator(mode="after")
     def _segredo(self) -> "Configuracao":

@@ -3,10 +3,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
+from app.config import configuracao
 from app.dominios.empresas.modelos import Empresa, ImagemEmpresa
 from app.dominios.fiscal import leiaute, servico
 from app.dominios.fiscal.esquemas import (
-    CancelamentoDados, Danfe, Faixa, Inutilizacao, InutilizacaoDados, Lacunas, Nota, Operacao, OperacaoDados,
+    CancelamentoDados, Danfe, EmailDados, EmailEnviado, EmailSugerido, Faixa, Inutilizacao, InutilizacaoDados, Lacunas, Nota, Operacao, OperacaoDados,
     RetornoSefaz, Serie,
 )
 from app.dominios.fiscal.modelos import SITUACOES
@@ -25,6 +26,7 @@ _STATUS = {
     servico.NaoEncontrada: status.HTTP_404_NOT_FOUND,
     servico.DadoInvalido: status.HTTP_422_UNPROCESSABLE_CONTENT,
     servico.SefazFora: status.HTTP_503_SERVICE_UNAVAILABLE,
+    servico.EmailFora: status.HTTP_502_BAD_GATEWAY,
 }
 
 
@@ -160,6 +162,24 @@ def xml(nota_id: int, ctx: Ver) -> Response:
     nome = f"{nota.chave}-{'procNFe' if nota.protocolo else 'NFe'}.xml"
     return Response(nota.xml, media_type="application/xml",
                     headers={"Content-Disposition": f'attachment; filename="{nome}"'})
+
+
+@router.get("/notas/{nota_id}/email", response_model=EmailSugerido)
+def email_sugerido(nota_id: int, ctx: Emitir) -> EmailSugerido:
+    """Para quem vai o e-mail: o do cliente; em homologação, a conta do sistema."""
+    nota = _obter(ctx, nota_id)
+    if nota.ambiente == "2":
+        return EmailSugerido(para=configuracao().email_usuario or None, homologacao=True)
+    return EmailSugerido(para=servico.email_do_cliente(ctx.db, nota), homologacao=False)
+
+
+@router.post("/notas/{nota_id}/email", response_model=EmailEnviado)
+def enviar_email(nota_id: int, dados: EmailDados, ctx: Emitir) -> EmailEnviado:
+    """Manda o DANFE (da NF-e, em PDF) e o XML por e-mail, pela conta do sistema."""
+    try:
+        return EmailEnviado(para=servico.enviar_email(ctx.db, ctx.empresa_id, nota_id, dados.para))
+    except servico.ErroNota as e:
+        raise _http(ctx, e)
 
 
 @router.post("/notas/{nota_id}/consultar", response_model=Nota)

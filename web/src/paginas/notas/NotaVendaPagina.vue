@@ -37,6 +37,7 @@
           <q-btn v-if="nota?.situacao === 'pendente'" flat no-caps color="primary" icon="travel_explore" label="Consultar na SEFAZ" @click="consultar" />
           <q-btn v-if="danfe || pdf" unelevated no-caps color="primary" icon="print" label="Imprimir" @click="imprimir" />
           <q-btn v-if="pdf" flat no-caps color="primary" icon="open_in_new" label="Abrir o PDF" :href="pdf" target="_blank" />
+          <q-btn v-if="danfe || pdf" flat no-caps color="primary" icon="mail" label="Enviar por e-mail" @click="enviarNotaPorEmail($q, nota)" />
           <q-btn v-if="depois" flat no-caps color="primary" icon="arrow_forward" :label="depois.rotulo" :to="depois.rota" />
         </div>
       </div>
@@ -102,9 +103,11 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
+import { useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
 
 import { api, mensagemDeErro } from '@/servicos/api'
+import { enviarNotaPorEmail } from '@/servicos/emailNota'
 import { formatarCnpj, formatarDataHora, formatarDocumento, formatarQuantidade } from '@/servicos/formatos'
 
 const NOME = { pendente: 'Pendente', rejeitada: 'Rejeitada', autorizada: 'Autorizada', cancelada: 'Cancelada', denegada: 'Denegada', inutilizada: 'Inutilizada' }
@@ -116,6 +119,7 @@ const PAGAMENTOS = {
 // depois da nota, o que mais sai na impressora (o carnê, o canhoto da entrega)
 const PROXIMOS = { carne: 'Imprimir o carnê', 'canhoto-entrega': 'Imprimir o canhoto da entrega' }
 
+const $q = useQuasar()
 const rota = useRoute()
 const nota = ref(null)
 const danfe = ref(null)

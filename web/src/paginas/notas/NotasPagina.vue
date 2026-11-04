@@ -37,6 +37,7 @@
         <q-td :props="props" class="text-right">
           <q-btn v-if="props.row.venda_id" flat dense no-caps icon="receipt" label="DANFE" :to="{ name: 'nota-venda', params: { id: props.row.venda_id }, query: { modelo: props.row.modelo } }" />
           <q-btn flat dense no-caps icon="download" label="XML" @click="baixarXml(props.row)" />
+          <q-btn v-if="podeEmitir && ['autorizada', 'cancelada'].includes(props.row.situacao)" flat dense no-caps icon="mail" label="E-mail" @click="enviarNotaPorEmail($q, props.row)" />
           <q-btn v-if="podeEmitir && !['cancelada', 'inutilizada'].includes(props.row.situacao)" flat dense no-caps icon="travel_explore" label="Consultar" @click="consultar(props.row)" />
           <q-btn v-if="podeCancelar && props.row.situacao === 'autorizada'" flat dense no-caps color="negative" icon="block" label="Cancelar" @click="cancelar(props.row)" />
         </q-td>
@@ -50,6 +51,7 @@ import { useQuasar } from 'quasar'
 import { computed, onMounted, ref } from 'vue'
 
 import { api, mensagemDeErro } from '@/servicos/api'
+import { enviarNotaPorEmail } from '@/servicos/emailNota'
 import { formatarDataHora, formatarMoeda } from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
 

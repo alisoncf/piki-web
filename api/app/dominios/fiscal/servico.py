@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import configuracao
 from app.dominios.acesso.modelos import Usuario
 from app.dominios.caixa.modelos import TIPOS_DE_FORMA
-from app.dominios.empresas.modelos import Empresa
+from app.dominios.empresas.modelos import Empresa, ImagemEmpresa
 from app.dominios.estoque.modelos import Estoque
 from app.dominios.fiscal import leiaute, sefaz
 from app.dominios.fiscal.modelos import (
@@ -24,7 +24,7 @@ from app.dominios.fiscal.modelos import (
     NumeracaoNota, OperacaoNota,
 )
 from app.dominios.vendas.modelos import Venda
-from app.nucleo import segredos
+from app.nucleo import email, segredos
 from app.nucleo.documentos import so_digitos
 
 ZERO = Decimal("0.00")
@@ -44,6 +44,10 @@ class DadoInvalido(ErroNota):
 
 class SefazFora(ErroNota):
     """A SEFAZ não respondeu. A nota, se já foi gravada, fica pendente."""
+
+
+class EmailFora(ErroNota):
+    """O servidor de e-mail recusou ou não respondeu."""
 
 
 def numeracoes(db: Session, empresa_id: int) -> list[NumeracaoNota]:
@@ -474,6 +478,45 @@ def inutilizar(db: Session, empresa_id: int, usuario: Usuario, modelo: str, seri
         nota.situacao = INUTILIZADA
     db.commit()
     return feita
+
+
+# --- e-mail do DANFE e do XML ---
+
+def email_do_cliente(db: Session, nota: NotaFiscal) -> str | None:
+    venda = db.get(Venda, nota.venda_id) if nota.venda_id else None
+    return venda.cliente.email if venda and venda.cliente else None
+
+
+def enviar_email(db: Session, empresa_id: int, nota_id: int, para: str | None) -> str:
+    """Manda o DANFE (da NF-e, em PDF) e o XML. Em homologação vai sempre para a própria conta do sistema, nunca para
+    o cliente. Devolve para quem foi."""
+    nota = obter(db, empresa_id, nota_id)
+    if nota.situacao not in (AUTORIZADA, CANCELADA):
+        raise DadoInvalido("Só se manda por e-mail a nota autorizada")
+    try:
+        destino = email.remetente() if nota.ambiente == "2" else (para or email_do_cliente(db, nota) or "").strip()
+    except email.ErroEmail as e:
+        raise DadoInvalido(str(e))
+    if not destino:
+        raise DadoInvalido("O cliente não tem e-mail: informe para quem mandar")
+    empresa = db.get(Empresa, empresa_id)
+    loja = empresa.nome_fantasia or empresa.razao_social or empresa.nome
+    nome = "NF-e" if nota.modelo == "55" else "NFC-e"
+    anexos = [(f"{nota.chave}.xml", nota.xml.encode(), "application/xml")]
+    if nota.modelo == "55":
+        logo = db.get(ImagemEmpresa, (empresa_id, "logo"))
+        anexos.insert(0, (f"{nota.chave}.pdf", leiaute.danfe_pdf(nota.xml, logo.conteudo if logo else None,
+                                                                 nota.situacao == CANCELADA), "application/pdf"))
+    texto = (f"Olá,\n\nSegue a {nome} {nota.numero} (série {nota.serie}) de {loja}"
+             f"{' (cancelada)' if nota.situacao == CANCELADA else ''}.\n\nChave de acesso: {nota.chave}\n\n"
+             "Este e-mail foi enviado automaticamente.")
+    if nota.ambiente == "2":
+        texto = "EMITIDA EM HOMOLOGAÇÃO, SEM VALOR FISCAL.\n\n" + texto
+    try:
+        email.enviar(destino, f"{nome} {nota.numero} - {loja}", texto, anexos)
+    except email.ErroEmail as e:
+        raise EmailFora(str(e))
+    return destino
 
 
 @dataclass

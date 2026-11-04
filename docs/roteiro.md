@@ -134,7 +134,8 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
   - [ ] Contingência (nova, o VB6 não tem), carta de correção
 - [~] Emissão de NF-e
   - [x] NF-e da venda recebida, natureza e CFOP parametrizáveis, DANFE A4 em PDF (migração 0037) — 03/11/2026
-  - [ ] E-mail do DANFE e do XML, carta de correção
+  - [x] E-mail do DANFE e do XML pela conta Gmail do sistema (em homologação, só para ela) — 03/11/2026
+  - [ ] Carta de correção
   - [ ] Remessa e retorno do consignado (com a consignação, onda 5) e devolução
 - [ ] Entrada de notas e SPED
 - [x] ECF: não é mais usado, fora do escopo (P4, D29) — 03/11/2026

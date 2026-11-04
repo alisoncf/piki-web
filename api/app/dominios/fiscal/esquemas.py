@@ -93,6 +93,20 @@ class Operacao(OperacaoDados):
     uso: str
 
 
+class EmailDados(BaseModel):
+    para: str | None = Field(default=None, max_length=200, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+                             description="Sem ele, o e-mail do cliente; em homologação, sempre a conta do sistema")
+
+
+class EmailEnviado(BaseModel):
+    para: str
+
+
+class EmailSugerido(BaseModel):
+    para: str | None
+    homologacao: bool
+
+
 class RetornoSefaz(BaseModel):
     codigo: str
     motivo: str
