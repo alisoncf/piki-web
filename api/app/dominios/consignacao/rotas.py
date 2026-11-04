@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.dominios.consignacao import servico
 from app.dominios.consignacao.esquemas import (
-    Confirmacao, ItemNovo, LimitesDados, Posicao, QuantidadeDados, Representante, RepresentanteDados,
-    RepresentanteNovo, RepresentanteResumo, SenhaDados, Transferencia, TransferenciaNova,
+    Confirmacao, ConfirmacaoDevolucao, Devolucao, DevolucaoDados, DevolucaoNova, ItemComEle, ItemDevolucaoNovo, ItemNovo,
+    LimitesDados, Posicao, QuantidadeDados, Representante, RepresentanteDados, RepresentanteNovo, RepresentanteResumo,
+    SenhaDados, Transferencia, TransferenciaNova,
 )
 from app.dominios.consignacao.modelos import SITUACOES_TRANSFERENCIA
 from app.dominios.consignacao.modelos import Representante as ModeloRepresentante
@@ -24,12 +25,15 @@ _STATUS = {
     servico.NaoEncontrado: status.HTTP_404_NOT_FOUND,
     servico.DadoInvalido: status.HTTP_422_UNPROCESSABLE_CONTENT,
     servico.Duplicado: status.HTTP_409_CONFLICT,
+    servico.PedeAutorizacao: status.HTTP_403_FORBIDDEN,
 }
 
 
 def _http(ctx: Contexto, erro: servico.ErroConsignacao) -> HTTPException:
     ctx.db.rollback()
-    return HTTPException(_STATUS[type(erro)], str(erro))
+    # como no desconto da venda: a tela pede o login e a senha de quem libera e manda de novo
+    cabecalhos = {"X-Pede-Autorizacao": "sim"} if isinstance(erro, servico.PedeAutorizacao) else None
+    return HTTPException(_STATUS[type(erro)], str(erro), headers=cabecalhos)
 
 
 def _ficha(representante: ModeloRepresentante) -> Representante:
@@ -163,4 +167,83 @@ def confirmar(transferencia_id: int, dados: Confirmacao, ctx: Transferir) -> Tra
     except servico.ErroConsignacao as e:
         raise _http(ctx, e)
     return Transferencia.model_validate(transferencia).model_copy(update={"avisos": avisos})
+
+
+@router.get("/representantes/{representante_id}/com-ele", response_model=list[ItemComEle])
+def com_ele(representante_id: int, ctx: Ver) -> list[ItemComEle]:
+    """O que está com o representante nesta loja, item de transferência a item (o mesmo produto repete se veio em
+    transferências diferentes): é daqui que se escolhe o que volta na devolução."""
+    return [ItemComEle.model_validate(i) for i in servico.com_ele(ctx.db, ctx.empresa_id, representante_id)]
+
+
+@router.get("/consignacao/devolucoes", response_model=list[Devolucao])
+def devolucoes(ctx: Ver, representante_id: int | None = None) -> list[Devolucao]:
+    return [Devolucao.model_validate(d) for d in servico.devolucoes(ctx.db, ctx.empresa_id, representante_id)]
+
+
+@router.post("/consignacao/devolucoes", response_model=Devolucao)
+def abrir_devolucao(dados: DevolucaoNova, ctx: Transferir) -> Devolucao:
+    """Começa a devolução; se o representante já tem uma aberta nesta loja, devolve ela."""
+    try:
+        return Devolucao.model_validate(servico.abrir_devolucao(ctx.db, ctx.empresa_id, ctx.usuario, dados.representante_id))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.get("/consignacao/devolucoes/{devolucao_id}", response_model=Devolucao)
+def obter_devolucao(devolucao_id: int, ctx: Ver) -> Devolucao:
+    try:
+        return Devolucao.model_validate(servico.obter_devolucao(ctx.db, ctx.empresa_id, devolucao_id))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.put("/consignacao/devolucoes/{devolucao_id}", response_model=Devolucao)
+def alterar_devolucao(devolucao_id: int, dados: DevolucaoDados, ctx: Transferir) -> Devolucao:
+    """Retificadora (corrige um produto transferido errado) e observação."""
+    try:
+        return Devolucao.model_validate(
+            servico.alterar_devolucao(ctx.db, ctx.empresa_id, devolucao_id, dados.retificadora, dados.observacao))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.post("/consignacao/devolucoes/{devolucao_id}/itens", response_model=Devolucao)
+def incluir_na_devolucao(devolucao_id: int, dados: ItemDevolucaoNovo, ctx: Transferir) -> Devolucao:
+    try:
+        return Devolucao.model_validate(servico.incluir_na_devolucao(
+            ctx.db, ctx.empresa_id, devolucao_id, dados.item_transferencia_id, dados.quantidade))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.put("/consignacao/devolucoes/{devolucao_id}/itens/{item_id}", response_model=Devolucao)
+def alterar_na_devolucao(devolucao_id: int, item_id: int, dados: QuantidadeDados, ctx: Transferir) -> Devolucao:
+    try:
+        return Devolucao.model_validate(
+            servico.alterar_na_devolucao(ctx.db, ctx.empresa_id, devolucao_id, item_id, dados.quantidade))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.delete("/consignacao/devolucoes/{devolucao_id}", status_code=status.HTTP_204_NO_CONTENT)
+def descartar_devolucao(devolucao_id: int, ctx: Transferir) -> Response:
+    try:
+        servico.descartar_devolucao(ctx.db, ctx.empresa_id, devolucao_id)
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/consignacao/devolucoes/{devolucao_id}/confirmar", response_model=Devolucao)
+def confirmar_devolucao(devolucao_id: int, dados: ConfirmacaoDevolucao, ctx: Transferir) -> Devolucao:
+    """O representante confirma com a senha: as peças voltam para a loja. Com a devolução dele bloqueada, 403 com o
+    cabeçalho X-Pede-Autorizacao: manda de novo com a `liberacao` do gerente."""
+    liberacao = dados.liberacao
+    try:
+        return Devolucao.model_validate(servico.confirmar_devolucao(
+            ctx.db, ctx.empresa_id, ctx.usuario, ctx.permissoes, devolucao_id, dados.senha,
+            liberacao.login if liberacao else None, liberacao.senha if liberacao else None))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
 

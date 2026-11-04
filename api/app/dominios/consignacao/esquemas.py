@@ -200,3 +200,76 @@ class QuantidadeDados(BaseModel):
 
 class Confirmacao(BaseModel):
     senha: str = Field(min_length=1, max_length=20, description="A senha do representante")
+
+
+class TransferenciaDoItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    numero: int
+    confirmada_em: datetime | None
+
+
+class ItemComEle(BaseModel):
+    """Um item de transferência que ainda tem resto com o representante: de onde a peça devolvida (ou acertada) sai."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    transferencia: TransferenciaDoItem
+    produto: ProdutoDoItem
+    descricao: str
+    preco: Decimal
+    quantidade: Decimal
+    restante: Decimal
+
+
+class ItemDevolucao(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ordem: int
+    item_transferencia: ItemComEle
+    quantidade: Decimal
+    total: Decimal
+
+
+class Devolucao(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    numero: int
+    situacao: str
+    retificadora: bool
+    observacao: str | None
+    representante: RepresentanteDaTransferencia
+    total: Decimal
+    atendida_por: Pessoa
+    autorizada_por: Pessoa | None
+    criado_em: datetime
+    confirmada_em: datetime | None
+    itens: list[ItemDevolucao]
+
+
+class DevolucaoNova(BaseModel):
+    representante_id: int
+
+
+class DevolucaoDados(BaseModel):
+    retificadora: bool = False
+    observacao: str | None = Field(default=None, max_length=200)
+
+
+class ItemDevolucaoNovo(BaseModel):
+    item_transferencia_id: int = Field(description="O item de transferência de onde a peça volta (GET .../com-ele)")
+    quantidade: Decimal = Field(default=Decimal("1"), gt=0, max_digits=14, decimal_places=3)
+
+
+class Liberacao(BaseModel):
+    login: str = Field(min_length=1, max_length=30)
+    senha: str = Field(min_length=1, max_length=200)
+
+
+class ConfirmacaoDevolucao(Confirmacao):
+    liberacao: Liberacao | None = Field(default=None, description="O gerente, se a devolução do representante está bloqueada")
+

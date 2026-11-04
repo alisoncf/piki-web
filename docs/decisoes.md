@@ -428,6 +428,13 @@ Transferência (Alison, 04/11/2026; feita no mesmo dia, migração 0039):
 - No VB6 a tab_consignacoes não tem cabeçalho: cada linha é um item. A importação (`python -m etl consignado`) dá a cada representante com saldo uma transferência confirmada com as linhas que ainda têm resto, cada uma com o seu preço: na matriz, 69 representantes, 4.783 itens, 12.697 peças, R$ 1,15 milhão pelo preço da transferência. O reservado do estoque já vinha do ETL de estoque.
 - Permissão `consignacao.transferir` (o funcionário do balcão: escolhe o representante, procura produtos e vê o que está com ele). Na ficha do representante, o que está com ele na loja, pelos dois preços.
 
+Devolução (Alison, 04/11/2026; feita no mesmo dia, migração 0040):
+
+- O funcionário escolhe na lista do que ainda está com o representante; **o mesmo produto aparece uma vez por transferência** (como no VB6), e a peça volta daquele item de transferência (não mais do que resta dele). No acerto o VB6 faz igual; o Alison pode querer mudar isso no futuro.
+- **Pede a senha do representante.** O bloqueado também devolve. Não gera custo: as peças voltam para a loja (o reservado do estoque baixa, movimento "Devolução do representante") e sai o comprovante para ele, com a transferência de origem de cada peça.
+- **Devolução retificadora:** marca a devolução que corrige um produto transferido errado (o retif_dev do VB6), com uma observação; aparece no comprovante e no movimento de estoque.
+- **Bloquear devolução:** com ele ligado no representante, a confirmação pede o login e a senha de quem tem `consignacao.liberar` (o gerente), como no desconto da venda; a devolução guarda quem liberou. O bloqueio de impressão vai usar a mesma permissão quando houver as impressões do consignado.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.

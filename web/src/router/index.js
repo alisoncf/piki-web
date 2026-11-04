@@ -26,7 +26,13 @@ export const rotas = [
     // fora do layout, para imprimir só o comprovante
     path: '/consignacao/transferencias/:id(\\d+)/comprovante',
     name: 'comprovante-transferencia',
-    component: () => import('@/paginas/consignacao/ComprovanteTransferenciaPagina.vue'),
+    component: () => import('@/paginas/consignacao/ComprovanteConsignadoPagina.vue'),
+    meta: { permissao: ['consignacao.transferir', 'representantes.ver'] },
+  },
+  {
+    path: '/consignacao/devolucoes/:id(\\d+)/comprovante',
+    name: 'comprovante-devolucao',
+    component: () => import('@/paginas/consignacao/ComprovanteConsignadoPagina.vue'),
     meta: { permissao: ['consignacao.transferir', 'representantes.ver'] },
   },
   {
@@ -261,6 +267,18 @@ export const rotas = [
         path: 'consignacao/transferencias/:id(\\d+)',
         name: 'transferencia',
         component: () => import('@/paginas/consignacao/TransferenciaPagina.vue'),
+        meta: { permissao: 'consignacao.transferir' },
+      },
+      {
+        path: 'consignacao/devolucoes/nova',
+        name: 'devolucao-nova',
+        component: () => import('@/paginas/consignacao/DevolucaoPagina.vue'),
+        meta: { permissao: 'consignacao.transferir' },
+      },
+      {
+        path: 'consignacao/devolucoes/:id(\\d+)',
+        name: 'devolucao',
+        component: () => import('@/paginas/consignacao/DevolucaoPagina.vue'),
         meta: { permissao: 'consignacao.transferir' },
       },
       {

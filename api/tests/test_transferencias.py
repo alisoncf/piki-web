@@ -1,5 +1,5 @@
-"""Transferência do consignado (D30): o representante leva produtos, confirma com a senha, dentro do limite.
-Dados fictícios."""
+"""Transferência e devolução do consignado (D30): o representante leva produtos (com a senha, dentro do limite) e
+devolve. Dados fictícios."""
 from decimal import Decimal
 
 import pytest
@@ -145,3 +145,69 @@ def test_importa_o_consignado_do_vb6(banco, cenario, balcao, tmp_path):
             [("Perfume Ficticio", 2, 1, Decimal("100.00")), ("Toalha Ficticia", 3, 3, Decimal("28.00"))])
         assert importar_consignado(conexao, db, "01").itens == 2  # de novo: refaz os itens, sem duplicar
         assert db.query(Transferencia).count() == 1
+
+
+def _transferir(cliente, davi, rep_id, produto_id, quantidade):
+    t = cliente.post("/consignacao/transferencias", headers=davi, json={"representante_id": rep_id}).json()
+    cliente.post(f"/consignacao/transferencias/{t['id']}/itens", headers=davi,
+                 json={"produto_id": produto_id, "quantidade": quantidade})
+    r = cliente.post(f"/consignacao/transferencias/{t['id']}/confirmar", headers=davi, json={"senha": "gato"})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_devolucao_escolhe_de_qual_transferencia(banco, cliente, cenario, balcao):
+    davi, rep = balcao["davi"], balcao["rep"]
+    t1 = _transferir(cliente, davi, rep, balcao["perfume"], "2")
+    t2 = _transferir(cliente, davi, rep, balcao["perfume"], "1")
+    # o mesmo produto, de duas transferências: aparece duas vezes, das mais antigas às mais novas
+    com_ele = cliente.get(f"/representantes/{rep}/com-ele", headers=davi).json()
+    assert [(i["transferencia"]["numero"], i["descricao"], i["restante"]) for i in com_ele] == [
+        (t1["numero"], "Perfume Ficticio", "2.000"), (t2["numero"], "Perfume Ficticio", "1.000")]
+
+    d = cliente.post("/consignacao/devolucoes", headers=davi, json={"representante_id": rep}).json()
+    assert (d["numero"], d["situacao"]) == (1, "aberta")
+    assert cliente.post("/consignacao/devolucoes", headers=davi, json={"representante_id": rep}).json()["id"] == d["id"]
+    url = f"/consignacao/devolucoes/{d['id']}"
+    r = cliente.post(f"{url}/itens", headers=davi, json={"item_transferencia_id": com_ele[1]["id"], "quantidade": "2"})
+    assert r.status_code == 422 and "só restam 1 desta transferência" in r.json()["detail"]
+    cliente.post(f"{url}/itens", headers=davi, json={"item_transferencia_id": com_ele[0]["id"]})
+    d = cliente.post(f"{url}/itens", headers=davi, json={"item_transferencia_id": com_ele[0]["id"]}).json()  # soma
+    assert [(i["item_transferencia"]["transferencia"]["numero"], i["quantidade"], i["total"]) for i in d["itens"]] == [
+        (t1["numero"], "2.000", "240.00")]
+    d = cliente.put(url, headers=davi, json={"retificadora": True, "observacao": "Levou o perfume errado"}).json()
+    assert (d["retificadora"], d["observacao"]) == (True, "Levou o perfume errado")
+
+    r = cliente.post(f"{url}/confirmar", headers=davi, json={"senha": "errada"})
+    assert r.status_code == 422 and "senha do representante" in r.json()["detail"]
+    d = cliente.post(f"{url}/confirmar", headers=davi, json={"senha": "gato"}).json()
+    assert (d["situacao"], d["autorizada_por"]) == ("confirmada", None)
+    assert [(i["transferencia"]["numero"], i["restante"]) for i in cliente.get(f"/representantes/{rep}/com-ele", headers=davi).json()] == [
+        (t2["numero"], "1.000")]
+    with banco() as db:
+        perfume = db.query(Estoque).filter_by(empresa_id=cenario["e1"], produto_id=balcao["perfume"]).one()
+        assert (perfume.quantidade, perfume.reservado) == (3, 1)  # voltaram 2 para a loja
+        mov = db.query(MovimentoEstoque).filter_by(tipo="consignacao_devolucao").one()
+        assert (mov.reservado, mov.documento, mov.observacao) == (-2, "devolução 1", "retificadora")
+    assert cliente.get(f"/representantes/{rep}/posicao", headers=davi).json()["em_uso"] == "120.00"
+
+
+def test_devolucao_bloqueada_pede_o_gerente(banco, cliente, cenario, balcao):
+    davi, rep = balcao["davi"], balcao["rep"]
+    _transferir(cliente, davi, rep, balcao["perfume"], "1")
+    with banco() as db:
+        representante = db.get(Representante, rep)
+        representante.bloqueia_devolucao = True
+        representante.bloqueado, representante.motivo_bloqueio = True, "Atrasou"  # bloqueado também devolve
+        db.commit()
+    d = cliente.post("/consignacao/devolucoes", headers=davi, json={"representante_id": rep}).json()
+    item = cliente.get(f"/representantes/{rep}/com-ele", headers=davi).json()[0]
+    url = f"/consignacao/devolucoes/{d['id']}"
+    cliente.post(f"{url}/itens", headers=davi, json={"item_transferencia_id": item["id"]})
+    r = cliente.post(f"{url}/confirmar", headers=davi, json={"senha": "gato"})
+    assert r.status_code == 403 and r.headers.get("X-Pede-Autorizacao") == "sim"
+    r = cliente.post(f"{url}/confirmar", headers=davi, json={"senha": "gato", "liberacao": {"login": "davi", "senha": "senha-davi"}})
+    assert r.status_code == 403 and "não pode liberar" in r.json()["detail"]
+    r = cliente.post(f"{url}/confirmar", headers=davi, json={"senha": "gato", "liberacao": {"login": "caio", "senha": "senha-caio"}})
+    assert r.status_code == 200, r.text
+    assert (r.json()["situacao"], r.json()["autorizada_por"]["nome"]) == ("confirmada", "Caio Admin")

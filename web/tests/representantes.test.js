@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
-import ComprovanteTransferenciaPagina from '@/paginas/consignacao/ComprovanteTransferenciaPagina.vue'
+import ComprovanteConsignadoPagina from '@/paginas/consignacao/ComprovanteConsignadoPagina.vue'
+import DevolucaoPagina from '@/paginas/consignacao/DevolucaoPagina.vue'
 import RepresentantePagina from '@/paginas/consignacao/RepresentantePagina.vue'
 import RepresentantesPagina from '@/paginas/consignacao/RepresentantesPagina.vue'
 import TransferenciaPagina from '@/paginas/consignacao/TransferenciaPagina.vue'
@@ -45,7 +46,10 @@ async function montar(componente, caminho) {
       { path: '/consignacao/transferencias', name: 'transferencias', component: vazio },
       { path: '/consignacao/transferencias/nova', name: 'transferencia-nova', component: componente === TransferenciaPagina ? componente : vazio },
       { path: '/consignacao/transferencias/:id', name: 'transferencia', component: componente === TransferenciaPagina ? componente : vazio },
-      { path: '/consignacao/transferencias/:id/comprovante', name: 'comprovante-transferencia', component: componente === ComprovanteTransferenciaPagina ? componente : vazio },
+      { path: '/consignacao/transferencias/:id/comprovante', name: 'comprovante-transferencia', component: componente === ComprovanteConsignadoPagina ? componente : vazio },
+      { path: '/consignacao/devolucoes/nova', name: 'devolucao-nova', component: componente === DevolucaoPagina ? componente : vazio },
+      { path: '/consignacao/devolucoes/:id', name: 'devolucao', component: componente === DevolucaoPagina ? componente : vazio },
+      { path: '/consignacao/devolucoes/:id/comprovante', name: 'comprovante-devolucao', component: componente === ComprovanteConsignadoPagina ? componente : vazio },
     ],
   })
   await router.push(caminho)
@@ -181,7 +185,7 @@ describe('representantes', () => {
       itens: [{ id: 1, ordem: 1, produto: { id: 7, codigo: 12, unidade: 'UN', fracionado: false }, descricao: 'Perfume Ficticio',
         quantidade: '2.000', preco: '120.00', total: '240.00', restante: '2.000' }] }
     vi.spyOn(api, 'get').mockResolvedValue({ data: confirmada })
-    const { wrapper } = await montar(ComprovanteTransferenciaPagina, '/consignacao/transferencias/9/comprovante?imprimir=1')
+    const { wrapper } = await montar(ComprovanteConsignadoPagina, '/consignacao/transferencias/9/comprovante?imprimir=1')
     const texto = wrapper.text()
     expect(texto).toContain('Transferência de consignado nº 4')
     expect(texto).toContain('262 · Maria Ficticia')
@@ -190,4 +194,65 @@ describe('representantes', () => {
     expect(texto).toContain('Recebi em consignação')
     expect(window.print).toHaveBeenCalled()
   })
+
+  it('devolução: escolhe a peça no que está com ele; bloqueada, pede a liberação do gerente', async () => {
+    entrar(['consignacao.transferir'])
+    window.print = vi.fn()
+    const comEle = [
+      { id: 21, transferencia: { id: 1, numero: 4, confirmada_em: '2026-10-01T10:00:00' }, produto: { id: 7, codigo: 12, unidade: 'UN', fracionado: false },
+        descricao: 'Perfume Ficticio', preco: '100.00', quantidade: '2.000', restante: '2.000' },
+      { id: 22, transferencia: { id: 2, numero: 5, confirmada_em: '2026-11-01T10:00:00' }, produto: { id: 7, codigo: 12, unidade: 'UN', fracionado: false },
+        descricao: 'Perfume Ficticio', preco: '120.00', quantidade: '1.000', restante: '1.000' },
+    ]
+    const aberta = { id: 3, numero: 1, situacao: 'aberta', retificadora: false, observacao: null,
+      representante: { id: 3, codigo: 262, cliente: CLIENTE, bloqueado: false, lembrete: null }, total: '0.00',
+      atendida_por: { id: 1, nome: 'Ana' }, autorizada_por: null, criado_em: '2026-11-04T10:00:00', confirmada_em: null, itens: [] }
+    const comItem = { ...aberta, total: '120.00', itens: [{ id: 1, ordem: 1, item_transferencia: comEle[1], quantidade: '1.000', total: '120.00' }] }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: { '/representantes': [REP], '/representantes/3/com-ele': comEle }[url] }))
+    let confirmacoes = 0
+    const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+      if (url.endsWith('/confirmar')) {
+        confirmacoes += 1
+        if (confirmacoes === 1) {
+          const erro = new Error('bloqueada')
+          erro.response = { status: 403, headers: { 'x-pede-autorizacao': 'sim' }, data: { detail: 'A devolução deste representante está bloqueada' } }
+          throw erro
+        }
+        return { data: { ...comItem, situacao: 'confirmada' } }
+      }
+      return { data: url.endsWith('/itens') ? comItem : aberta }
+    })
+    const { wrapper, router } = await montar(DevolucaoPagina, '/consignacao/devolucoes/nova')
+    await wrapper.findComponent({ name: 'QSelect' }).vm.$emit('update:modelValue', 3)
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/consignacao/devolucoes', { representante_id: 3 })
+    // o mesmo produto, uma linha por transferência
+    const linhas = wrapper.findAll('tbody tr')
+    expect(linhas).toHaveLength(2)
+    expect(linhas[1].text()).toContain('5 · 01/11/2026')
+    await linhas[1].trigger('click')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/consignacao/devolucoes/3/itens', { item_transferencia_id: 22, quantidade: '1' })
+
+    await botao(wrapper, 'Confirmar com a senha').trigger('click')
+    await flushPromises()
+    const senha = document.querySelector('.q-dialog input')
+    senha.value = 'gato'
+    senha.dispatchEvent(new Event('input'))
+    await flushPromises()
+    ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.includes('Confirmar')).click()
+    await flushPromises()
+    expect(document.body.textContent).toContain('A devolução deste representante está bloqueada')
+    const campos = [...document.querySelectorAll('.q-dialog input')]
+    campos[0].value = 'gerente'
+    campos[0].dispatchEvent(new Event('input'))
+    campos[1].value = 'senha-gerente'
+    campos[1].dispatchEvent(new Event('input'))
+    await flushPromises()
+    document.querySelector('.q-dialog form').dispatchEvent(new Event('submit'))
+    await flushPromises()
+    expect(post).toHaveBeenLastCalledWith('/consignacao/devolucoes/3/confirmar', { senha: 'gato', liberacao: { login: 'gerente', senha: 'senha-gerente' } })
+    expect(router.currentRoute.value.name).toBe('comprovante-devolucao')
+  })
 })
+

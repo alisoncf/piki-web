@@ -1,4 +1,4 @@
-"""Regras da consignação (D30): o cadastro de representantes e a transferência."""
+"""Regras da consignação (D30): o cadastro de representantes, a transferência e a devolução."""
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.dominios.clientes.modelos import Cliente
 from app.dominios.consignacao.esquemas import LimitesDados, RepresentanteDados
+from app.dominios.acesso import servico as acesso
 from app.dominios.acesso.modelos import Usuario
 from app.dominios.consignacao.modelos import (
-    ABERTA, COMISSOES_PADRAO, CONFIRMADA, ComissaoRepresentante, ItemTransferencia, Representante, Transferencia,
+    ABERTA, COMISSOES_PADRAO, CONFIRMADA, ComissaoRepresentante, Devolucao, ItemDevolucao, ItemTransferencia,
+    Representante, Transferencia,
 )
 from app.dominios.estoque import servico as estoque
 from app.dominios.produtos.modelos import Produto
@@ -302,3 +304,166 @@ def confirmar(db: Session, empresa_id: int, usuario: Usuario, transferencia_id: 
     transferencia.situacao, transferencia.confirmada_em = CONFIRMADA, datetime.now()
     db.commit()
     return transferencia, avisos
+
+
+# --- devolução: o representante devolve produtos à loja, sem custo ---
+
+PERMISSAO_LIBERAR = "consignacao.liberar"  # o gerente, para o representante com a devolução bloqueada
+
+
+class PedeAutorizacao(ErroConsignacao):
+    """O representante tem a devolução bloqueada: a tela pede o login e a senha do gerente e manda de novo."""
+
+
+def com_ele(db: Session, empresa_id: int, representante_id: int) -> list[ItemTransferencia]:
+    """Os itens de transferência que ainda têm resto com o representante, um por transferência (o mesmo produto
+    aparece repetido se veio em transferências diferentes), dos mais antigos aos mais novos."""
+    return list(db.scalars(
+        select(ItemTransferencia).join(ItemTransferencia.transferencia)
+        .where(Transferencia.empresa_id == empresa_id, Transferencia.representante_id == representante_id,
+               Transferencia.situacao == CONFIRMADA, ItemTransferencia.restante > 0)
+        .order_by(Transferencia.confirmada_em, ItemTransferencia.ordem)))
+
+
+def devolucoes(db: Session, empresa_id: int, representante_id: int | None = None, limite: int = 100) -> list[Devolucao]:
+    consulta = select(Devolucao).where(Devolucao.empresa_id == empresa_id)
+    if representante_id:
+        consulta = consulta.where(Devolucao.representante_id == representante_id)
+    return list(db.scalars(consulta.order_by(Devolucao.id.desc()).limit(limite)))
+
+
+def obter_devolucao(db: Session, empresa_id: int, devolucao_id: int) -> Devolucao:
+    devolucao = db.get(Devolucao, devolucao_id)
+    if devolucao is None or devolucao.empresa_id != empresa_id:
+        raise NaoEncontrado("Devolução não encontrada")
+    return devolucao
+
+
+def _devolucao_aberta(db: Session, empresa_id: int, devolucao_id: int) -> Devolucao:
+    devolucao = obter_devolucao(db, empresa_id, devolucao_id)
+    if devolucao.situacao != ABERTA:
+        raise DadoInvalido("A devolução já foi confirmada")
+    return devolucao
+
+
+def abrir_devolucao(db: Session, empresa_id: int, usuario: Usuario, representante_id: int) -> Devolucao:
+    """Começa a devolução do representante (o bloqueado também devolve); se já tem uma aberta, é ela."""
+    representante = obter(db, representante_id)
+    aberta = db.scalar(select(Devolucao).where(
+        Devolucao.empresa_id == empresa_id, Devolucao.representante_id == representante_id, Devolucao.situacao == ABERTA))
+    if aberta is not None:
+        return aberta
+    numero = (db.scalar(select(func.max(Devolucao.numero)).where(Devolucao.empresa_id == empresa_id)) or 0) + 1
+    devolucao = Devolucao(empresa_id=empresa_id, numero=numero, representante=representante, situacao=ABERTA,
+                          retificadora=False, total=ZERO, atendida_por=usuario)
+    db.add(devolucao)
+    db.commit()
+    return devolucao
+
+
+def _recalcular_devolucao(devolucao: Devolucao) -> None:
+    devolucao.total = sum((i.total for i in devolucao.itens), ZERO)
+
+
+def incluir_na_devolucao(db: Session, empresa_id: int, devolucao_id: int, item_transferencia_id: int,
+                         quantidade: Decimal) -> Devolucao:
+    """A peça volta do item de transferência escolhido; não mais do que resta dele com o representante."""
+    devolucao = _devolucao_aberta(db, empresa_id, devolucao_id)
+    origem = db.get(ItemTransferencia, item_transferencia_id)
+    transferencia = origem.transferencia if origem else None
+    if (transferencia is None or transferencia.empresa_id != empresa_id or transferencia.situacao != CONFIRMADA
+            or transferencia.representante_id != devolucao.representante_id):
+        raise NaoEncontrado("Este produto não está com o representante")
+    item = next((i for i in devolucao.itens if i.item_transferencia_id == origem.id), None)
+    total = quantidade + (item.quantidade if item else ZERO3)
+    if not origem.produto.fracionado and not _inteira(total):
+        raise DadoInvalido(f"{origem.descricao} não aceita quantidade com fração")
+    if total > origem.restante:
+        raise DadoInvalido(f"{origem.descricao}: só restam {origem.restante.normalize():f} desta transferência "
+                           f"({transferencia.numero}) com o representante")
+    if item is None:
+        devolucao.itens.append(ItemDevolucao(ordem=max((i.ordem for i in devolucao.itens), default=0) + 1,
+                                             item_transferencia=origem, quantidade=total))
+    else:
+        item.quantidade = total
+    _recalcular_devolucao(devolucao)
+    db.commit()
+    return devolucao
+
+
+def alterar_na_devolucao(db: Session, empresa_id: int, devolucao_id: int, item_id: int, quantidade: Decimal) -> Devolucao:
+    """Quantidade zero tira o item."""
+    devolucao = _devolucao_aberta(db, empresa_id, devolucao_id)
+    item = next((i for i in devolucao.itens if i.id == item_id), None)
+    if item is None:
+        raise NaoEncontrado("Item não encontrado")
+    origem = item.item_transferencia
+    if quantidade <= 0:
+        devolucao.itens.remove(item)
+    else:
+        if not origem.produto.fracionado and not _inteira(quantidade):
+            raise DadoInvalido(f"{origem.descricao} não aceita quantidade com fração")
+        if quantidade > origem.restante:
+            raise DadoInvalido(f"{origem.descricao}: só restam {origem.restante.normalize():f} com o representante")
+        item.quantidade = quantidade
+    _recalcular_devolucao(devolucao)
+    db.commit()
+    return devolucao
+
+
+def alterar_devolucao(db: Session, empresa_id: int, devolucao_id: int, retificadora: bool,
+                      observacao: str | None) -> Devolucao:
+    devolucao = _devolucao_aberta(db, empresa_id, devolucao_id)
+    devolucao.retificadora, devolucao.observacao = retificadora, (observacao or "").strip() or None
+    db.commit()
+    return devolucao
+
+
+def descartar_devolucao(db: Session, empresa_id: int, devolucao_id: int) -> None:
+    db.delete(_devolucao_aberta(db, empresa_id, devolucao_id))
+    db.commit()
+
+
+def _liberacao(db: Session, empresa_id: int, permissoes: set[str], login: str | None, senha: str | None) -> Usuario | None:
+    """Quem libera a devolução bloqueada: quem tem a permissão, ou o gerente que digita o login e a senha."""
+    if PERMISSAO_LIBERAR in permissoes:
+        return None
+    if not login or not senha:
+        raise PedeAutorizacao("A devolução deste representante está bloqueada: só com a liberação do gerente")
+    try:
+        gerente = acesso.autenticar(db, login, senha)
+    except acesso.ErroAcesso:
+        raise PedeAutorizacao("Login ou senha de quem libera não confere")
+    if PERMISSAO_LIBERAR not in acesso.permissoes_na_empresa(db, gerente, empresa_id):
+        raise PedeAutorizacao(f"{gerente.nome} não pode liberar a devolução bloqueada")
+    return gerente
+
+
+def confirmar_devolucao(db: Session, empresa_id: int, usuario: Usuario, permissoes: set[str], devolucao_id: int,
+                        senha: str, login_gerente: str | None = None, senha_gerente: str | None = None) -> Devolucao:
+    """O representante confirma com a senha dele: as peças saem do que está com ele e voltam para a loja (o
+    reservado do estoque baixa). Com a devolução bloqueada, pede a liberação do gerente."""
+    devolucao = _devolucao_aberta(db, empresa_id, devolucao_id)
+    representante = devolucao.representante
+    if not devolucao.itens:
+        raise DadoInvalido("A devolução não tem produtos")
+    if not representante.senha_hash:
+        raise DadoInvalido("O representante não tem senha: cadastre-a na ficha dele")
+    if not conferir_senha(representante, senha):
+        raise DadoInvalido("A senha do representante não confere")
+    if representante.bloqueia_devolucao:
+        devolucao.autorizada_por = _liberacao(db, empresa_id, permissoes, login_gerente, senha_gerente)
+    for item in devolucao.itens:
+        origem = item.item_transferencia
+        if item.quantidade > origem.restante:  # outra devolução ou um acerto baixou antes
+            raise DadoInvalido(f"{origem.descricao}: só restam {origem.restante.normalize():f} com o representante")
+        origem.restante -= item.quantidade
+        try:
+            estoque.movimentar(db, empresa_id, origem.produto_id, "consignacao_devolucao", reservado=-item.quantidade,
+                               usuario_id=usuario.id, documento=f"devolução {devolucao.numero}",
+                               observacao="retificadora" if devolucao.retificadora else None)
+        except estoque.ErroEstoque as e:
+            raise DadoInvalido(str(e))
+    devolucao.situacao, devolucao.confirmada_em = CONFIRMADA, datetime.now()
+    db.commit()
+    return devolucao

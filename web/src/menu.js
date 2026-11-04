@@ -55,7 +55,8 @@ export const MENU = [
     icone: 'local_shipping',
     filhos: [
       { titulo: 'Transferência', icone: 'move_up', rota: '/consignacao/transferencias/nova', permissao: 'consignacao.transferir' },
-      { titulo: 'Transferências', icone: 'list_alt', rota: '/consignacao/transferencias', permissao: ['consignacao.transferir', 'representantes.ver'] },
+      { titulo: 'Devolução', icone: 'move_down', rota: '/consignacao/devolucoes/nova', permissao: 'consignacao.transferir' },
+      { titulo: 'Transferências e devoluções', icone: 'list_alt', rota: '/consignacao/transferencias', permissao: ['consignacao.transferir', 'representantes.ver'] },
       { titulo: 'Representantes', icone: 'badge', rota: '/consignacao/representantes', permissao: ['representantes.ver', 'representantes.editar', 'consignacao.transferir'] },
     ],
   },

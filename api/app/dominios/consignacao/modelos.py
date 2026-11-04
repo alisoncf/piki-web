@@ -125,3 +125,49 @@ class ItemTransferencia(Base):
     def total(self) -> Decimal:
         return (self.quantidade * self.preco).quantize(Decimal("0.01"))
 
+
+
+class Devolucao(ComDatas, Base):
+    """O representante devolve produtos à loja, sem custo: sai de cada item de transferência escolhido (de onde a
+    peça veio) e volta para a loja. Uma aberta por representante; confirmada com a senha dele. A retificadora
+    corrige um produto transferido errado (tab_devconsign do VB6, com o retif_dev)."""
+
+    __tablename__ = "consignacao_devolucao"
+    __table_args__ = (UniqueConstraint("empresa_id", "numero"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), index=True)
+    numero: Mapped[int] = mapped_column(Integer)  # sequência da loja
+    representante_id: Mapped[int] = mapped_column(ForeignKey("representante.id"), index=True)
+    situacao: Mapped[str] = mapped_column(String(10), default=ABERTA, index=True)
+    retificadora: Mapped[bool] = mapped_column(Boolean, default=False)
+    observacao: Mapped[str | None] = mapped_column(String(200))
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0.00"))  # pelo preço da transferência
+    atendida_por_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))
+    # o gerente que liberou, quando o representante tem a devolução bloqueada
+    autorizada_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    confirmada_em: Mapped[datetime | None] = mapped_column(DateTime)
+
+    representante: Mapped[Representante] = relationship(lazy="joined")
+    atendida_por: Mapped[Usuario] = relationship(foreign_keys=[atendida_por_id], lazy="joined")
+    autorizada_por: Mapped[Usuario | None] = relationship(foreign_keys=[autorizada_por_id], lazy="joined")
+    itens: Mapped[list["ItemDevolucao"]] = relationship(
+        back_populates="devolucao", cascade="all, delete-orphan", order_by="ItemDevolucao.ordem", lazy="selectin")
+
+
+class ItemDevolucao(Base):
+    __tablename__ = "consignacao_devolucao_item"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    devolucao_id: Mapped[int] = mapped_column(ForeignKey("consignacao_devolucao.id", ondelete="CASCADE"), index=True)
+    ordem: Mapped[int] = mapped_column(Integer)
+    # de que item de transferência a peça volta (o mesmo produto pode ter vindo em transferências diferentes)
+    item_transferencia_id: Mapped[int] = mapped_column(ForeignKey("consignacao_transferencia_item.id"), index=True)
+    quantidade: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+
+    devolucao: Mapped[Devolucao] = relationship(back_populates="itens")
+    item_transferencia: Mapped[ItemTransferencia] = relationship(lazy="joined")
+
+    @property
+    def total(self) -> Decimal:
+        return (self.quantidade * self.item_transferencia.preco).quantize(Decimal("0.01"))
