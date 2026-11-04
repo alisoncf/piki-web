@@ -122,7 +122,7 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 
 - [~] Levantamento do fluxo com o Alison (D30) — 03/11/2026
 - [x] Representantes: cadastro e importação do VB6 (migração 0038) — 03/11/2026
-- [ ] Transferência (saída), com o estoque reservado e o limite
+- [x] Transferência (saída), com o estoque reservado, o limite, a senha e o comprovante; importação do saldo do VB6 (migração 0039) — 04/11/2026
 - [ ] Devolução de consignado
 - [ ] Acertos (para cliente e para o representante), com as comissões
 - [ ] NF-e de remessa e de retorno

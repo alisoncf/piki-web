@@ -5,8 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 
+import ComprovanteTransferenciaPagina from '@/paginas/consignacao/ComprovanteTransferenciaPagina.vue'
 import RepresentantePagina from '@/paginas/consignacao/RepresentantePagina.vue'
 import RepresentantesPagina from '@/paginas/consignacao/RepresentantesPagina.vue'
+import TransferenciaPagina from '@/paginas/consignacao/TransferenciaPagina.vue'
 import { api } from '@/servicos/api'
 import { useSessaoStore } from '@/stores/sessao'
 
@@ -22,6 +24,9 @@ const COMISSOES = [
   { tipo_cobranca: 'cliente', nome: 'Cobrança no cliente', percentual: '15.00', padrao: true },
   { tipo_cobranca: 'representante', nome: 'Representante recebe', percentual: '25.00', padrao: false },
 ]
+const POSICAO = { limite: '5000.00', em_uso: '420.00', em_uso_atual: '510.00', disponivel: '4580.00', pecas: '5.000', itens: [
+  { produto_id: 1, codigo: 1, descricao: 'Perfume Ficticio', quantidade: '3.000', total_transferencia: '360.00', total_atual: '450.00' },
+] }
 const REP = {
   id: 3, codigo: 262, cliente: CLIENTE, ativo: true, bloqueado: false, limite: '5000.00', motivo_bloqueio: null, tem_senha: true,
   bloqueia_impressao: false, bloqueia_devolucao: false, lembrete: 'Acerta toda sexta', lembrete_acerto: null, observacao: null,
@@ -37,6 +42,10 @@ async function montar(componente, caminho) {
       { path: '/consignacao/representantes', name: 'representantes', component: componente === RepresentantesPagina ? componente : vazio },
       { path: '/consignacao/representantes/:id', name: 'representante', component: componente === RepresentantePagina ? componente : vazio },
       { path: '/cadastros/clientes/:id', name: 'cliente', component: vazio },
+      { path: '/consignacao/transferencias', name: 'transferencias', component: vazio },
+      { path: '/consignacao/transferencias/nova', name: 'transferencia-nova', component: componente === TransferenciaPagina ? componente : vazio },
+      { path: '/consignacao/transferencias/:id', name: 'transferencia', component: componente === TransferenciaPagina ? componente : vazio },
+      { path: '/consignacao/transferencias/:id/comprovante', name: 'comprovante-transferencia', component: componente === ComprovanteTransferenciaPagina ? componente : vazio },
     ],
   })
   await router.push(caminho)
@@ -78,12 +87,14 @@ describe('representantes', () => {
 
   it('salva o limite, o bloqueio e as comissões; o vazio volta para a padrão', async () => {
     entrar(['representantes.editar', 'representantes.limites'])
-    vi.spyOn(api, 'get').mockResolvedValue({ data: REP })
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url.endsWith('/posicao') ? POSICAO : REP }))
     const put = vi.spyOn(api, 'put').mockResolvedValue({ data: { ...REP, bloqueado: true, motivo_bloqueio: 'Atrasou' } })
     const { wrapper } = await montar(RepresentantePagina, '/consignacao/representantes/3')
     expect(wrapper.text()).toContain('Representante 262 · Maria Ficticia')
     expect(wrapper.text()).toContain('Acerta toda sexta')
     expect(wrapper.text()).toContain('Centro (Anápolis - GO)')
+    expect(wrapper.text()).toMatch(/Em uso \(preço da transferência\)\s*R\$\s420,00/)
+    expect(wrapper.text()).toMatch(/Em uso \(preço atual\)\s*R\$\s510,00/)
 
     const toggle = wrapper.findAllComponents({ name: 'QToggle' }).find((t) => t.props('label') === 'Bloqueado')
     await toggle.vm.$emit('update:modelValue', true)
@@ -104,7 +115,7 @@ describe('representantes', () => {
 
   it('sem representantes.limites, o limite e as comissões só aparecem', async () => {
     entrar(['representantes.editar'])
-    vi.spyOn(api, 'get').mockResolvedValue({ data: REP })
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({ data: url.endsWith('/posicao') ? POSICAO : REP }))
     const put = vi.spyOn(api, 'put').mockResolvedValue({ data: REP })
     const { wrapper } = await montar(RepresentantePagina, '/consignacao/representantes/3')
     expect(botao(wrapper, 'Salvar limite e comissões')).toBeUndefined()
@@ -114,5 +125,69 @@ describe('representantes', () => {
     await botao(wrapper, 'Trocar a senha').trigger('click')
     await flushPromises()
     expect(put).toHaveBeenCalledWith('/representantes/3/senha', { senha: 'gato12' })
+  })
+
+  it('no balcão: escolhe o representante, inclui o produto e confirma com a senha dele', async () => {
+    entrar(['consignacao.transferir'])
+    window.print = vi.fn()
+    const aberta = { id: 9, numero: 4, situacao: 'aberta', representante: { id: 3, codigo: 262, cliente: CLIENTE, bloqueado: false, lembrete: 'Acerta toda sexta' },
+      total: '0.00', atendida_por: { id: 1, nome: 'Ana' }, criado_em: '2026-11-04T10:00:00', confirmada_em: null, itens: [], avisos: [] }
+    const item = { id: 1, ordem: 1, produto: { id: 7, codigo: 12, unidade: 'UN', fracionado: false }, descricao: 'Perfume Ficticio',
+      quantidade: '2.000', preco: '120.00', total: '240.00', restante: '0.000' }
+    const comItem = { ...aberta, itens: [item], total: '240.00' }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: {
+        '/representantes': [REP],
+        '/representantes/3/posicao': { ...POSICAO, limite: '500.00', disponivel: '80.00' },
+        '/produtos': { itens: [{ id: 7, codigo: 12, nome: 'Perfume Ficticio', preco_venda: '120.00', estoque: '3.000' }], total: 1 },
+        '/consignacao/transferencias/9': { ...comItem, situacao: 'confirmada' },
+      }[url],
+    }))
+    const post = vi.spyOn(api, 'post').mockImplementation(async (url) => ({
+      data: url.endsWith('/itens') ? comItem : url.endsWith('/confirmar') ? { ...comItem, situacao: 'confirmada', avisos: [] } : aberta,
+    }))
+    const { wrapper, router } = await montar(TransferenciaPagina, '/consignacao/transferencias/nova')
+    await wrapper.findComponent({ name: 'QSelect' }).vm.$emit('update:modelValue', 3)
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/consignacao/transferencias', { representante_id: 3 })
+    expect(router.currentRoute.value.name).toBe('transferencia')
+    expect(wrapper.text()).toContain('Acerta toda sexta')
+
+    const busca = wrapper.findAllComponents({ name: 'QInput' }).find((c) => c.props('label')?.startsWith('Código'))
+    await busca.vm.$emit('update:modelValue', '12')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/consignacao/transferencias/9/itens', { produto_id: 7, quantidade: '1' })
+    // 80 de limite livre, 240 na transferência: passa
+    expect(wrapper.text()).toContain('Passa do limite')
+
+    await botao(wrapper, 'Confirmar com a senha').trigger('click')
+    await flushPromises()
+    const senha = document.querySelector('.q-dialog input')
+    senha.value = 'gato'
+    senha.dispatchEvent(new Event('input'))
+    await flushPromises()
+    ;[...document.querySelectorAll('.q-dialog button')].find((b) => b.textContent.includes('Confirmar')).click()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/consignacao/transferencias/9/confirmar', { senha: 'gato' })
+    expect(router.currentRoute.value.name).toBe('comprovante-transferencia')
+  })
+
+  it('o comprovante tem o produto, o preço e a quantidade, e a linha para assinar', async () => {
+    entrar(['consignacao.transferir'])
+    window.print = vi.fn()
+    const confirmada = { id: 9, numero: 4, situacao: 'confirmada', representante: { id: 3, codigo: 262, cliente: CLIENTE, bloqueado: false, lembrete: null },
+      total: '240.00', atendida_por: { id: 1, nome: 'Ana' }, criado_em: '2026-11-04T10:00:00', confirmada_em: '2026-11-04T10:05:00', avisos: [],
+      itens: [{ id: 1, ordem: 1, produto: { id: 7, codigo: 12, unidade: 'UN', fracionado: false }, descricao: 'Perfume Ficticio',
+        quantidade: '2.000', preco: '120.00', total: '240.00', restante: '2.000' }] }
+    vi.spyOn(api, 'get').mockResolvedValue({ data: confirmada })
+    const { wrapper } = await montar(ComprovanteTransferenciaPagina, '/consignacao/transferencias/9/comprovante?imprimir=1')
+    const texto = wrapper.text()
+    expect(texto).toContain('Transferência de consignado nº 4')
+    expect(texto).toContain('262 · Maria Ficticia')
+    expect(texto).toContain('00000012 · Perfume Ficticio')
+    expect(texto).toMatch(/R\$\s120,00/)
+    expect(texto).toContain('Recebi em consignação')
+    expect(window.print).toHaveBeenCalled()
   })
 })

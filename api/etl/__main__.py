@@ -10,6 +10,7 @@
     python -m etl receber --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-receber-01.txt
     python -m etl notas --origem "mysql+pymysql://..." --empresa 01
     python -m etl representantes --origem "mysql+pymysql://..." --empresa 01 (depois dos clientes)
+    python -m etl consignado --origem "mysql+pymysql://..." --empresa 01 (depois dos representantes e do estoque)
     python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun"
 
 Para um MariaDB local em que o root entra pela autenticação do Windows (sem
@@ -29,6 +30,7 @@ import app.registro_modelos  # noqa: F401 (todos os modelos, para as relações 
 from app.nucleo.banco import engine
 from etl.caixa import importar_caixa
 from etl.clientes import importar_clientes
+from etl.consignado import importar_consignado
 from etl.empresas import ConflitoEmpresa, importar_empresas
 from etl.fornecedores import importar_fornecedores
 from etl.estoque import importar_estoque
@@ -94,6 +96,9 @@ def main(argv: list[str] | None = None) -> None:
     rp.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     rp.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     rp.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
+    cg = sub.add_parser("consignado", help="o que está com cada representante (depois dos representantes e do estoque)")
+    cg.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
+    cg.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
     args = p.parse_args(argv)
     # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
     sys.stdout.reconfigure(encoding="utf-8")
@@ -180,6 +185,11 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"representantes novos: {r.representantes} ({r.ja_clientes} já eram clientes, "
                       f"{r.clientes_criados} viraram clientes); inativos: {r.inativos}; comissões próprias: {r.comissoes}")
                 _avisos(r.avisos, args.avisos)
+            elif args.comando == "consignado":
+                r = importar_consignado(conexao, db, args.empresa)
+                print(f"representantes com consignado: {r.representantes}, itens: {r.itens}, peças: {r.pecas.normalize():f}, "
+                      f"R$ {r.valor} pelo preço da transferência")
+                _avisos(r.avisos, None)
             elif args.comando == "notas":
                 r = importar_numeracao(conexao, db, args.empresa)
                 for linha in r.series:

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -108,3 +108,95 @@ class Representante(RepresentanteResumo):
     avalista_telefones: str | None
     avalista_anotacoes: str | None
     comissoes: list[Comissao]
+
+
+class ItemPosicao(BaseModel):
+    produto_id: int
+    codigo: int
+    descricao: str
+    quantidade: Decimal
+    total_transferencia: Decimal
+    total_atual: Decimal
+
+
+class Posicao(BaseModel):
+    """O estoque consignado do representante na loja: o "em uso" é pelo preço da transferência (o que conta no
+    limite); mostra também pelo preço atual."""
+
+    limite: Decimal
+    em_uso: Decimal
+    em_uso_atual: Decimal
+    disponivel: Decimal
+    pecas: Decimal
+    itens: list[ItemPosicao]
+
+
+class RepresentanteDaTransferencia(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    codigo: int
+    cliente: ClienteDoRepresentante
+    bloqueado: bool
+    lembrete: str | None
+
+
+class Pessoa(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+
+
+class ProdutoDoItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    codigo: int
+    unidade: str
+    fracionado: bool
+
+
+class ItemTransferencia(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ordem: int
+    produto: ProdutoDoItem
+    descricao: str
+    quantidade: Decimal
+    preco: Decimal
+    total: Decimal
+    restante: Decimal
+
+
+class Transferencia(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    numero: int
+    situacao: str
+    representante: RepresentanteDaTransferencia
+    total: Decimal
+    atendida_por: Pessoa
+    criado_em: datetime
+    confirmada_em: datetime | None
+    itens: list[ItemTransferencia]
+    avisos: list[str] = []
+
+
+class TransferenciaNova(BaseModel):
+    representante_id: int
+
+
+class ItemNovo(BaseModel):
+    produto_id: int
+    quantidade: Decimal = Field(default=Decimal("1"), gt=0, max_digits=14, decimal_places=3)
+
+
+class QuantidadeDados(BaseModel):
+    quantidade: Decimal = Field(ge=0, max_digits=14, decimal_places=3, description="Zero tira o item")
+
+
+class Confirmacao(BaseModel):
+    senha: str = Field(min_length=1, max_length=20, description="A senha do representante")

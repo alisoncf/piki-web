@@ -23,6 +23,13 @@ export const rotas = [
     meta: { permissao: ['notas.ver', 'notas.emitir', 'caixa.operar'] },
   },
   {
+    // fora do layout, para imprimir só o comprovante
+    path: '/consignacao/transferencias/:id(\\d+)/comprovante',
+    name: 'comprovante-transferencia',
+    component: () => import('@/paginas/consignacao/ComprovanteTransferenciaPagina.vue'),
+    meta: { permissao: ['consignacao.transferir', 'representantes.ver'] },
+  },
+  {
     // fora do layout, para imprimir só o carnê
     path: '/vendas/:id(\\d+)/carne',
     name: 'carne',
@@ -230,13 +237,31 @@ export const rotas = [
         path: 'consignacao/representantes',
         name: 'representantes',
         component: () => import('@/paginas/consignacao/RepresentantesPagina.vue'),
-        meta: { permissao: ['representantes.ver', 'representantes.editar'] },
+        meta: { permissao: ['representantes.ver', 'representantes.editar', 'consignacao.transferir'] },
       },
       {
         path: 'consignacao/representantes/:id(\\d+)',
         name: 'representante',
         component: () => import('@/paginas/consignacao/RepresentantePagina.vue'),
-        meta: { permissao: ['representantes.ver', 'representantes.editar'] },
+        meta: { permissao: ['representantes.ver', 'representantes.editar', 'consignacao.transferir'] },
+      },
+      {
+        path: 'consignacao/transferencias',
+        name: 'transferencias',
+        component: () => import('@/paginas/consignacao/TransferenciasPagina.vue'),
+        meta: { permissao: ['consignacao.transferir', 'representantes.ver'] },
+      },
+      {
+        path: 'consignacao/transferencias/nova',
+        name: 'transferencia-nova',
+        component: () => import('@/paginas/consignacao/TransferenciaPagina.vue'),
+        meta: { permissao: 'consignacao.transferir' },
+      },
+      {
+        path: 'consignacao/transferencias/:id(\\d+)',
+        name: 'transferencia',
+        component: () => import('@/paginas/consignacao/TransferenciaPagina.vue'),
+        meta: { permissao: 'consignacao.transferir' },
       },
       {
         path: 'notas/operacoes',

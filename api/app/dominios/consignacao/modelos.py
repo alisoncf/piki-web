@@ -5,13 +5,15 @@ endereço e os telefones são os da ficha do cliente; aqui ficam só os do consi
 (limite, situação, senha, comissões, avalista). Cadastro global, como o cliente; hoje só a
 matriz trabalha com consignado. No VB6: tab_representantes, tab_reptip.
 """
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.dominios.acesso.modelos import Usuario
 from app.dominios.clientes.modelos import Cliente
+from app.dominios.produtos.modelos import Produto
 from app.nucleo.banco import Base, ComDatas
 
 # a comissão de quem não tem uma própria, por tipo de cobrança (tab_tipocob do VB6)
@@ -71,3 +73,55 @@ class ComissaoRepresentante(Base):
     percentual: Mapped[Decimal] = mapped_column(Numeric(5, 2))
 
     representante: Mapped[Representante] = relationship(back_populates="comissoes")
+
+
+# a transferência: montada no balcão (aberta) e confirmada pelo representante com a senha
+ABERTA = "aberta"
+CONFIRMADA = "confirmada"
+SITUACOES_TRANSFERENCIA = (ABERTA, CONFIRMADA)
+
+
+class Transferencia(ComDatas, Base):
+    """O representante leva produtos "emprestados" para o estoque dele (tab_consignacoes do VB6, que não tinha
+    cabeçalho: cada linha era um item). Uma aberta por representante; confirmada, os produtos passam a estar com
+    ele (o reservado do estoque da loja) e cada item guarda quanto ainda resta com ele."""
+
+    __tablename__ = "consignacao_transferencia"
+    __table_args__ = (UniqueConstraint("empresa_id", "numero"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), index=True)
+    numero: Mapped[int] = mapped_column(Integer)  # sequência da loja
+    representante_id: Mapped[int] = mapped_column(ForeignKey("representante.id"), index=True)
+    situacao: Mapped[str] = mapped_column(String(10), default=ABERTA, index=True)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0.00"))  # pelo preço da transferência
+    atendida_por_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"))  # o funcionário do balcão
+    confirmada_em: Mapped[datetime | None] = mapped_column(DateTime)
+
+    representante: Mapped[Representante] = relationship(lazy="joined")
+    atendida_por: Mapped[Usuario] = relationship(lazy="joined")
+    itens: Mapped[list["ItemTransferencia"]] = relationship(
+        back_populates="transferencia", cascade="all, delete-orphan", order_by="ItemTransferencia.ordem", lazy="selectin")
+
+
+class ItemTransferencia(Base):
+    __tablename__ = "consignacao_transferencia_item"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    transferencia_id: Mapped[int] = mapped_column(ForeignKey("consignacao_transferencia.id", ondelete="CASCADE"),
+                                                  index=True)
+    ordem: Mapped[int] = mapped_column(Integer)
+    produto_id: Mapped[int] = mapped_column(ForeignKey("produto.id"), index=True)
+    descricao: Mapped[str] = mapped_column(String(120))
+    quantidade: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    preco: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # o preço de venda do dia, com que a peça sai
+    # o que ainda está com o representante (o "reman." do VB6): baixa na devolução e no acerto
+    restante: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=Decimal("0.000"))
+
+    transferencia: Mapped[Transferencia] = relationship(back_populates="itens")
+    produto: Mapped[Produto] = relationship(lazy="joined")
+
+    @property
+    def total(self) -> Decimal:
+        return (self.quantidade * self.preco).quantize(Decimal("0.01"))
+

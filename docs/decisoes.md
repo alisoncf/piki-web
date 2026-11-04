@@ -417,7 +417,16 @@ Regras do cadastro (Alison, 03/11/2026):
 - **Comissão** por representante e por tipo de cobrança; sem a própria, vale a padrão do tipo (loja 20%, cliente 15%, representante 20%, depósito e boleto 0%).
 - **Senha** guardada como hash, conferida sem diferenciar maiúsculas (como no VB6); nunca volta da API.
 - **Feito (03/11/2026, migração 0038):** cadastro de representantes (lista, ficha com os dados do cliente, limite, bloqueio, comissões, senha, avalista, lembretes), permissões `representantes.ver`, `representantes.editar` e `representantes.limites` (limite, bloqueio e comissões, como a permissão própria do VB6), e a importação `python -m etl representantes`: liga ao cliente de mesmo CPF (200 já eram clientes) ou cria o cliente; o mesmo CPF em dois cadastros do VB6 vira um representante só, com o código do ativo; o excluído fica inativo; a senha vira hash; só as comissões diferentes da padrão são gravadas. Na matriz: 439 representantes, 121 ativos, 112 comissões próprias; 14 com CPF inválido (todos excluídos) ficam com o cliente sem CPF.
-- **A conferir com o Alison:** o que exatamente o "bloquear impressão" e o "bloquear devolução" impedem (por enquanto só são guardados).
+- **Bloquear impressão e bloquear devolução** (Alison, 04/11/2026): servem para o funcionário não imprimir nem fazer a devolução daquele representante sem o gerente chegar. Vão pedir a autorização do gerente (login e senha, como no desconto) quando a devolução e as impressões do consignado forem feitas.
+
+Transferência (Alison, 04/11/2026; feita no mesmo dia, migração 0039):
+
+- A transferência em aberto é só a situação: uma por representante na loja; abrir de novo continua a mesma. Confirmada com a senha do representante, os produtos passam a estar com ele (o reservado do estoque da loja, movimento "Envio ao representante"; a quantidade continua sendo da loja).
+- Cada item sai pelo **preço de venda do dia** (no VB6, 98% das linhas de outubro de 2026 tinham o unit_con igual ao preço de venda; as outras são de produtos que mudaram de preço depois) e guarda **o que resta com o representante** (o "reman." do VB6), que a devolução e o acerto vão baixar.
+- **Limite estourado bloqueia** (pelo preço da transferência); bloqueado ou inativo não leva. O disponível da loja negativo só avisa, como na venda.
+- **Comprovante** (o produto, o preço e a quantidade, com a linha para o representante assinar): sai pela janela de impressão logo depois de confirmar. O Alison vai mandar a foto do comprovante do VB6 para conferir.
+- No VB6 a tab_consignacoes não tem cabeçalho: cada linha é um item. A importação (`python -m etl consignado`) dá a cada representante com saldo uma transferência confirmada com as linhas que ainda têm resto, cada uma com o seu preço: na matriz, 69 representantes, 4.783 itens, 12.697 peças, R$ 1,15 milhão pelo preço da transferência. O reservado do estoque já vinha do ETL de estoque.
+- Permissão `consignacao.transferir` (o funcionário do balcão: escolhe o representante, procura produtos e vê o que está com ele). Na ficha do representante, o que está com ele na loja, pelos dois preços.
 
 ## Substituídas
 

@@ -27,6 +27,35 @@
         </div>
       </section>
 
+      <section v-if="posicao" class="cartao q-pa-md q-mb-md">
+        <div class="row items-center">
+          <div class="formulario__secao col">Com o representante nesta loja</div>
+          <q-btn v-if="sessao.pode('consignacao.transferir') && rep.ativo && !rep.bloqueado" flat no-caps color="primary" icon="move_up" label="Nova transferência" @click="novaTransferencia" />
+        </div>
+        <div class="row q-col-gutter-md">
+          <div class="col-6 col-sm-3"><div class="text-caption text-suave">Peças</div>{{ formatarQuantidade(posicao.pecas) }}</div>
+          <div class="col-6 col-sm-3"><div class="text-caption text-suave">Em uso (preço da transferência)</div>{{ formatarMoeda(posicao.em_uso) }}</div>
+          <div class="col-6 col-sm-3"><div class="text-caption text-suave">Em uso (preço atual)</div>{{ formatarMoeda(posicao.em_uso_atual) }}</div>
+          <div class="col-6 col-sm-3">
+            <div class="text-caption text-suave">Resta do limite</div>
+            <span :class="Number(posicao.disponivel) < 0 ? 'text-negative' : ''">{{ formatarMoeda(posicao.disponivel) }}</span>
+          </div>
+        </div>
+        <q-expansion-item v-if="posicao.itens.length" dense label="Ver os produtos" class="q-mt-sm">
+          <q-markup-table flat dense>
+            <thead><tr><th class="text-left">Produto</th><th class="text-right">Qtd.</th><th class="text-right">Preço da transferência</th><th class="text-right">Preço atual</th></tr></thead>
+            <tbody>
+              <tr v-for="i in posicao.itens" :key="i.produto_id">
+                <td>{{ formatarCodigoProduto(i.codigo) }} · {{ i.descricao }}</td>
+                <td class="text-right">{{ formatarQuantidade(i.quantidade) }}</td>
+                <td class="text-right">{{ formatarMoeda(i.total_transferencia) }}</td>
+                <td class="text-right">{{ formatarMoeda(i.total_atual) }}</td>
+              </tr>
+            </tbody>
+          </q-markup-table>
+        </q-expansion-item>
+      </section>
+
       <section class="cartao q-pa-md q-mb-md">
         <div class="formulario__secao">Limite, bloqueio e comissões</div>
         <div class="row q-col-gutter-md">
@@ -87,10 +116,12 @@
 <script setup>
 import { useQuasar } from 'quasar'
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { api, mensagemDeErro } from '@/servicos/api'
-import { formatarDataHora, formatarDocumento, formatarTelefone, nomeSetor } from '@/servicos/formatos'
+import {
+  formatarCodigoProduto, formatarDataHora, formatarDocumento, formatarMoeda, formatarQuantidade, formatarTelefone, nomeSetor,
+} from '@/servicos/formatos'
 import { useSessaoStore } from '@/stores/sessao'
 
 const CAMPOS = ['ativo', 'lembrete', 'lembrete_acerto', 'observacao', 'ultima_conferencia', 'avalista_nome', 'avalista_cpf',
@@ -100,7 +131,9 @@ const PADRAO = { loja: '20', cliente: '15', representante: '20', deposito: '0', 
 
 const $q = useQuasar()
 const rota = useRoute()
+const roteador = useRouter()
 const sessao = useSessaoStore()
+const posicao = ref(null)
 const podeEditar = computed(() => sessao.pode('representantes.editar'))
 const podeLimites = computed(() => sessao.pode('representantes.limites'))
 const rep = ref(null)
@@ -164,9 +197,20 @@ async function trocarSenha() {
   senha.value = ''
 }
 
+async function novaTransferencia() {
+  try {
+    const { data } = await api.post('/consignacao/transferencias', { representante_id: rep.value.id })
+    roteador.push({ name: 'transferencia', params: { id: data.id } })
+  } catch (e) {
+    $q.notify({ type: 'negative', message: mensagemDeErro(e) })
+  }
+}
+
 onMounted(async () => {
   try {
-    mostrar((await api.get(`/representantes/${rota.params.id}`)).data)
+    const [r, p] = await Promise.all([api.get(`/representantes/${rota.params.id}`), api.get(`/representantes/${rota.params.id}/posicao`)])
+    mostrar(r.data)
+    posicao.value = p.data
   } catch (e) {
     $q.notify({ type: 'negative', message: mensagemDeErro(e) })
   }
