@@ -390,6 +390,22 @@ Decisão do Alison.
 - **Crédito suspenso** (Alison, 03/11/2026): o cliente com crédito suspenso só compra à vista. É o que o sistema já faz: não compra no crediário, nem com autorização.
 - **Baixa das vendas no cartão:** o financeiro baixa numa conta bancária da empresa. O Alison ainda vai pensar melhor; fica para quando houver as contas do financeiro.
 
+### D30. Consignação e representantes (03/11/2026, em levantamento)
+
+O fluxo, contado pelo Alison:
+
+- **Transferência:** o representante vem à loja, escolhe os produtos e um funcionário o atende, num balcão próprio do consignado; é parecido com uma venda, mas gera uma transferência: um documento que ele assina e que diz que "leva emprestado" os produtos para o estoque dele (casa, carro, loja). Ele confirma com uma **senha própria** (no futuro, talvez biometria).
+- **Devolução de consignado:** ele devolve produtos à loja; não gera custo, a mercadoria volta e sai um comprovante para ele.
+- **Acerto:** o que ele vendeu. Pode ser **para um cliente dele** (gera o carnê, como na venda, referente ao acerto) ou **para ele mesmo**. As comissões são diferentes em cada caso. O Alison vai detalhar.
+- Na tela de acerto do VB6: escolhe cliente ou representante, os produtos saem do estoque consignado dele (com a transferência de origem), há o valor negociado e a diferença, a data base, a conta de cobrança, a comissão em % (15% na "cobrança no cliente"), a forma de pagamento, a entrada e as parcelas (duplicata ou cheque).
+
+O que os dados do VB6 mostram (só a matriz usa):
+
+- 443 representantes cadastrados, 122 não excluídos; 119 com mercadoria em mãos (12,6 mil peças).
+- Em 2026: 2.044 transferências, 660 devoluções e 5.150 acertos (R$ 3,26 milhões, 3.806 clientes, R$ 459 mil de comissão).
+- A comissão é por representante e por tipo de cobrança (`tab_reptip`), com o padrão do tipo (`tab_tipocob`): pagamento na loja 20%, cobrança no cliente 15%, representante recebe 20% (vários com 25%).
+- O cadastro tem limite, situação (liberado ou bloqueado, com o motivo), senha, avalista, lembrete, lembrete do acerto, bloqueio de impressão e de devolução e data da última conferência. Alterar limite e comissão pede uma permissão própria no VB6.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
