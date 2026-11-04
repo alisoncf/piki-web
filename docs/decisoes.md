@@ -435,6 +435,16 @@ Devolução (Alison, 04/11/2026; feita no mesmo dia, migração 0040):
 - **Devolução retificadora:** marca a devolução que corrige um produto transferido errado (o retif_dev do VB6), com uma observação; aparece no comprovante e no movimento de estoque.
 - **Bloquear devolução:** com ele ligado no representante, a confirmação pede o login e a senha de quem tem `consignacao.liberar` (o gerente), como no desconto da venda; a devolução guarda quem liberou. O bloqueio de impressão vai usar a mesma permissão quando houver as impressões do consignado.
 
+Acerto (Alison, 04/11/2026, em levantamento):
+
+- **Para o cliente do representante:** gera o carnê no nome do cliente, como na venda. O representante pode ter vendido por mais: a **diferença** (valor negociado menos o preço da transferência) fica para ele; há um relatório de diferenças de acertos.
+- **Para o próprio representante:** as peças ficaram com algum cliente, mas ele assume a dívida, como se tivesse comprado e revendido; a comissão é maior porque ele assume o risco. O bloqueado só acerta para si à vista.
+- **Comissão** paga conforme o cliente paga as parcelas (relatório `frmRelComissParc` no VB6); o Alison acha que o processo pode melhorar.
+- **Entrada** (rara): vai para o caixa do consignado, que fica aberto para os acertos.
+- **Queima:** acerto só de produtos promocionais, em queima.
+- **Lembrete do acerto** do representante: importante, aparece ao acertar.
+- O que o código do VB6 (`frmAcerto`) mostra: comissão = % do tipo de cobrança do representante × total dos itens pelo preço da transferência + a diferença; para o cliente, o carnê é o valor negociado; para o representante, a comissão vira desconto (o carnê dele é o valor negociado menos a comissão). No acerto promocional (queima), a comissão é 5%. A comissão é dividida pelas parcelas (`tab_comissparc`), uma parte por parcela. Exemplo (acerto 0189592): itens R$ 2.504,00, negociado R$ 2.541,00, diferença e comissão R$ 37,00 (a comissão do representante na cobrança no cliente era 0%), carnê em 7 × R$ 363,00.
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.
