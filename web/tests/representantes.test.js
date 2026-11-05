@@ -21,9 +21,9 @@ const CLIENTE = {
   telefones: [{ numero: '62999990000', tipo: '3' }],
 }
 const COMISSOES = [
-  { tipo_cobranca: 'loja', nome: 'Pagamento na loja', percentual: '20.00', padrao: true },
-  { tipo_cobranca: 'cliente', nome: 'Cobrança no cliente', percentual: '15.00', padrao: true },
-  { tipo_cobranca: 'representante', nome: 'Representante recebe', percentual: '25.00', padrao: false },
+  { tipo_cobranca: 'loja', nome: 'Pagamento na loja', percentual: '20.00', padrao: true, percentual_padrao: '20.00' },
+  { tipo_cobranca: 'cliente', nome: 'Cobrança no cliente', percentual: '15.00', padrao: true, percentual_padrao: '15.00' },
+  { tipo_cobranca: 'representante', nome: 'Representante recebe', percentual: '25.00', padrao: false, percentual_padrao: '20.00' },
 ]
 const POSICAO = { limite: '5000.00', em_uso: '420.00', em_uso_atual: '510.00', disponivel: '4580.00', pecas: '5.000', itens: [
   { produto_id: 1, codigo: 1, descricao: 'Perfume Ficticio', quantidade: '3.000', total_transferencia: '360.00', total_atual: '450.00' },

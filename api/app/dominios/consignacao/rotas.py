@@ -1,25 +1,35 @@
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.dominios.consignacao import servico
+from app.dominios.consignacao.esquemas import Acerto, AcertoDados, AcertoNovo, ConfirmacaoAcerto, ItemAcertoNovo
+from app.dominios.consignacao.esquemas import ParcelaDoAcerto
 from app.dominios.consignacao.esquemas import (
     Confirmacao, ConfirmacaoDevolucao, Devolucao, DevolucaoDados, DevolucaoNova, ItemComEle, ItemDevolucaoNovo, ItemNovo,
     LimitesDados, Posicao, QuantidadeDados, Representante, RepresentanteDados, RepresentanteNovo, RepresentanteResumo,
     SenhaDados, Transferencia, TransferenciaNova,
 )
-from app.dominios.consignacao.modelos import SITUACOES_TRANSFERENCIA
+from app.dominios.consignacao.modelos import COMISSOES_ACERTO, SITUACOES_TRANSFERENCIA, ComissaoParcela
+from app.dominios.consignacao.modelos import Acerto as ModeloAcerto
 from app.dominios.consignacao.modelos import Representante as ModeloRepresentante
+from app.dominios.receber.modelos import TIPOS_COBRANCA
+from app.dominios.vendas.esquemas import ImpressaoCarne
+from app.dominios.vendas.rotas import impressao_carne
 from app.nucleo.contexto import Contexto, exige
 
 router = APIRouter(tags=["consignação"])
 
-# o balcão do consignado escolhe o representante e vê a ficha dele
-Ver = Annotated[Contexto, Depends(exige("representantes.ver", "representantes.editar", "consignacao.transferir"))]
+# o balcão e o caixa do consignado escolhem o representante e veem a ficha dele
+Ver = Annotated[Contexto, Depends(exige("representantes.ver", "representantes.editar", "consignacao.transferir",
+                                        "consignacao.acertar"))]
 Editar = Annotated[Contexto, Depends(exige("representantes.editar"))]
 Limites = Annotated[Contexto, Depends(exige("representantes.limites"))]
 # o funcionário do balcão do consignado
 Transferir = Annotated[Contexto, Depends(exige("consignacao.transferir"))]
+# quem faz o acerto, no caixa do consignado
+Acertar = Annotated[Contexto, Depends(exige("consignacao.acertar"))]
 
 _STATUS = {
     servico.NaoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -172,7 +182,7 @@ def confirmar(transferencia_id: int, dados: Confirmacao, ctx: Transferir) -> Tra
 @router.get("/representantes/{representante_id}/com-ele", response_model=list[ItemComEle])
 def com_ele(representante_id: int, ctx: Ver) -> list[ItemComEle]:
     """O que está com o representante nesta loja, item de transferência a item (o mesmo produto repete se veio em
-    transferências diferentes): é daqui que se escolhe o que volta na devolução."""
+    transferências diferentes): é daqui que se escolhe o que volta na devolução e o que sai no acerto."""
     return [ItemComEle.model_validate(i) for i in servico.com_ele(ctx.db, ctx.empresa_id, representante_id)]
 
 
@@ -246,4 +256,104 @@ def confirmar_devolucao(devolucao_id: int, dados: ConfirmacaoDevolucao, ctx: Tra
             liberacao.login if liberacao else None, liberacao.senha if liberacao else None))
     except servico.ErroConsignacao as e:
         raise _http(ctx, e)
+
+
+_NOMES_COMISSAO = {tipo: nome for tipo, (nome, _) in TIPOS_COBRANCA.items()} | {
+    tipo: nome for tipo, (nome, _) in COMISSOES_ACERTO.items()}
+
+
+def _acerto(ctx: Contexto, acerto: ModeloAcerto) -> Acerto:
+    resposta = Acerto.model_validate(acerto)
+    resposta.nome_comissao = _NOMES_COMISSAO.get(acerto.tipo_comissao, acerto.tipo_comissao)
+    conta = servico.carne_do_acerto(ctx.db, acerto)
+    if conta is not None:
+        comissoes = {c.parcela_id: c.valor for c in ctx.db.query(ComissaoParcela).filter_by(acerto_id=acerto.id)}
+        resposta.conta_id = conta.id
+        resposta.carne = [ParcelaDoAcerto(id=p.id, numero=p.numero, vencimento=p.vencimento, valor=p.valor,
+                                          comissao=comissoes.get(p.id, Decimal("0.00"))) for p in conta.parcelas]
+    return resposta
+
+
+@router.get("/consignacao/acertos", response_model=list[Acerto])
+def acertos(ctx: Ver, representante_id: int | None = None) -> list[Acerto]:
+    return [_acerto(ctx, a) for a in servico.acertos(ctx.db, ctx.empresa_id, representante_id)]
+
+
+@router.post("/consignacao/acertos", response_model=Acerto)
+def abrir_acerto(dados: AcertoNovo, ctx: Acertar) -> Acerto:
+    """Começa o acerto; se o representante já tem um aberto nesta loja, devolve ele."""
+    try:
+        return _acerto(ctx, servico.abrir_acerto(ctx.db, ctx.empresa_id, ctx.usuario, dados.representante_id))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.get("/consignacao/acertos/{acerto_id}", response_model=Acerto)
+def obter_acerto(acerto_id: int, ctx: Ver) -> Acerto:
+    try:
+        return _acerto(ctx, servico.obter_acerto(ctx.db, ctx.empresa_id, acerto_id))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.put("/consignacao/acertos/{acerto_id}", response_model=Acerto)
+def alterar_acerto(acerto_id: int, dados: AcertoDados, ctx: Acertar) -> Acerto:
+    """Para quem (o cliente do representante ou ele), queima, à vista ou a prazo, o tipo de cobrança (que dá o % da
+    comissão), o valor negociado e as parcelas."""
+    try:
+        return _acerto(ctx, servico.alterar_acerto(ctx.db, ctx.empresa_id, acerto_id, dados))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.post("/consignacao/acertos/{acerto_id}/itens", response_model=Acerto)
+def incluir_no_acerto(acerto_id: int, dados: ItemAcertoNovo, ctx: Acertar) -> Acerto:
+    try:
+        return _acerto(ctx, servico.incluir_no_acerto(
+            ctx.db, ctx.empresa_id, acerto_id, dados.item_transferencia_id, dados.quantidade))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.put("/consignacao/acertos/{acerto_id}/itens/{item_id}", response_model=Acerto)
+def alterar_no_acerto(acerto_id: int, item_id: int, dados: QuantidadeDados, ctx: Acertar) -> Acerto:
+    try:
+        return _acerto(ctx, servico.alterar_no_acerto(ctx.db, ctx.empresa_id, acerto_id, item_id, dados.quantidade))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.delete("/consignacao/acertos/{acerto_id}", status_code=status.HTTP_204_NO_CONTENT)
+def descartar_acerto(acerto_id: int, ctx: Acertar) -> Response:
+    try:
+        servico.descartar_acerto(ctx.db, ctx.empresa_id, acerto_id)
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/consignacao/acertos/{acerto_id}/confirmar", response_model=Acerto)
+def confirmar_acerto(acerto_id: int, dados: ConfirmacaoAcerto, ctx: Acertar) -> Acerto:
+    """Fecha o acerto no caixa do consignado: as peças saem do que está com o representante, o pago entra no caixa
+    e o resto vira o carnê. Passando do limite de crédito, 403 com X-Pede-Autorizacao: manda de novo com a
+    `autorizacao` da gerência."""
+    autorizacao = dados.autorizacao
+    try:
+        return _acerto(ctx, servico.confirmar_acerto(
+            ctx.db, ctx.empresa_id, ctx.usuario, ctx.permissoes, acerto_id, dados.sessao_caixa_id, dados.pagamentos,
+            autorizacao.login if autorizacao else None, autorizacao.senha if autorizacao else None))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.get("/consignacao/acertos/{acerto_id}/carne", response_model=ImpressaoCarne)
+def carne_do_acerto(acerto_id: int, ctx: Ver) -> ImpressaoCarne:
+    try:
+        acerto = servico.obter_acerto(ctx.db, ctx.empresa_id, acerto_id)
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+    conta = servico.carne_do_acerto(ctx.db, acerto)
+    if conta is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Este acerto não tem carnê")
+    return impressao_carne(ctx.db, conta, f"acerto {acerto.numero}", acerto.confirmada_em)
 

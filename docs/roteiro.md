@@ -124,7 +124,8 @@ Com o ETL rodando, os relatórios já podem mostrar todas as filiais juntas, ant
 - [x] Representantes: cadastro e importação do VB6 (migração 0038) — 03/11/2026
 - [x] Transferência (saída), com o estoque reservado, o limite, a senha e o comprovante; importação do saldo do VB6 (migração 0039) — 04/11/2026
 - [x] Devolução de consignado: escolhe de qual transferência a peça volta, senha do representante, retificadora, liberação do gerente (migração 0040) — 04/11/2026
-- [ ] Acertos (para cliente e para o representante), com as comissões
+- [x] Acerto (para o cliente do representante e para ele, a prazo e à vista, e o de queima): comissão pelo tipo de cobrança ou pelo jeito de pagar, carnê com a comissão por parcela, limite de crédito, caixa do consignado e comprovante (migração 0041) — 05/11/2026
+- [ ] Comissões do acerto: relatório do que ficou liberado conforme o cliente paga, pagamento ao representante e saldo
 - [ ] NF-e de remessa e de retorno
 - [ ] Relatórios da consignação
 

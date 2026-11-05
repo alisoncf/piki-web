@@ -242,7 +242,12 @@ def carne(venda_id: int, ctx: Ver) -> ImpressaoCarne:
     conta = servico.carne(ctx.db, venda)
     if conta is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Esta venda não tem carnê")
-    loja = ctx.db.get(Empresa, venda.empresa_id)
+    return impressao_carne(ctx.db, conta, f"venda {venda.numero}", venda.recebida_em, venda=venda.numero)
+
+
+def impressao_carne(db, conta, documento: str, data, venda: int | None = None) -> ImpressaoCarne:
+    """O carnê impresso de uma conta (da venda ou do acerto de consignação)."""
+    loja = db.get(Empresa, conta.empresa_id)
     cidade_loja = f"{loja.cidade.nome}/{loja.cidade.uf}" if loja.cidade else None
     cliente = conta.cliente
     setor = cliente.setor
@@ -253,8 +258,9 @@ def carne(venda_id: int, ctx: Ver) -> ImpressaoCarne:
             endereco=_juntar(_juntar(loja.logradouro, loja.numero, loja.complemento, separador=", "),
                              loja.bairro, cidade_loja, separador=" - "),
         ),
-        venda=venda.numero,
-        data=venda.recebida_em,
+        venda=venda,
+        documento=documento,
+        data=data,
         cliente=ClienteDoCarne(
             id=cliente.id, nome=cliente.nome, cpf_cnpj=cliente.cpf_cnpj,
             endereco=_juntar(_juntar(cliente.logradouro, cliente.numero and f"nº {cliente.numero}", cliente.complemento),

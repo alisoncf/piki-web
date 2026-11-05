@@ -1,7 +1,8 @@
 <template>
   <div class="carne">
     <div class="sem-impressao row items-center q-gutter-sm q-pa-md">
-      <q-btn flat no-caps icon="arrow_back" label="Voltar para a venda" :to="{ name: 'venda', params: { id: rota.params.id } }" />
+      <q-btn v-if="acerto" flat no-caps icon="arrow_back" label="Voltar para o acerto" :to="{ name: 'comprovante-acerto', params: { id: rota.params.id } }" />
+      <q-btn v-else flat no-caps icon="arrow_back" label="Voltar para a venda" :to="{ name: 'venda', params: { id: rota.params.id } }" />
       <q-space />
       <q-btn unelevated no-caps color="primary" icon="print" label="Imprimir" :disable="!dados" @click="imprimir" />
     </div>
@@ -13,7 +14,7 @@
         <!-- fica na loja -->
         <div class="canhoto">
           <div class="loja">{{ dados.loja.nome }}</div>
-          <div class="campo"><span>Carnê</span>{{ dados.carne.id }} · venda {{ dados.venda }}</div>
+          <div class="campo"><span>Carnê</span>{{ dados.carne.id }} · {{ dados.documento }}</div>
           <div class="campo"><span>Parcela</span>{{ p.numero }}/{{ dados.carne.parcelas.length }} · nº {{ p.id }}</div>
           <div class="campo"><span>Vencimento</span><strong>{{ data(p.vencimento) }}</strong></div>
           <div class="campo"><span>Valor</span><strong>{{ formatarMoeda(p.valor) }}</strong></div>
@@ -42,7 +43,7 @@
             <div class="campo"><span>Vencimento</span><strong class="destaque">{{ data(p.vencimento) }}</strong></div>
             <div class="campo"><span>Valor da parcela</span><strong class="destaque">{{ formatarMoeda(p.valor) }}</strong></div>
             <div class="campo"><span>Carnê · nº da parcela</span>{{ dados.carne.id }} · {{ p.id }}</div>
-            <div class="campo"><span>Venda</span>{{ dados.venda }} de {{ formatarDataHora(dados.data).slice(0, 10) }}</div>
+            <div class="campo"><span>{{ acerto ? 'Acerto' : 'Venda' }}</span>{{ dados.documento.replace(/^\D+/, '') }} de {{ formatarDataHora(dados.data).slice(0, 10) }}</div>
             <div class="campo"><span>Valor do carnê</span>{{ formatarMoeda(dados.carne.valor) }}</div>
             <div class="campo"><span>Juros de atraso</span>__________</div>
           </div>
@@ -56,7 +57,7 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { api, mensagemDeErro } from '@/servicos/api'
@@ -67,6 +68,8 @@ const dados = ref(null)
 const erro = ref('')
 
 const data = (valor) => formatarDataHora(valor)
+// o mesmo carnê serve à venda e ao acerto de consignação: a rota diz qual
+const acerto = computed(() => rota.name === 'carne-acerto')
 
 function imprimir() {
   window.print()
@@ -74,7 +77,8 @@ function imprimir() {
 
 onMounted(async () => {
   try {
-    dados.value = (await api.get(`/vendas/${rota.params.id}/carne`)).data
+    const url = acerto.value ? `/consignacao/acertos/${rota.params.id}/carne` : `/vendas/${rota.params.id}/carne`
+    dados.value = (await api.get(url)).data
   } catch (e) {
     erro.value = mensagemDeErro(e)
     return

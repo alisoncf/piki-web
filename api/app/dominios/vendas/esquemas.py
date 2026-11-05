@@ -366,7 +366,8 @@ class ImpressaoCarne(BaseModel):
     """O que vai no carnê impresso."""
 
     loja: LojaDoCarne
-    venda: int
+    venda: int | None  # o carnê da venda; o do acerto de consignação não tem
+    documento: str  # "venda 12", "acerto 3"
     data: datetime
     cliente: ClienteDoCarne
     carne: Carne

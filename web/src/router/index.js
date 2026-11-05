@@ -36,6 +36,18 @@ export const rotas = [
     meta: { permissao: ['consignacao.transferir', 'representantes.ver'] },
   },
   {
+    path: '/consignacao/acertos/:id(\\d+)/comprovante',
+    name: 'comprovante-acerto',
+    component: () => import('@/paginas/consignacao/ComprovanteAcertoPagina.vue'),
+    meta: { permissao: ['consignacao.acertar', 'representantes.ver'] },
+  },
+  {
+    path: '/consignacao/acertos/:id(\\d+)/carne',
+    name: 'carne-acerto',
+    component: () => import('@/paginas/vendas/CarnePagina.vue'),
+    meta: { permissao: ['consignacao.acertar', 'representantes.ver'] },
+  },
+  {
     // fora do layout, para imprimir só o carnê
     path: '/vendas/:id(\\d+)/carne',
     name: 'carne',
@@ -255,7 +267,7 @@ export const rotas = [
         path: 'consignacao/transferencias',
         name: 'transferencias',
         component: () => import('@/paginas/consignacao/TransferenciasPagina.vue'),
-        meta: { permissao: ['consignacao.transferir', 'representantes.ver'] },
+        meta: { permissao: ['consignacao.transferir', 'consignacao.acertar', 'representantes.ver'] },
       },
       {
         path: 'consignacao/transferencias/nova',
@@ -268,6 +280,18 @@ export const rotas = [
         name: 'transferencia',
         component: () => import('@/paginas/consignacao/TransferenciaPagina.vue'),
         meta: { permissao: 'consignacao.transferir' },
+      },
+      {
+        path: 'consignacao/acertos/novo',
+        name: 'acerto-novo',
+        component: () => import('@/paginas/consignacao/AcertoPagina.vue'),
+        meta: { permissao: 'consignacao.acertar' },
+      },
+      {
+        path: 'consignacao/acertos/:id(\\d+)',
+        name: 'acerto',
+        component: () => import('@/paginas/consignacao/AcertoPagina.vue'),
+        meta: { permissao: 'consignacao.acertar' },
       },
       {
         path: 'consignacao/devolucoes/nova',

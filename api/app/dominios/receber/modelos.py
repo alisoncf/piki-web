@@ -57,6 +57,7 @@ class ContaReceber(ComDatas, Base):
     empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), index=True)  # a loja que vendeu
     cliente_id: Mapped[int] = mapped_column(ForeignKey("cliente.id"), index=True)
     venda_id: Mapped[int | None] = mapped_column(ForeignKey("venda.id"), unique=True)
+    acerto_id: Mapped[int | None] = mapped_column(ForeignKey("consignacao_acerto.id"), unique=True)
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # soma das parcelas
     historico: Mapped[str] = mapped_column(String(80))
     usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))  # quem lançou (no VB6, pode faltar)
@@ -68,6 +69,7 @@ class ContaReceber(ComDatas, Base):
     usuario: Mapped[Usuario | None] = relationship(lazy="joined")
     empresa: Mapped[Empresa] = relationship(lazy="joined")
     venda: Mapped["Venda | None"] = relationship()  # noqa: F821 (vendas.modelos); só quando pedida
+    acerto: Mapped["Acerto | None"] = relationship()  # noqa: F821 (consignacao.modelos); só quando pedido
     parcelas: Mapped[list["ParcelaReceber"]] = relationship(
         back_populates="conta", cascade="all, delete-orphan", order_by="ParcelaReceber.numero", lazy="selectin"
     )
@@ -79,6 +81,8 @@ class ContaReceber(ComDatas, Base):
             return f"{self.empresa.codigo}-{self.documento_legado}"
         if self.venda is not None:
             return f"{self.empresa.codigo}-venda {self.venda.numero}"
+        if self.acerto is not None:
+            return f"{self.empresa.codigo}-acerto {self.acerto.numero}"
         return str(self.id)
 
 

@@ -68,7 +68,7 @@
             <q-toggle v-model="limites.bloqueia_devolucao" label="Bloquear devolução" :disable="!podeLimites" />
           </div>
           <div class="col-12 col-md-7">
-            <div class="text-caption text-suave q-mb-xs">Comissão por tipo de cobrança (vazio: a padrão do tipo)</div>
+            <div class="text-caption text-suave q-mb-xs">Comissão por tipo de cobrança e no acerto à vista e de queima (vazio: a padrão)</div>
             <div v-for="c in limites.comissoes" :key="c.tipo_cobranca" class="row items-center q-col-gutter-sm q-mb-xs">
               <div class="col">{{ c.nome }}</div>
               <q-input v-model="c.percentual" outlined dense type="number" min="0" max="100" step="0.01" suffix="%" :placeholder="c.padraoDoTipo" class="col-4" :readonly="!podeLimites" />
@@ -126,8 +126,6 @@ import { useSessaoStore } from '@/stores/sessao'
 
 const CAMPOS = ['ativo', 'lembrete', 'lembrete_acerto', 'observacao', 'ultima_conferencia', 'avalista_nome', 'avalista_cpf',
   'avalista_rg', 'avalista_endereco', 'avalista_telefones', 'avalista_anotacoes']
-// as comissões padrão de cada tipo (as mesmas da API), para mostrar no campo vazio
-const PADRAO = { loja: '20', cliente: '15', representante: '20', deposito: '0', boleto: '0' }
 
 const $q = useQuasar()
 const rota = useRoute()
@@ -161,7 +159,7 @@ function mostrar(dadosApi) {
     motivo_bloqueio: dadosApi.motivo_bloqueio ?? '',
     bloqueia_impressao: dadosApi.bloqueia_impressao,
     bloqueia_devolucao: dadosApi.bloqueia_devolucao,
-    comissoes: dadosApi.comissoes.map((c) => ({ ...c, percentual: c.padrao ? '' : c.percentual, padraoDoTipo: PADRAO[c.tipo_cobranca] ?? '' })),
+    comissoes: dadosApi.comissoes.map((c) => ({ ...c, percentual: c.padrao ? '' : c.percentual, padraoDoTipo: String(Number(c.percentual_padrao)) })),
   }
 }
 

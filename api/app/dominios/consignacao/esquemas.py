@@ -1,6 +1,8 @@
 from datetime import date, datetime
 from decimal import Decimal
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.dominios.cidades.esquemas import SetorResumo
@@ -89,6 +91,7 @@ class Comissao(BaseModel):
     nome: str
     percentual: Decimal
     padrao: bool  # vale a do tipo, o representante não tem uma própria
+    percentual_padrao: Decimal
 
 
 class Representante(RepresentanteResumo):
@@ -139,6 +142,7 @@ class RepresentanteDaTransferencia(BaseModel):
     cliente: ClienteDoRepresentante
     bloqueado: bool
     lembrete: str | None
+    lembrete_acerto: str | None
 
 
 class Pessoa(BaseModel):
@@ -272,4 +276,118 @@ class Liberacao(BaseModel):
 
 class ConfirmacaoDevolucao(Confirmacao):
     liberacao: Liberacao | None = Field(default=None, description="O gerente, se a devolução do representante está bloqueada")
+
+
+class AcertoNovo(BaseModel):
+    representante_id: int
+
+
+class AcertoDados(BaseModel):
+    """O que se escolhe no acerto aberto. O % da comissão vem do representante, pelo tipo."""
+
+    para: Literal["cliente", "representante"] = "cliente"
+    cliente_id: int | None = Field(default=None, description="O cliente do representante (no acerto para o cliente)")
+    queima: bool = Field(default=False, description="Só produtos em queima, pelo preço de queima; à vista, para ele")
+    pagamento: Literal["prazo", "vista"] = "prazo"
+    tipo_comissao: str | None = Field(default=None, description=(
+        "A prazo, o tipo de cobrança; à vista, vista_dinheiro, vista_cartao ou vista_parcelado"))
+    negociado: Decimal | None = Field(default=None, max_digits=14, decimal_places=2,
+                                      description="O valor por que o representante vendeu; a diferença fica para ele")
+    parcelas: int = Field(default=1, ge=1, le=36)
+    primeiro_vencimento: date | None = None
+
+
+class ClienteDoAcerto(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    cpf_cnpj: str | None
+
+
+class ItemAcerto(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ordem: int
+    item_transferencia: ItemComEle
+    quantidade: Decimal
+    preco: Decimal
+    total: Decimal
+
+
+class FormaDoPagamento(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+    tipo: str
+
+
+class PagamentoAcerto(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    forma_pagamento: FormaDoPagamento
+    valor: Decimal
+    parcelas: int
+
+
+class ParcelaDoAcerto(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    numero: int
+    vencimento: date
+    valor: Decimal
+    comissao: Decimal = Decimal("0.00")
+
+
+class Acerto(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    numero: int
+    situacao: str
+    representante: RepresentanteDaTransferencia
+    para: str
+    cliente: ClienteDoAcerto | None
+    queima: bool
+    pagamento: str
+    tipo_comissao: str
+    nome_comissao: str = ""
+    percentual: Decimal
+    total_inicial: Decimal
+    diferenca: Decimal
+    negociado: Decimal
+    comissao: Decimal
+    valor: Decimal
+    entrada: Decimal
+    a_prazo: Decimal
+    parcelas: int
+    primeiro_vencimento: date | None
+    atendida_por: Pessoa
+    autorizada_por: Pessoa | None
+    criado_em: datetime
+    confirmada_em: datetime | None
+    itens: list[ItemAcerto]
+    pagamentos: list[PagamentoAcerto]
+    carne: list[ParcelaDoAcerto] = []  # depois de confirmado, as parcelas geradas
+    conta_id: int | None = None
+
+
+class ItemAcertoNovo(BaseModel):
+    item_transferencia_id: int = Field(description="O item de transferência de onde a peça sai (GET .../com-ele)")
+    quantidade: Decimal = Field(default=Decimal("1"), gt=0, max_digits=14, decimal_places=3)
+
+
+class PagamentoDados(BaseModel):
+    forma_pagamento_id: int
+    valor: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    parcelas: int = Field(default=1, ge=1, le=36)
+
+
+class ConfirmacaoAcerto(BaseModel):
+    sessao_caixa_id: int = Field(description="O caixa do consignado, aberto")
+    pagamentos: list[PagamentoDados] = Field(default=[], description="À vista, tudo; a prazo, a entrada (se tiver)")
+    autorizacao: Liberacao | None = Field(default=None, description="A gerência, se o carnê passa do limite")
 

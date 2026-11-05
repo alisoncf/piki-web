@@ -238,7 +238,7 @@ describe('vendas', () => {
     entrar()
     vi.spyOn(api, 'get').mockResolvedValue({
       data: {
-        loja: { nome: 'Loja Ficticia', cnpj: null, endereco: 'Rua A, 1', telefone: null }, venda: 15, data: '2026-11-02T11:00:00',
+        loja: { nome: 'Loja Ficticia', cnpj: null, endereco: 'Rua A, 1', telefone: null }, venda: 15, documento: 'venda 15', data: '2026-11-02T11:00:00',
         cliente: { id: 8, nome: 'Freguesa Ficticia', cpf_cnpj: null, endereco: 'Rua B nº 2', cidade: 'Goiânia/GO' },
         carne: { id: 21, valor: '60.00', parcelas: [{ numero: 1, vencimento: '2026-12-02', valor: '30.00', aberto: '30.00' }, { numero: 2, vencimento: '2027-01-02', valor: '30.00', aberto: '30.00' }] },
       },
@@ -248,6 +248,7 @@ describe('vendas', () => {
     expect(wrapper.findAll('.parcela')).toHaveLength(2)
     expect(wrapper.text()).toContain('02/01/2027')
     expect(wrapper.text()).toContain('2/2')
+    expect(wrapper.text()).toContain('21 · venda 15')
   })
   it('venda a consumidor: o vendedor dá o nome e fecha a venda', async () => {
     entrar(['vendas.vender'])

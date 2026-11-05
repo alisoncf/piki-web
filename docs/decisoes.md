@@ -435,7 +435,7 @@ Devolução (Alison, 04/11/2026; feita no mesmo dia, migração 0040):
 - **Devolução retificadora:** marca a devolução que corrige um produto transferido errado (o retif_dev do VB6), com uma observação; aparece no comprovante e no movimento de estoque.
 - **Bloquear devolução:** com ele ligado no representante, a confirmação pede o login e a senha de quem tem `consignacao.liberar` (o gerente), como no desconto da venda; a devolução guarda quem liberou. O bloqueio de impressão vai usar a mesma permissão quando houver as impressões do consignado.
 
-Acerto (Alison, 04/11/2026, em levantamento):
+Acerto (Alison, 04 e 05/11/2026; feito em 05/11/2026, migração 0041):
 
 - **Para o cliente do representante:** gera o carnê no nome do cliente, como na venda. O representante pode ter vendido por mais: a **diferença** (valor negociado menos o preço da transferência) fica para ele; há um relatório de diferenças de acertos.
 - **Para o próprio representante:** as peças ficaram com algum cliente, mas ele assume a dívida, como se tivesse comprado e revendido; a comissão é maior porque ele assume o risco. O bloqueado só acerta para si à vista.
@@ -444,6 +444,15 @@ Acerto (Alison, 04/11/2026, em levantamento):
 - **Queima:** acerto só de produtos promocionais, em queima.
 - **Lembrete do acerto** do representante: importante, aparece ao acertar.
 - O que o código do VB6 (`frmAcerto`) mostra: comissão = % do tipo de cobrança do representante × total dos itens pelo preço da transferência + a diferença; para o cliente, o carnê é o valor negociado; para o representante, a comissão vira desconto (o carnê dele é o valor negociado menos a comissão). No acerto promocional (queima), a comissão é 5%. A comissão é dividida pelas parcelas (`tab_comissparc`), uma parte por parcela. Exemplo (acerto 0189592): itens R$ 2.504,00, negociado R$ 2.541,00, diferença e comissão R$ 37,00 (a comissão do representante na cobrança no cliente era 0%), carnê em 7 × R$ 363,00.
+- **Respostas de 05/11/2026:** a comissão do acerto para o próprio representante é descontada na hora, no carnê dele. O acerto de queima é pelo **preço de queima**. **Sem cheques**: o cheque pré-datado vira parcela do carnê. O acerto **respeita o limite de crédito** e o bloqueio de quem paga (o cliente, ou o representante como cliente), como o crediário da venda: acima do limite, só com a gerência (`vendas.autorizar`). **Não sai nota fiscal** no acerto (nos raríssimos casos em que precisa, faz-se uma venda; a ver depois). **O acerto não pede a senha do representante.** A comissão do acerto para o cliente vai ficando liberada conforme o cliente paga as parcelas; a loja tira o relatório, paga ao representante e baixa o valor pago, e o resto fica de **saldo** (o relatório e a baixa ficam para depois do acerto).
+- Como ficou:
+  - O acerto é montado no balcão (aberto, um por representante, como a devolução) e confirmado no caixa do consignado (o caixa deste computador, aberto): as peças saem do item de transferência escolhido (o mesmo produto aparece uma vez por transferência), do que está com ele e da loja (movimento "Acerto de consignação": quantidade e reservado baixam).
+  - **Para o cliente:** só a prazo (como no VB6), com entrada opcional; o carnê é o valor negociado menos a entrada, no nome do cliente, com o tipo de cobrança escolhido. A comissão é dividida em partes iguais pelas parcelas e guardada por parcela, para o relatório de comissões.
+  - **Para o representante:** a prazo (o carnê no nome dele, pela ficha de cliente dele) ou à vista; a comissão vira desconto, e a diferença não muda o que ele paga.
+  - O **% da comissão** vem da ficha do representante: a prazo, pelo tipo de cobrança; **à vista, pelo jeito que ele paga**: dinheiro ou PIX 25%, cartão à vista 20%, cartão parcelado 15% (no VB6, o `txdescontoavista_par` e dois números no código); **queima, 5%**. Esses quatro entraram na lista de comissões da ficha, com a padrão de cada um, e podem ser mudados por representante. O pagamento à vista tem que ser feito do jeito escolhido (no dinheiro, PIX ou depósito; no cartão à vista, em 1x; no parcelado, no crédito em mais de 1x).
+  - **Queima** só para o próprio representante e à vista, como no VB6 (os acertos de queima do VB6 são todos assim); só produtos com preço de queima.
+  - O que entra no caixa: cada pagamento e, no a prazo, o carnê na forma Crediário (como na venda), com o documento "acerto N". O comprovante mostra as peças, o negociado, a diferença, a comissão (ou o desconto) e as duplicatas, com a assinatura do representante; o carnê do acerto usa a mesma impressão do carnê da venda.
+  - Permissão nova `consignacao.acertar`. O lembrete do acerto aparece em destaque na tela.
 
 ## Substituídas
 
