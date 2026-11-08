@@ -44,6 +44,7 @@ MOTIVOS_AUTOMATICOS = {
     "crediario": ("entrada", "Recebimento de crediário"),
     "cancelamento_venda": ("saida", "Cancelamento de venda"),
     "acerto": ("entrada", "Acerto de consignação"),
+    "comissao_consignado": ("saida", "Comissão de representante"),
 }
 
 ABERTO = "aberto"

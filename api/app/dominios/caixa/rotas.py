@@ -37,7 +37,7 @@ def _sessao(ctx: Contexto, sessao: SessaoCaixa) -> Sessao:
 @router.get("/formas-pagamento", response_model=list[Forma])
 def listar_formas(
     ctx: Annotated[Contexto, Depends(exige("caixa.operar", "caixa.conferir", "caixa.configurar", "vendas.vender", "vendas.ver",
-                                                   "consignacao.acertar"))],
+                                                   "consignacao.acertar", "consignacao.pagar_comissao"))],
     so_ativas: bool = False,
 ) -> list[Forma]:
     return [Forma.model_validate(f) for f in servico.listar_formas(ctx.db, so_ativas)]
@@ -66,7 +66,7 @@ def alterar_forma(forma_id: int, dados: FormaDados, ctx: Configurar) -> Forma:
 
 @router.get("/caixas", response_model=list[Caixa])
 def listar_caixas(ctx: Annotated[Contexto, Depends(exige("caixa.operar", "caixa.conferir", "caixa.configurar",
-                                                         "consignacao.acertar"))]) -> list[Caixa]:
+                                                         "consignacao.acertar", "consignacao.pagar_comissao"))]) -> list[Caixa]:
     """Os caixas da loja ativa, com a sessão aberta de cada um."""
     resposta = []
     for caixa, sessao in servico.listar_caixas(ctx.db, ctx.empresa_id):

@@ -454,6 +454,15 @@ Acerto (Alison, 04 e 05/11/2026; feito em 05/11/2026, migração 0041):
   - O que entra no caixa: cada pagamento e, no a prazo, o carnê na forma Crediário (como na venda), com o documento "acerto N". O comprovante mostra as peças, o negociado, a diferença, a comissão (ou o desconto) e as duplicatas, com a assinatura do representante; o carnê do acerto usa a mesma impressão do carnê da venda.
   - Permissão nova `consignacao.acertar`. O lembrete do acerto aparece em destaque na tela.
 
+Comissões do acerto (Alison, 05 e 08/11/2026; feito em 08/11/2026, migração 0042):
+
+- Na `tab_comissparc`, `status_com` 1 é em aberto e 2 é pago. **A comissão fica liberada no vencimento da parcela**, pague o cliente ou não, como o relatório do VB6 filtra. **O Alison vai confirmar essa regra**, que pode mudar: ela está só em `_liberada()`, no serviço da consignação.
+- O saldo só baixa quando a loja paga de verdade: dá-se baixa no valor pago e sai do caixa deste computador (dinheiro, PIX ou depósito; motivo "Comissão de representante"). O pagamento pode ser parcial; o que falta fica de saldo.
+- A baixa vale para as comissões liberadas do **período filtrado no relatório**, das mais antigas para as mais novas. O VB6 baixava linha a linha, inteira; aqui a linha pode ficar parcial.
+- O pagamento errado se desfaz enquanto o caixa estiver aberto: o valor volta e as comissões voltam ao saldo. Os do VB6 não se desfazem.
+- Permissões novas: `consignacao.comissoes` (ver) e `consignacao.pagar_comissao` (pagar e desfazer).
+- **Histórico do VB6:** vem tudo (`python -m etl comissoes`), pagas e em aberto, como estão lá, com um pagamento por lançamento de caixa. Os acertos antigos não vêm: número, data, cliente e parcela ficam na própria comissão. As linhas em aberto entram no saldo, inclusive as muito antigas, em que a baixa quase não foi usada (com vencimento desde 2025, 58.408 linhas em aberto e 647 pagas na matriz).
+
 ## Substituídas
 
 - **D2.** ~~FastAPI + Vue/Quasar sobre o banco atual~~. A stack continua, mas o banco passou a ser novo. Substituída pela D8 em 30/10/2026.

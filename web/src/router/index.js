@@ -36,6 +36,12 @@ export const rotas = [
     meta: { permissao: ['consignacao.transferir', 'representantes.ver'] },
   },
   {
+    path: '/consignacao/comissoes/pagamentos/:id(\\d+)',
+    name: 'comprovante-comissao',
+    component: () => import('@/paginas/consignacao/ComprovanteComissaoPagina.vue'),
+    meta: { permissao: ['consignacao.comissoes', 'consignacao.pagar_comissao'] },
+  },
+  {
     path: '/consignacao/acertos/:id(\\d+)/comprovante',
     name: 'comprovante-acerto',
     component: () => import('@/paginas/consignacao/ComprovanteAcertoPagina.vue'),
@@ -280,6 +286,12 @@ export const rotas = [
         name: 'transferencia',
         component: () => import('@/paginas/consignacao/TransferenciaPagina.vue'),
         meta: { permissao: 'consignacao.transferir' },
+      },
+      {
+        path: 'consignacao/comissoes',
+        name: 'comissoes',
+        component: () => import('@/paginas/consignacao/ComissoesPagina.vue'),
+        meta: { permissao: ['consignacao.comissoes', 'consignacao.pagar_comissao'] },
       },
       {
         path: 'consignacao/acertos/novo',

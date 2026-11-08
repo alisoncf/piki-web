@@ -57,6 +57,7 @@ export const MENU = [
       { titulo: 'Transferência', icone: 'move_up', rota: '/consignacao/transferencias/nova', permissao: 'consignacao.transferir' },
       { titulo: 'Devolução', icone: 'move_down', rota: '/consignacao/devolucoes/nova', permissao: 'consignacao.transferir' },
       { titulo: 'Acerto', icone: 'handshake', rota: '/consignacao/acertos/novo', permissao: 'consignacao.acertar' },
+      { titulo: 'Comissões', icone: 'payments', rota: '/consignacao/comissoes', permissao: ['consignacao.comissoes', 'consignacao.pagar_comissao'] },
       { titulo: 'Transferências, devoluções e acertos', icone: 'list_alt', rota: '/consignacao/transferencias', permissao: ['consignacao.transferir', 'consignacao.acertar', 'representantes.ver'] },
       { titulo: 'Representantes', icone: 'badge', rota: '/consignacao/representantes', permissao: ['representantes.ver', 'representantes.editar', 'consignacao.transferir', 'consignacao.acertar'] },
     ],

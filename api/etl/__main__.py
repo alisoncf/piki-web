@@ -11,6 +11,7 @@
     python -m etl notas --origem "mysql+pymysql://..." --empresa 01
     python -m etl representantes --origem "mysql+pymysql://..." --empresa 01 (depois dos clientes)
     python -m etl consignado --origem "mysql+pymysql://..." --empresa 01 (depois dos representantes e do estoque)
+    python -m etl comissoes --origem "mysql+pymysql://..." --empresa 01 --avisos avisos-comissoes-01.txt (depois dos representantes e do receber)
     python -m etl produtos --origem "mysql+pymysql://.../requinte" --empresa 01 --outras "mysql+pymysql://.../requintejun"
 
 Para um MariaDB local em que o root entra pela autenticação do Windows (sem
@@ -30,6 +31,7 @@ import app.registro_modelos  # noqa: F401 (todos os modelos, para as relações 
 from app.nucleo.banco import engine
 from etl.caixa import importar_caixa
 from etl.clientes import importar_clientes
+from etl.comissoes import importar_comissoes
 from etl.consignado import importar_consignado
 from etl.empresas import ConflitoEmpresa, importar_empresas
 from etl.fornecedores import importar_fornecedores
@@ -99,6 +101,10 @@ def main(argv: list[str] | None = None) -> None:
     cg = sub.add_parser("consignado", help="o que está com cada representante (depois dos representantes e do estoque)")
     cg.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
     cg.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
+    cm = sub.add_parser("comissoes", help="as comissões dos acertos e os pagamentos, todo o histórico (depois dos representantes e do receber)")
+    cm.add_argument("--origem", required=True, help="URL SQLAlchemy do banco do VB6")
+    cm.add_argument("--empresa", required=True, help="código da empresa (cod_emp) dona deste banco")
+    cm.add_argument("--avisos", help="arquivo para gravar todos os avisos (na tela saem só os primeiros)")
     args = p.parse_args(argv)
     # no Windows a saída redirecionada usa cp1252, que não tem os caracteres estranhos de alguns nomes antigos
     sys.stdout.reconfigure(encoding="utf-8")
@@ -190,6 +196,12 @@ def main(argv: list[str] | None = None) -> None:
                 print(f"representantes com consignado: {r.representantes}, itens: {r.itens}, peças: {r.pecas.normalize():f}, "
                       f"R$ {r.valor} pelo preço da transferência")
                 _avisos(r.avisos, None)
+            elif args.comando == "comissoes":
+                r = importar_comissoes(conexao, db, args.empresa)
+                print(f"comissões novas: {r.novas}, atualizadas: {r.atualizadas}, baixadas agora: {r.baixadas}, pagamentos novos: {r.pagamentos}")
+                print(f"em aberto: {r.em_aberto} linhas, R$ {r.valor_em_aberto}; pagas: R$ {r.valor_pago}")
+                print(f"de representante não importado: {r.sem_representante}; sem vencimento: {r.sem_vencimento}")
+                _avisos(r.avisos, args.avisos)
             elif args.comando == "notas":
                 r = importar_numeracao(conexao, db, args.empresa)
                 for linha in r.series:

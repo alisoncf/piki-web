@@ -391,3 +391,54 @@ class ConfirmacaoAcerto(BaseModel):
     pagamentos: list[PagamentoDados] = Field(default=[], description="À vista, tudo; a prazo, a entrada (se tiver)")
     autorizacao: Liberacao | None = Field(default=None, description="A gerência, se o carnê passa do limite")
 
+
+class LinhaComissao(BaseModel):
+    id: int
+    acerto: str | None
+    data_acerto: date | None
+    cliente: str | None
+    parcela: str | None
+    vencimento: date
+    valor_parcela: Decimal | None
+    falta_na_parcela: Decimal | None  # só das parcelas que estão no sistema
+    valor: Decimal
+    pago: Decimal
+    situacao: str
+    liberada: bool
+
+
+class RelatorioComissoes(BaseModel):
+    comissao: Decimal
+    pago: Decimal
+    liberado: Decimal  # o saldo que já pode ser pago
+    a_vencer: Decimal
+    quantas: int  # as linhas do filtro; a lista vem limitada
+    linhas: list[LinhaComissao]
+
+
+class PagamentoComissaoDados(BaseModel):
+    valor: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    forma_pagamento_id: int
+    sessao_caixa_id: int
+    de: date | None = None  # o período do relatório: só baixa as comissões dele
+    ate: date | None = None
+
+
+class PagamentoComissao(BaseModel):
+    id: int
+    data_hora: datetime
+    valor: Decimal
+    forma: str | None
+    usuario: str | None
+    estornado_em: datetime | None
+    estornado_por: str | None
+    do_vb6: bool
+
+
+class LinhaDoPagamento(LinhaComissao):
+    baixado: Decimal
+
+
+class ComprovanteComissao(PagamentoComissao):
+    representante: RepresentanteResumo
+    linhas: list[LinhaDoPagamento]

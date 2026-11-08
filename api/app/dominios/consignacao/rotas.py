@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
@@ -5,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.dominios.consignacao import servico
 from app.dominios.consignacao.esquemas import Acerto, AcertoDados, AcertoNovo, ConfirmacaoAcerto, ItemAcertoNovo
-from app.dominios.consignacao.esquemas import ParcelaDoAcerto
+from app.dominios.consignacao.esquemas import (
+    ComprovanteComissao, PagamentoComissao, PagamentoComissaoDados, ParcelaDoAcerto, RelatorioComissoes,
+)
 from app.dominios.consignacao.esquemas import (
     Confirmacao, ConfirmacaoDevolucao, Devolucao, DevolucaoDados, DevolucaoNova, ItemComEle, ItemDevolucaoNovo, ItemNovo,
     LimitesDados, Posicao, QuantidadeDados, Representante, RepresentanteDados, RepresentanteNovo, RepresentanteResumo,
@@ -13,6 +16,7 @@ from app.dominios.consignacao.esquemas import (
 )
 from app.dominios.consignacao.modelos import COMISSOES_ACERTO, SITUACOES_TRANSFERENCIA, ComissaoParcela
 from app.dominios.consignacao.modelos import Acerto as ModeloAcerto
+from app.dominios.consignacao.modelos import PagamentoComissao as ModeloPagamentoComissao
 from app.dominios.consignacao.modelos import Representante as ModeloRepresentante
 from app.dominios.receber.modelos import TIPOS_COBRANCA
 from app.dominios.vendas.esquemas import ImpressaoCarne
@@ -23,13 +27,15 @@ router = APIRouter(tags=["consignação"])
 
 # o balcão e o caixa do consignado escolhem o representante e veem a ficha dele
 Ver = Annotated[Contexto, Depends(exige("representantes.ver", "representantes.editar", "consignacao.transferir",
-                                        "consignacao.acertar"))]
+                                        "consignacao.acertar", "consignacao.comissoes", "consignacao.pagar_comissao"))]
 Editar = Annotated[Contexto, Depends(exige("representantes.editar"))]
 Limites = Annotated[Contexto, Depends(exige("representantes.limites"))]
 # o funcionário do balcão do consignado
 Transferir = Annotated[Contexto, Depends(exige("consignacao.transferir"))]
 # quem faz o acerto, no caixa do consignado
 Acertar = Annotated[Contexto, Depends(exige("consignacao.acertar"))]
+VerComissoes = Annotated[Contexto, Depends(exige("consignacao.comissoes", "consignacao.pagar_comissao"))]
+PagarComissao = Annotated[Contexto, Depends(exige("consignacao.pagar_comissao"))]
 
 _STATUS = {
     servico.NaoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -357,3 +363,56 @@ def carne_do_acerto(acerto_id: int, ctx: Ver) -> ImpressaoCarne:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Este acerto não tem carnê")
     return impressao_carne(ctx.db, conta, f"acerto {acerto.numero}", acerto.confirmada_em)
 
+
+def _pagamento_comissao(pagamento: ModeloPagamentoComissao) -> dict:
+    return {"id": pagamento.id, "data_hora": pagamento.data_hora, "valor": pagamento.valor,
+            "forma": pagamento.forma_pagamento.nome if pagamento.forma_pagamento else None,
+            "usuario": pagamento.usuario.nome if pagamento.usuario else None, "estornado_em": pagamento.estornado_em,
+            "estornado_por": pagamento.estornado_por.nome if pagamento.estornado_por else None,
+            "do_vb6": pagamento.lancamento_id is None}
+
+
+@router.get("/representantes/{representante_id}/comissoes", response_model=RelatorioComissoes)
+def relatorio_comissoes(representante_id: int, ctx: VerComissoes, de: date | None = None, ate: date | None = None,
+                        so_abertas: bool = True) -> RelatorioComissoes:
+    try:
+        return RelatorioComissoes(**servico.relatorio_comissoes(ctx.db, ctx.empresa_id, representante_id, de, ate, so_abertas))
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+
+
+@router.get("/representantes/{representante_id}/comissoes/pagamentos", response_model=list[PagamentoComissao])
+def pagamentos_de_comissao(representante_id: int, ctx: VerComissoes) -> list[PagamentoComissao]:
+    return [PagamentoComissao(**_pagamento_comissao(p))
+            for p in servico.pagamentos_de_comissao(ctx.db, ctx.empresa_id, representante_id)]
+
+
+@router.post("/representantes/{representante_id}/comissoes/pagamentos", response_model=PagamentoComissao,
+             status_code=status.HTTP_201_CREATED)
+def pagar_comissao(representante_id: int, dados: PagamentoComissaoDados, ctx: PagarComissao) -> PagamentoComissao:
+    try:
+        pagamento = servico.pagar_comissao(ctx.db, ctx.empresa_id, ctx.usuario, representante_id, dados.valor,
+                                           dados.forma_pagamento_id, dados.sessao_caixa_id, dados.de, dados.ate)
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+    return PagamentoComissao(**_pagamento_comissao(pagamento))
+
+
+@router.get("/consignacao/comissoes/pagamentos/{pagamento_id}", response_model=ComprovanteComissao)
+def comprovante_comissao(pagamento_id: int, ctx: VerComissoes) -> ComprovanteComissao:
+    try:
+        pagamento = servico.obter_pagamento_comissao(ctx.db, ctx.empresa_id, pagamento_id)
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+    return ComprovanteComissao(**_pagamento_comissao(pagamento),
+                               representante=RepresentanteResumo.model_validate(pagamento.representante),
+                               linhas=servico.linhas_do_pagamento(ctx.db, pagamento))
+
+
+@router.post("/consignacao/comissoes/pagamentos/{pagamento_id}/estornar", response_model=PagamentoComissao)
+def estornar_pagamento_comissao(pagamento_id: int, ctx: PagarComissao) -> PagamentoComissao:
+    try:
+        pagamento = servico.estornar_pagamento_comissao(ctx.db, ctx.empresa_id, ctx.usuario, pagamento_id)
+    except servico.ErroConsignacao as e:
+        raise _http(ctx, e)
+    return PagamentoComissao(**_pagamento_comissao(pagamento))

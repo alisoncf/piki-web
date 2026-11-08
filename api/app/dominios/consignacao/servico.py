@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.dominios.caixa import servico as caixa
@@ -13,13 +13,13 @@ from app.dominios.acesso import servico as acesso
 from app.dominios.acesso.modelos import Usuario
 from app.dominios.consignacao.modelos import (
     A_PRAZO, A_VISTA, ABERTA, COMISSOES_ACERTO, COMISSOES_PADRAO, CONFIRMADA, PARA_CLIENTE, PARA_REPRESENTANTE, Acerto,
-    ComissaoParcela, ComissaoRepresentante, Devolucao, ItemAcerto, ItemDevolucao, ItemTransferencia, PagamentoAcerto,
-    Representante, Transferencia,
+    BaixaComissao, ComissaoParcela, ComissaoRepresentante, Devolucao, ItemAcerto, ItemDevolucao, ItemTransferencia,
+    PagamentoAcerto, PagamentoComissao, Representante, Transferencia,
 )
 from app.dominios.estoque import servico as estoque
 from app.dominios.produtos.modelos import Produto
 from app.dominios.receber import servico as contas
-from app.dominios.receber.modelos import TIPOS_COBRANCA, ContaReceber
+from app.dominios.receber.modelos import TIPOS_COBRANCA, ContaReceber, ParcelaReceber
 from app.nucleo.documentos import cpf_valido, so_digitos
 from app.nucleo.seguranca import conferir_hash, gerar_hash
 from app.nucleo.textos import moeda
@@ -758,8 +758,9 @@ def confirmar_acerto(db: Session, empresa_id: int, usuario: Usuario, permissoes:
         if acerto.para == PARA_CLIENTE and acerto.comissao > 0:
             db.flush()
             for parcela, parte in zip(conta.parcelas, contas.dividir(acerto.comissao, len(conta.parcelas))):
-                db.add(ComissaoParcela(acerto_id=acerto.id, representante_id=representante.id, parcela_id=parcela.id,
-                                       valor=parte))
+                db.add(ComissaoParcela(empresa_id=empresa_id, acerto_id=acerto.id, representante_id=representante.id,
+                                       parcela_id=parcela.id, vencimento=parcela.vencimento, valor=parte,
+                                       pago=Decimal("0.00")))
     for forma, valor in lancamentos:
         db.add(LancamentoCaixa(sessao_id=sessao.id, tipo="entrada", motivo="acerto", forma_pagamento_id=forma.id,
                                valor=valor, documento=documento_caixa, usuario_id=usuario.id))
@@ -768,3 +769,149 @@ def confirmar_acerto(db: Session, empresa_id: int, usuario: Usuario, permissoes:
     db.commit()
     return acerto
 
+
+# comissões do acerto
+
+def _liberada():
+    """Quando a comissão pode ser paga: hoje, no vencimento da parcela, pague o cliente ou não. O Alison vai confirmar;
+    se mudar, é aqui."""
+    return ComissaoParcela.vencimento <= date.today()
+
+
+def _do_filtro(empresa_id: int, representante_id: int, de: date | None, ate: date | None) -> list:
+    filtro = [ComissaoParcela.empresa_id == empresa_id, ComissaoParcela.representante_id == representante_id]
+    if de:
+        filtro.append(ComissaoParcela.vencimento >= de)
+    if ate:
+        filtro.append(ComissaoParcela.vencimento <= ate)
+    return filtro
+
+
+def _linhas_de_comissao(db: Session, filtro: list, limite: int | None = None) -> list[dict]:
+    """As linhas do relatório: do acerto e da parcela, ou o que veio do VB6."""
+    consulta = (select(ComissaoParcela, Acerto.numero, Acerto.confirmada_em, Acerto.parcelas, Cliente.nome,
+                       ParcelaReceber.numero, ParcelaReceber.valor, ParcelaReceber.aberto)
+                .outerjoin(Acerto, Acerto.id == ComissaoParcela.acerto_id)
+                .outerjoin(Cliente, Cliente.id == Acerto.cliente_id)
+                .outerjoin(ParcelaReceber, ParcelaReceber.id == ComissaoParcela.parcela_id)
+                .where(*filtro).order_by(ComissaoParcela.vencimento, ComissaoParcela.id).limit(limite))
+    hoje = date.today()
+    linhas = []
+    for c, numero, confirmada, parcelas, cliente, parcela, valor_parcela, aberto in db.execute(consulta):
+        linhas.append({
+            "id": c.id, "acerto": str(numero) if numero else c.acerto_legado,
+            "data_acerto": confirmada.date() if confirmada else c.data_acerto_legado,
+            "cliente": cliente or c.cliente_legado, "parcela": c.parcela_legado or (f"{parcela}/{parcelas}" if parcela else None),
+            "vencimento": c.vencimento, "valor_parcela": c.valor_parcela_legado if numero is None else valor_parcela,
+            "falta_na_parcela": aberto, "valor": c.valor, "pago": c.pago, "situacao": c.situacao,
+            "liberada": c.vencimento <= hoje,
+        })
+    return linhas
+
+
+def relatorio_comissoes(db: Session, empresa_id: int, representante_id: int, de: date | None = None,
+                        ate: date | None = None, so_abertas: bool = True, limite: int = 2000) -> dict:
+    obter(db, representante_id)
+    filtro = _do_filtro(empresa_id, representante_id, de, ate)
+    resto = ComissaoParcela.valor - ComissaoParcela.pago
+    if so_abertas:
+        contagem = func.count(case((ComissaoParcela.pago != ComissaoParcela.valor, 1)))
+    else:
+        contagem = func.count()
+    total, pago, liberado, a_vencer, quantas = db.execute(select(
+        func.coalesce(func.sum(ComissaoParcela.valor), 0), func.coalesce(func.sum(ComissaoParcela.pago), 0),
+        func.coalesce(func.sum(case((_liberada(), resto), else_=0)), 0),
+        func.coalesce(func.sum(case((_liberada(), 0), else_=resto)), 0),
+        contagem,
+    ).where(*filtro)).one()
+    if so_abertas:
+        filtro.append(ComissaoParcela.pago != ComissaoParcela.valor)
+    total, pago, liberado, a_vencer = (_centavos(Decimal(v)) for v in (total, pago, liberado, a_vencer))
+    return {"comissao": total, "pago": pago, "liberado": liberado, "a_vencer": a_vencer, "quantas": quantas,
+            "linhas": _linhas_de_comissao(db, filtro, limite)}
+
+
+def pagar_comissao(db: Session, empresa_id: int, usuario: Usuario, representante_id: int, valor: Decimal,
+                   forma_pagamento_id: int, sessao_caixa_id: int, de: date | None = None,
+                   ate: date | None = None) -> PagamentoComissao:
+    """Dá baixa no valor pago, nas comissões liberadas do período do relatório, das mais antigas para as mais novas: o
+    que não foi pago fica de saldo. Sai do caixa."""
+    representante = obter(db, representante_id)
+    try:
+        sessao = caixa.obter_sessao(db, empresa_id, sessao_caixa_id)
+    except caixa.NaoEncontrado as e:
+        raise DadoInvalido(str(e))
+    if sessao.situacao != ABERTO:
+        raise DadoInvalido(f"O caixa {sessao.caixa.nome} está fechado")
+    forma = db.get(FormaPagamento, forma_pagamento_id)
+    if forma is None or forma.tipo not in FORMAS_DA_COMISSAO["vista_dinheiro"]:
+        raise DadoInvalido("A comissão é paga em dinheiro, PIX ou depósito")
+    linhas = list(db.scalars(select(ComissaoParcela).where(
+        *_do_filtro(empresa_id, representante_id, de, ate), _liberada(), ComissaoParcela.pago != ComissaoParcela.valor,
+    ).order_by(ComissaoParcela.vencimento, ComissaoParcela.id).with_for_update()))
+    disponivel = sum((c.valor - c.pago for c in linhas), Decimal("0.00"))
+    if valor > disponivel:
+        raise DadoInvalido(f"O valor passa do saldo liberado no período, {moeda(max(disponivel, Decimal('0.00')))}")
+
+    pagamento = PagamentoComissao(empresa_id=empresa_id, representante_id=representante.id, data_hora=datetime.now(),
+                                  valor=valor, forma_pagamento_id=forma.id, usuario_id=usuario.id)
+    db.add(pagamento)
+    db.flush()
+    # as linhas negativas (do VB6) já estão descontadas do saldo: baixam primeiro e somam ao que há para baixar
+    negativas = [c for c in linhas if c.valor < c.pago]
+    falta = valor + sum((c.pago - c.valor for c in negativas), Decimal("0.00"))
+    for comissao in negativas + [c for c in linhas if c.valor > c.pago]:
+        resto = comissao.valor - comissao.pago
+        parte = resto if resto < 0 else min(resto, falta)
+        if resto > 0:
+            falta -= parte
+        if parte:
+            comissao.pago += parte
+            pagamento.baixas.append(BaixaComissao(comissao_id=comissao.id, valor=parte))
+    lancamento = LancamentoCaixa(sessao_id=sessao.id, tipo="saida", motivo="comissao_consignado", forma_pagamento_id=forma.id,
+                                 valor=valor, historico=f"Comissão {representante.codigo} {representante.cliente.nome}"[:80],
+                                 documento=f"comissão {pagamento.id}", usuario_id=usuario.id)
+    db.add(lancamento)
+    db.flush()
+    pagamento.lancamento_id = lancamento.id
+    db.commit()
+    return pagamento
+
+
+def pagamentos_de_comissao(db: Session, empresa_id: int, representante_id: int, limite: int = 200) -> list[PagamentoComissao]:
+    return list(db.scalars(select(PagamentoComissao).where(
+        PagamentoComissao.empresa_id == empresa_id, PagamentoComissao.representante_id == representante_id,
+    ).order_by(PagamentoComissao.data_hora.desc(), PagamentoComissao.id.desc()).limit(limite)))
+
+
+def obter_pagamento_comissao(db: Session, empresa_id: int, pagamento_id: int) -> PagamentoComissao:
+    pagamento = db.get(PagamentoComissao, pagamento_id)
+    if pagamento is None or pagamento.empresa_id != empresa_id:
+        raise NaoEncontrado("Pagamento não encontrado")
+    return pagamento
+
+
+def linhas_do_pagamento(db: Session, pagamento: PagamentoComissao) -> list[dict]:
+    """As comissões que o pagamento baixou, com quanto de cada uma."""
+    baixas = {b.comissao_id: b.valor for b in pagamento.baixas}
+    return [linha | {"baixado": baixas[linha["id"]]}
+            for linha in _linhas_de_comissao(db, [ComissaoParcela.id.in_(baixas)])]
+
+
+def estornar_pagamento_comissao(db: Session, empresa_id: int, usuario: Usuario, pagamento_id: int) -> PagamentoComissao:
+    """O pagamento errado: o valor volta ao caixa, se ele ainda estiver aberto, e as comissões voltam ao saldo."""
+    pagamento = obter_pagamento_comissao(db, empresa_id, pagamento_id)
+    if pagamento.estornado_em is not None:
+        raise DadoInvalido("Este pagamento já foi desfeito")
+    lancamento = db.get(LancamentoCaixa, pagamento.lancamento_id) if pagamento.lancamento_id else None
+    if lancamento is None:
+        raise DadoInvalido("Pagamento feito no VB6: não dá para desfazer aqui")
+    if lancamento.sessao.situacao != ABERTO:
+        raise DadoInvalido("O caixa deste pagamento já foi fechado: não dá para desfazer")
+    agora = datetime.now()
+    for baixa in pagamento.baixas:
+        baixa.comissao.pago -= baixa.valor
+    lancamento.estornado_em, lancamento.estornado_por_id = agora, usuario.id
+    pagamento.estornado_em, pagamento.estornado_por_id = agora, usuario.id
+    db.commit()
+    return pagamento

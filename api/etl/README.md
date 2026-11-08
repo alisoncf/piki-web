@@ -143,3 +143,12 @@ Decisão D26. Lê `tab_formaspag` e `tab_caixas` de cada loja.
 | Importação do estoque de cada loja (`estoque.py`) | pronta, com testes |
 | Importação das formas de pagamento e caixas (`caixa.py`) | pronta, com testes |
 | Demais domínios | acompanham as ondas do roteiro |
+
+## Comissões dos acertos
+
+Decisão D30. `python -m etl comissoes --origem ... --empresa 01 --avisos avisos.txt`, depois dos representantes e das contas a receber.
+
+- Vem todo o histórico da `tab_comissparc`, para consulta: as linhas pagas e as em aberto, como estão no VB6, e um pagamento por lançamento de caixa (`seq_cai`).
+- Os acertos antigos não vêm: o número, a data, o cliente e a parcela ficam na própria comissão.
+- As linhas em aberto entram no saldo do representante, inclusive as muito antigas. Para pagar só o que é recente, filtre o período no relatório: a baixa respeita o período.
+- Rodar de novo acrescenta o que é novo e dá baixa no que foi pago no VB6 depois; o que já foi pago no sistema novo não é mexido.

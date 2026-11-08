@@ -45,6 +45,8 @@ PERMISSOES: dict[str, str] = {
     "representantes.limites": "Alterar o limite, o bloqueio e as comissões dos representantes",
     "consignacao.transferir": "Atender o representante no balcão do consignado: transferências e devoluções (e ver o que está com ele)",
     "consignacao.acertar": "Fazer o acerto do representante no caixa do consignado (para o cliente dele ou para ele)",
+    "consignacao.comissoes": "Ver o relatório de comissões dos representantes e os pagamentos feitos",
+    "consignacao.pagar_comissao": "Pagar a comissão ao representante, saindo do caixa, e desfazer o pagamento",
     "consignacao.liberar": "Liberar a devolução e a impressão do representante que tem esses bloqueios (o gerente)",
     "notas.configurar": "Alterar a natureza da operação e o CFOP das notas (venda, remessa, retorno, devolução)",
 }

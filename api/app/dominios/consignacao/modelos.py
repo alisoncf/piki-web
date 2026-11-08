@@ -287,14 +287,74 @@ class PagamentoAcerto(Base):
 
 
 class ComissaoParcela(Base):
-    """A parte da comissão do acerto para o cliente que vai em cada parcela do carnê (tab_comissparc do VB6): o
-    representante ganha conforme o cliente paga."""
+    """A parte da comissão do acerto para o cliente que vai em cada parcela do carnê (tab_comissparc do VB6): fica
+    liberada no vencimento e vai sendo baixada conforme a loja paga ao representante.
+
+    As linhas importadas do VB6 não têm o acerto (que não veio) e, se o carnê já estava quitado, nem a parcela: o que o
+    relatório mostra delas fica nos campos *_legado."""
 
     __tablename__ = "consignacao_comissao_parcela"
+    __table_args__ = (UniqueConstraint("empresa_id", "legado"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    acerto_id: Mapped[int] = mapped_column(ForeignKey("consignacao_acerto.id"), index=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), index=True)
+    acerto_id: Mapped[int | None] = mapped_column(ForeignKey("consignacao_acerto.id"), index=True)
     representante_id: Mapped[int] = mapped_column(ForeignKey("representante.id"), index=True)
-    parcela_id: Mapped[int] = mapped_column(ForeignKey("conta_receber_parcela.id"), unique=True)
+    parcela_id: Mapped[int | None] = mapped_column(ForeignKey("conta_receber_parcela.id"), unique=True)
+    # o vencimento com que a parcela nasceu; não acompanha a prorrogação, como no VB6
+    vencimento: Mapped[date] = mapped_column(Date, index=True)
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))  # no VB6 há linhas negativas
+    pago: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal("0.00"))
+    legado: Mapped[str | None] = mapped_column(String(7))  # seq_itd
+    acerto_legado: Mapped[str | None] = mapped_column(String(7))
+    data_acerto_legado: Mapped[date | None] = mapped_column(Date)
+    cliente_legado: Mapped[str | None] = mapped_column(String(80))
+    parcela_legado: Mapped[str | None] = mapped_column(String(20))  # "2/5" ou "cheque 2/5"
+    valor_parcela_legado: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+
+    @property
+    def situacao(self) -> str:
+        if self.pago == self.valor:
+            return "paga"
+        return "parcial" if self.pago else "aberta"
+
+
+class PagamentoComissao(Base):
+    """O que a loja pagou ao representante: sai do caixa e baixa as comissões liberadas. Os importados do VB6 não
+    têm lançamento, forma nem usuário."""
+
+    __tablename__ = "consignacao_comissao_pagamento"
+    __table_args__ = (UniqueConstraint("empresa_id", "legado"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    empresa_id: Mapped[int] = mapped_column(ForeignKey("empresa.id"), index=True)
+    representante_id: Mapped[int] = mapped_column(ForeignKey("representante.id"), index=True)
+    data_hora: Mapped[datetime] = mapped_column(DateTime)
     valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    forma_pagamento_id: Mapped[int | None] = mapped_column(ForeignKey("forma_pagamento.id"))
+    lancamento_id: Mapped[int | None] = mapped_column(ForeignKey("caixa_lancamento.id"))
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    estornado_em: Mapped[datetime | None] = mapped_column(DateTime)
+    estornado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
+    legado: Mapped[str | None] = mapped_column(String(7))  # seq_cai
+
+    representante: Mapped[Representante] = relationship(lazy="joined")
+    forma_pagamento: Mapped[FormaPagamento | None] = relationship(lazy="joined")
+    usuario: Mapped[Usuario | None] = relationship(foreign_keys=[usuario_id], lazy="joined")
+    estornado_por: Mapped[Usuario | None] = relationship(foreign_keys=[estornado_por_id], lazy="joined")
+    baixas: Mapped[list["BaixaComissao"]] = relationship(back_populates="pagamento", cascade="all, delete-orphan")
+
+
+class BaixaComissao(Base):
+    """Quanto de cada comissão um pagamento baixou: o pagamento parcial deixa o resto da linha em aberto."""
+
+    __tablename__ = "consignacao_comissao_baixa"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pagamento_id: Mapped[int] = mapped_column(ForeignKey("consignacao_comissao_pagamento.id", ondelete="CASCADE"), index=True)
+    comissao_id: Mapped[int] = mapped_column(ForeignKey("consignacao_comissao_parcela.id"), index=True)
+    valor: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+
+    pagamento: Mapped[PagamentoComissao] = relationship(back_populates="baixas")
+    comissao: Mapped[ComissaoParcela] = relationship()
 
